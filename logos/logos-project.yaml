@@ -1,0 +1,67 @@
+project:
+  name: dsh-root
+  description: ""
+  methodology: OpenLogos
+tech_stack: {}
+scenario_counter:
+  next_id: 34
+modules:
+  - id: core
+    name: 核心功能
+    lifecycle: launched
+    bootstrap: adopted
+    baseline_seed_state: seeded
+    skip_phases:
+      - api
+      - database
+      - scenario
+    deployment_required: true
+deployment_gates:
+  core:
+    deployment_required: true
+    smoke_required: true
+    environments:
+      - staging
+resource_index:
+  - path: logos/resources/prd/1-product-requirements/core-01-requirements.md
+    desc: dsh 需求文档。涉及产品定位、痛点 P01-P09、场景 S01-S33 与验收条件时必读。
+  - path: logos/resources/prd/2-product-design/1-feature-specs/core-01-feature-design.md
+    desc: core 功能规格（CLI/Web/Desktop/SDK 四交付面信息架构 + P0 场景交互规格）。涉及交互设计、功能规格时必读。
+  - path: logos/resources/prd/3-technical-plan/1-architecture/core-system-map.md
+    desc: core 系统地图（逆向基线，62 候选）。涉及 Cordis 服务缝、事件域、子系统划分时必读。
+  - path: logos/resources/prd/3-technical-plan/1-architecture/core-dependency-map.md
+    desc: core 依赖地图（分层模型与依赖规则）。涉及包依赖方向、分层约束时必读。
+  - path: logos/resources/prd/3-technical-plan/1-architecture/core-entry-points.md
+    desc: core 入口点清单（CLI/profile/SDK/路由）。涉及启动面、命令参数、发布入口时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-scenario-candidates.md
+    desc: core 场景候选清单（逆向基线，30 候选，verified:false）。涉及现状场景覆盖核对时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S31-fleet-gateway-login.md
+    desc: S31 网关登录场景时序（fleet 认证与开通）。涉及 user-fleet 认证链路实现时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S32-cross-user-isolation.md
+    desc: S32 跨用户隔离场景时序（归属判定与投递隔离）。涉及隔离验收时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S33-fleet-lifecycle.md
+    desc: S33 fleet 进程生命周期场景时序（开通/回收/重启/上限与 CPU 控制）。涉及 fleet 管理器实现时必读。
+  - path: logos/resources/prd/3-technical-plan/3-deployment/core-01-deployment-plan.md
+    desc: core 部署方案（分发拓扑、密钥、构建发布、回滚、冒烟策略）。涉及发布与部署检查时必读。
+  - path: logos/resources/test/core-S01-S10-test-cases.md
+    desc: S01-S10 入口与接入域测试用例（UT/ST-S01..S10）。涉及对应场景测试实现与验收时必读。
+  - path: logos/resources/test/core-S11-S20-test-cases.md
+    desc: S11-S20 会话协作域测试用例。涉及对应场景测试实现与验收时必读。
+  - path: logos/resources/test/core-S21-S30-test-cases.md
+    desc: S21-S30 数据安全人机域测试用例。涉及对应场景测试实现与验收时必读。
+  - path: logos/resources/test/core-S31-S33-test-cases.md
+    desc: S31-S33 fleet 隔离域测试用例（UT/ST-S31..S33 + 验收执行 CPU 资源约束）。涉及 fleet 测试实现与验收时必读。
+  - path: logos/resources/test/smoke/core-smoke-test-cases.md
+    desc: 部署后冒烟用例 SMOKE-core-01..11。涉及 openlogos smoke 判定时必读。
+  - path: logos/resources/implementation/core-01-implementation.md
+    desc: core 实现清单（场景→主责包映射、验证命令、reporter 接入差距）。涉及实现定位时必读。
+  - path: logos/resources/reference/note/2026-10-06-multi-user-and-cluster-plan.md
+    desc: 用户数据隔离与集群部署差距分析及 M1-M4 落地方案。涉及多用户、共享存储、执行池、分布式调度的变更提案前必读。
+conventions:
+  - 遵循 OpenLogos 三层推进模型（Why → What → How）
+  - 每次变更必须先创建 logos/changes/ 变更提案
+baseline_index:
+  core:
+    source_hash: 8f3e86787140013df139dcafc7e90f8dc99e58017dcc07c4d7aeb4ab979a072e
+    denominator: 133
+    generated_at: 2026-10-06T05:47:20.008Z

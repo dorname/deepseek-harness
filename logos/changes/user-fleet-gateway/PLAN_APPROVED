@@ -1,0 +1,1 @@
+plan-exit approved by user (interactive confirmation) at 2026-10-06 — proposal user-fleet-gateway, 9 delta tasks, change-lint PASS 7/7. User additionally required: acceptance-test execution must cap CPU utilization (reflected in deployment plan checks, S33 acceptance, smoke SMOKE-core-11).
