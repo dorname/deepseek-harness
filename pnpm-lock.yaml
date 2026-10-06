@@ -8724,6 +8724,18 @@ importers:
         specifier: workspace:*
         version: link:../../typert/protocol
 
+  packages/fleet/fleet-manager:
+    devDependencies:
+      '@deepseek-ai/dsh-home-paths':
+        specifier: workspace:~
+        version: link:../../util/home-paths
+
+  packages/fleet/gateway:
+    devDependencies:
+      '@deepseek-ai/dsh-fleet-manager':
+        specifier: workspace:~
+        version: link:../fleet-manager
+
   packages/fs/fs:
     devDependencies:
       '@deepseek-ai/cordis':

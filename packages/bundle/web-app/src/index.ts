@@ -65,6 +65,13 @@ export interface Config {
   publicUrl?: string
   /** Explicit `--trusted-host` authorities from this invocation. */
   trustedHosts: string[]
+  /**
+   * This process is reverse-proxied by a loopback User Fleet gateway: the
+   * /api fence binds the gateway's forwarded authority instead of the
+   * loopback Host. Only valid while the server binds loopback — the gateway
+   * is otherwise not the only loopback peer able to set forwarded headers.
+   */
+  trustLoopbackGateway: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -73,6 +80,7 @@ export const Config: z<Config> = z.object({
   surfaceContext: z.boolean().default(true),
   publicUrl: z.transform(z.string(), value => parsePublicUrl(value).href),
   trustedHosts: z.array(String).default([]),
+  trustLoopbackGateway: z.boolean().default(false),
 })
 
 /** Bind-dependent Web values shared by the trust fence and URL display. */
@@ -81,6 +89,8 @@ export interface WebRuntimeValues {
   lanAddresses: string[]
   /** LAN literals followed by explicit invocation authorities. */
   trustedHosts: string[]
+  /** Whether the /api fence binds the loopback gateway's forwarded authority. */
+  trustLoopbackGateway: boolean
 }
 
 /** Environment variable naming the advertised URL of this Web GUI. */
@@ -239,7 +249,10 @@ export const internals: {
  * @param config - validated {@link Config}.
  */
 export function apply(ctx: Context, config: Config): void {
-  const runtime = resolveLanTrust(ctx.webServer.host, config.trustedHosts)
+  const runtime: WebRuntimeValues = {
+    ...resolveLanTrust(ctx.webServer.host, config.trustedHosts),
+    trustLoopbackGateway: config.trustLoopbackGateway,
+  }
   // The schema validates a present string; an explicit YAML `null` bypasses
   // the string transform and reaches here, meaning unset.
   const publicUrl = config.publicUrl ?? undefined

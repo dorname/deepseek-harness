@@ -4,7 +4,9 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   ANONYMOUS_USER_ID_FILE_NAME,
+  DSH_FLEET_USER_ID_ENV,
   getOrCreateAnonymousUserId,
+  resolveAuditUserId,
 } from '../src/index.ts'
 
 const dirs: string[] = []
@@ -100,6 +102,50 @@ describe('getOrCreateAnonymousUserId', () => {
     } finally {
       if (previous === undefined) delete process.env.DSH_HOME
       else process.env.DSH_HOME = previous
+    }
+  })
+})
+
+describe('resolveAuditUserId', () => {
+  it('attributes to the fleet subject when the fleet injects one', () => {
+    expect(resolveAuditUserId({ env: { [DSH_FLEET_USER_ID_ENV]: 'user-a' } })).toEqual({ kind: 'fleet', subject: 'user-a' })
+  })
+
+  it('trims surrounding whitespace from the injected subject', () => {
+    expect(resolveAuditUserId({ env: { [DSH_FLEET_USER_ID_ENV]: '  user-a\n' } })).toEqual({ kind: 'fleet', subject: 'user-a' })
+  })
+
+  it('falls back to the anonymous id when no fleet subject is injected', () => {
+    const home = tempHome()
+    const audit = resolveAuditUserId({ env: { DSH_HOME: home } })
+    expect(audit.kind).toBe('anonymous')
+    expect(audit).toEqual({ kind: 'anonymous', id: getOrCreateAnonymousUserId({ env: { DSH_HOME: home } }) })
+  })
+
+  it('reads the process environment when no env seam is passed', () => {
+    const home = tempHome()
+    const previous = process.env.DSH_HOME
+    const injected = process.env[DSH_FLEET_USER_ID_ENV]
+    try {
+      Reflect.deleteProperty(process.env, DSH_FLEET_USER_ID_ENV)
+      process.env.DSH_HOME = home
+      const audit = resolveAuditUserId()
+      expect(audit).toEqual({ kind: 'anonymous', id: getOrCreateAnonymousUserId({ env: { DSH_HOME: home } }) })
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(process.env, 'DSH_HOME')
+      } else {
+        process.env.DSH_HOME = previous
+      }
+      if (injected !== undefined) {
+        process.env[DSH_FLEET_USER_ID_ENV] = injected
+      }
+    }
+  })
+
+  it('fails loud on a set-but-invalid fleet subject', () => {
+    for (const invalid of ['', '   ', 'a b', 'a\tb', 'x'.repeat(129)]) {
+      expect(() => resolveAuditUserId({ env: { [DSH_FLEET_USER_ID_ENV]: invalid } })).toThrow(DSH_FLEET_USER_ID_ENV)
     }
   })
 })

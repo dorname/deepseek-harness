@@ -71,11 +71,13 @@ export class HostConnectionService extends Service implements HostConnectionHand
    * @param ctx - owning Connection plugin context.
    * @param trustedHosts - deployment authorities accepted by the Host/Origin fence.
    * @param browserAuth - process token and persistent browser-session owner.
+   * @param trustForwardedAuthority - whether the fence binds the forwarded authority (loopback-gateway proxy mode).
    */
   constructor(
     ctx: Context,
     private readonly trustedHosts: readonly string[],
     private readonly browserAuth: BrowserAuth,
+    private readonly trustForwardedAuthority: boolean = false,
   ) {
     super(ctx, 'connection')
     this.operator = new OperatorPeer(ctx)
@@ -102,7 +104,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
 
   /** Apply the configured Host/Origin fence, then browser authentication. */
   requestRejection(request: ConnectionTrustRequest): ConnectionRequestRejection {
-    if (!isTrustedApiRequest(request, this.trustedHosts)) return 403
+    if (!isTrustedApiRequest(request, this.trustedHosts, { trustForwardedAuthority: this.trustForwardedAuthority })) return 403
     return this.browserAuth.isAuthenticated(request) ? undefined : 401
   }
 

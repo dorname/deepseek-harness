@@ -378,6 +378,8 @@
       "@deepseek-ai/dsh-goal": ["./packages/goal/goal/src"],
       "@deepseek-ai/dsh-goal-round-driver": ["./packages/goal/goal-round-driver/src"],
       "@deepseek-ai/dsh-headless": ["./packages/bundle/headless/src"],
+      "@deepseek-ai/dsh-fleet-manager": ["./packages/fleet/fleet-manager/src"],
+      "@deepseek-ai/dsh-gateway": ["./packages/fleet/gateway/src"],
       "@deepseek-ai/dsh-home-paths": ["./packages/util/home-paths/src"],
       "@deepseek-ai/dsh-hook-protocol": ["./packages/hooks/hook-protocol/src"],
       "@deepseek-ai/dsh-hooks-claude-code": ["./packages/hooks/hooks-claude-code/src"],

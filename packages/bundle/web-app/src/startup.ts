@@ -36,6 +36,8 @@ export interface WebStartupValues {
   publicUrl?: string
   /** Explicit `--trusted-host` authorities, in argument order. */
   trustedHosts: string[]
+  /** `--trust-loopback-gateway`: bind the /api fence to the forwarded authority. */
+  trustLoopbackGateway: boolean
 }
 
 /** The web flag family, as commander parsed it. */
@@ -45,6 +47,7 @@ interface WebOptions {
   port?: string
   publicUrl?: string
   trustedHost?: string[]
+  trustLoopbackGateway?: boolean
 }
 
 /**
@@ -61,6 +64,7 @@ function webCommand(): Command {
     .option('--port <port>', 'listen port; pass 0 to let the OS pick a free one')
     .option('--public-url <url>', 'advertise this HTTP(S) root in the printed, opened, web-surface, and DSH_WEB_URL forms; grants no trust')
     .option('--trusted-host <authority...>', 'extra authority the /api browser-trust fence accepts (host or host:port; repeatable)')
+    .option('--trust-loopback-gateway', 'this process is reverse-proxied by a loopback User Fleet gateway; the /api fence binds the forwarded authority instead of the loopback Host (declare the gateway authority via --trusted-host)')
     .addHelpText('after', `
 Examples:
   dsh --profile web                          serve on the composed host and port
@@ -101,6 +105,7 @@ export function apply(ctx: Context): void {
       ...options.port !== undefined && { port: Number(options.port) },
       ...options.publicUrl !== undefined && { publicUrl: options.publicUrl },
       trustedHosts: options.trustedHost ?? [],
+      trustLoopbackGateway: options.trustLoopbackGateway === true,
     } satisfies WebStartupValues)
   })
   parseCmdline(ctx, program)

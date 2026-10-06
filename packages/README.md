@@ -36,6 +36,7 @@ Every package lives in exactly one group; new packages join existing groups, and
 | [`feedback/`](feedback/README.md) | Human feedback capture and command |
 | [`telemetry/`](telemetry/README.md) | Shared Cordis OTel reporting channels |
 | [`identity/`](identity/README.md) | Shared anonymous identity |
+| [`fleet/`](fleet/README.md) | User Fleet deployment components: per-user process registry and authenticated gateway |
 | [`llm/`](llm/README.md) | LLM capability family: abstract service + provider adapters |
 | [`subprocess/`](subprocess/README.md) | Subprocess capability family: Service Definition + local process-tree provider |
 | [`ssh/`](ssh/README.md) | POSIX remote connection with paired filesystem, subprocess and sandbox providers |

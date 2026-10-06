@@ -51,6 +51,16 @@ const userId = getOrCreateAnonymousUserId() // stable for the process lifetime
 
 The value is stable for the process and matches what the built-in features use; it changes only when the file is deleted and a later launch mints a replacement. Even when the home directory cannot be written, the value still works for the current run, so records keep flowing.
 
+### Attributing to a fleet user
+
+A User Fleet deployment runs one harness process per authenticated user and injects that user's subject through `DSH_FLEET_USER_ID`. `resolveAuditUserId` is the single entry point that turns this into the identity a record should carry: the fleet subject when injected, otherwise the anonymous id above. A set-but-invalid value fails loud instead of silently dropping attribution.
+
+```ts
+import { resolveAuditUserId } from '@deepseek-ai/dsh-anonymous-user-id'
+
+const audit = resolveAuditUserId() // { kind: 'fleet', subject } | { kind: 'anonymous', id }
+```
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -72,7 +82,7 @@ This section explains the design decisions behind the package and points at the 
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Library entry: `getOrCreateAnonymousUserId`, file persistence, per-path memoization |
+| [`src/index.ts`](src/index.ts) | Library entry: `getOrCreateAnonymousUserId`, `resolveAuditUserId`, file persistence, per-path memoization |
 | [`tests/anonymous-user-id.spec.ts`](tests/anonymous-user-id.spec.ts) | Exercised behavior: mint, persistence, corruption, concurrency, memoization |
 
 ### The API
@@ -122,6 +132,7 @@ These limits describe when the id is a poor fit or needs special attention. They
 - **No cross-home identity** — different `$DSH_HOME` values cannot be correlated.
 - **Configured DeepSeek gateways receive the id** — `dsh-llm-deepseek` sends the stable header to its resolved `baseURL`, including deployment overrides, independently of telemetry sharing mode.
 - **Deleting the file does not reset the current process** — memoization keeps the run's id until the next launch.
+- **The fleet subject is format-checked, not authenticated** — `resolveAuditUserId` validates the shape of `DSH_FLEET_USER_ID`; proving who the gateway authenticated is the gateway's job.
 
 <a id="dev-note"></a>
 ### Dev Note

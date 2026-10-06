@@ -33,6 +33,31 @@ describe('isTrustedApiRequest', () => {
     }), [])).toBe(false)
   })
 
+  it('binds the forwarded authority only when forwarded-authority trust is enabled', () => {
+    // Loopback-gateway proxying: the browser names the gateway authority while
+    // the proxied request carries the loopback Host. Without the option the
+    // loopback Host passes but the gateway Origin fails the same-origin check.
+    const proxied = request({
+      host: '127.0.0.1:9201',
+      'x-forwarded-host': 'fleet.example',
+      'x-forwarded-proto': 'https',
+      origin: 'https://fleet.example',
+    })
+    expect(isTrustedApiRequest(proxied, ['fleet.example'], { trustForwardedAuthority: true })).toBe(true)
+    expect(isTrustedApiRequest(proxied, [], { trustForwardedAuthority: true })).toBe(false)
+    expect(isTrustedApiRequest(proxied, ['fleet.example'])).toBe(false)
+  })
+
+  it('ignores malformed or unexpected forwarded authorities and keeps the Host fence', () => {
+    const base = { host: '127.0.0.1:9201' }
+    // A missing proto defaults to http; the forwarded authority must still pass the Host fence.
+    expect(isTrustedApiRequest(request({ ...base, 'x-forwarded-host': 'fleet.example' }), ['fleet.example'], { trustForwardedAuthority: true })).toBe(true)
+    // A non-HTTP forwarded scheme is not a deployment this fence understands: the loopback Host binds instead.
+    expect(isTrustedApiRequest(request({ ...base, 'x-forwarded-host': 'fleet.example', 'x-forwarded-proto': 'ftp' }), [], { trustForwardedAuthority: true })).toBe(true)
+    // The forwarded authority itself must still pass the Host fence.
+    expect(isTrustedApiRequest(request({ ...base, 'x-forwarded-host': 'evil.example' }), [], { trustForwardedAuthority: true })).toBe(false)
+  })
+
   it('accepts a declared public authority: exact on host:port entries, any port on port-less entries', () => {
     const headers = { host: 'harness.internal:3080', origin: 'http://harness.internal:3080' }
     expect(isTrustedApiRequest(request(headers), ['harness.internal:3080'])).toBe(true)

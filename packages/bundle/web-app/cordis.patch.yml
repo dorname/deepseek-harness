@@ -205,6 +205,7 @@
         publicUrl: !!js ctx.webStartup.publicUrl
         surfaceContext: true
         trustedHosts: !!js ctx.webStartup.trustedHosts
+        trustLoopbackGateway: !!js ctx.webStartup.trustLoopbackGateway
 
     # The client-plugin reload chain, always mounted: it is idle until a
     # rebuild watcher (pnpm run dev:web) actually rewrites client bundles. It
@@ -234,6 +235,10 @@
         # A deployment adding authorities keeps this expression and concatenates
         # its literals, for example: ['app.internal', ...ctx.webRuntime.trustedHosts].
         trustedHosts: !!js ctx.webRuntime.trustedHosts
+        # Loopback User Fleet gateway mode: the fence binds the gateway's
+        # forwarded authority, so the gateway authority must be declared in
+        # trustedHosts above.
+        trustForwardedAuthority: !!js ctx.webRuntime.trustLoopbackGateway
 
     # Raw Blob and ReadableStream uploads run independently of Connection's
     # RPC and generation service.

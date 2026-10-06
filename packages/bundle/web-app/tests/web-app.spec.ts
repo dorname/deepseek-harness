@@ -147,6 +147,7 @@ describe('web-app runtime glue', () => {
     expect(ctx.get('webRuntime')).toEqual({
       lanAddresses: ['192.168.1.5'],
       trustedHosts: ['192.168.1.5', 'lab.internal'],
+      trustLoopbackGateway: false,
     })
     expect(log).toHaveBeenCalledWith('dsh web: http://127.0.0.1:4567/?token=test-token (LAN: http://192.168.1.5:4567/?token=test-token)')
     expect(log).toHaveBeenCalledWith('dsh web: opening the default browser; pass --no-open to disable')

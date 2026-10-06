@@ -65,6 +65,7 @@ export const apply = ctx => globalThis.__webStartupApply(ctx)
     '    port: !!js ctx.webStartup.port ?? 3080',
     '    publicUrl: !!js ctx.webStartup.publicUrl',
     '    trustedHosts: !!js ctx.webStartup.trustedHosts',
+    '    trustLoopbackGateway: !!js ctx.webStartup.trustLoopbackGateway',
     '- id: provider',
     `  name: ${pathToFileURL(join(dir, 'provider.mjs')).href}`,
     '',
@@ -106,19 +107,34 @@ describe('web command-line provider', () => {
       openBrowser: false,
       port: 8080,
       trustedHosts: ['lab.internal', 'lab-2.internal', '10.0.0.9'],
+      trustLoopbackGateway: false,
     })
     expect(observed.readerConfig).toEqual(values)
     expect(observed.exits).toEqual([])
   })
 
-  it('leaves deployment values to each consumer when flags omit them', async () => {
-    const { values, observed } = await bootProvider([])
-    expect(values).toEqual({ openBrowser: true, trustedHosts: [] })
+  it('publishes --trust-loopback-gateway for the connection fence', async () => {
+    const { values, observed } = await bootProvider(['--trust-loopback-gateway'])
+    expect(values).toEqual({ openBrowser: true, trustedHosts: [], trustLoopbackGateway: true })
     expect(observed.readerConfig).toEqual({
       host: '127.0.0.1',
       openBrowser: true,
       port: 3080,
       trustedHosts: [],
+      trustLoopbackGateway: true,
+    })
+    expect(observed.exits).toEqual([])
+  })
+
+  it('leaves deployment values to each consumer when flags omit them', async () => {
+    const { values, observed } = await bootProvider([])
+    expect(values).toEqual({ openBrowser: true, trustedHosts: [], trustLoopbackGateway: false })
+    expect(observed.readerConfig).toEqual({
+      host: '127.0.0.1',
+      openBrowser: true,
+      port: 3080,
+      trustedHosts: [],
+      trustLoopbackGateway: false,
     })
   })
 
@@ -158,6 +174,7 @@ describe('web command-line provider', () => {
       openBrowser: true,
       publicUrl: 'https://web.example/ui',
       trustedHosts: ['lab.internal'],
+      trustLoopbackGateway: false,
     })
     expect(observed.readerConfig).toEqual({
       host: '127.0.0.1',
@@ -165,6 +182,7 @@ describe('web command-line provider', () => {
       port: 3080,
       publicUrl: 'https://web.example/ui',
       trustedHosts: ['lab.internal'],
+      trustLoopbackGateway: false,
     })
     expect(observed.exits).toEqual([])
   })

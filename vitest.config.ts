@@ -35,6 +35,9 @@ const windowsUnsupportedPackages = process.platform === 'win32'
       'packages/sandbox/sandbox-local',
       // OpenSSH multiplexing and Unix-socket helper streams require POSIX endpoints.
       'packages/ssh/*',
+      // Fleet lifecycle tests drive POSIX child-process semantics (SIGTERM
+      // delivery to a handler, SIGKILL), and the fleet target host is POSIX.
+      'packages/fleet/*',
     ]
   : []
 

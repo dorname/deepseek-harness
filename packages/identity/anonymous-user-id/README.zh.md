@@ -51,6 +51,16 @@ const userId = getOrCreateAnonymousUserId() // stable for the process lifetime
 
 该值在进程内保持稳定，并与内置功能使用的值一致；只有当文件被删除、后续启动生成替代值时才会改变。即使 home 目录不可写，该值在本次运行中依然可用，记录因此不会中断。
 
+### 归属到 fleet 用户
+
+User Fleet 部署为每个已认证用户运行一个 harness 进程，并通过 `DSH_FLEET_USER_ID` 注入该用户的 subject。`resolveAuditUserId` 是把注入值转换为记录应携带身份的唯一入口：注入时返回 fleet subject，否则返回上文的匿名 id。注入但非法的值会直接失败，而不是悄悄丢弃归属。
+
+```ts
+import { resolveAuditUserId } from '@deepseek-ai/dsh-anonymous-user-id'
+
+const audit = resolveAuditUserId() // { kind: 'fleet', subject } | { kind: 'anonymous', id }
+```
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -72,7 +82,7 @@ const userId = getOrCreateAnonymousUserId() // stable for the process lifetime
 
 | 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | 库入口：`getOrCreateAnonymousUserId`、文件持久化、按路径记忆化 |
+| [`src/index.ts`](src/index.ts) | 库入口：`getOrCreateAnonymousUserId`、`resolveAuditUserId`、文件持久化、按路径记忆化 |
 | [`tests/anonymous-user-id.spec.ts`](tests/anonymous-user-id.spec.ts) | 测试覆盖的行为：生成、持久化、损坏、并发、记忆化 |
 
 ### API
@@ -122,6 +132,7 @@ const userId = getOrCreateAnonymousUserId() // stable for the process lifetime
 - **没有跨 home 身份**——不同 `$DSH_HOME` 值之间无法关联。
 - **已配置的 DeepSeek 网关会收到该 id**——`dsh-llm-deepseek` 会把稳定标头发送至解析后的 `baseURL`（包括部署覆盖），且不受遥测共享模式影响。
 - **删除文件不会重置当前进程**——记忆化会让本次运行的 id 一直保留到下次启动。
+- **fleet subject 只做格式校验，不做认证**——`resolveAuditUserId` 校验 `DSH_FLEET_USER_ID` 的形态；证明网关认证了谁，是网关的职责。
 
 <a id="dev-note"></a>
 ### 开发备注

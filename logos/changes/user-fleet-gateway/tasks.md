@@ -12,7 +12,11 @@
 - [x] 产出 delta 文件到 `deltas/test/smoke/` — core-smoke-test-cases.md：MODIFIED「二、冒烟测试用例」表追加 SMOKE-core-09..11（整表守恒携带既有 8 行，SMOKE-core-11 含 CPU 利用率上限）与「三、覆盖度校验」更新
 
 ## [code] 代码实现
-（本段在 plan 段留空：本提案需要代码实现（dsh-gateway、dsh-fleet-manager 新组件；web-app 网关转发头配置与 anonymous-user-id fleet 身份注入两处小改），但 `[code]` 切片由 merge 后的 slice-planner 基于已合并规格和真实 UT/ST ID 统一规划。此处仅保留 `## [code]` 标题，勿提前填写切片项。）
+> 删后续自检（slice-planner）：六维打分 12（跨模块/状态机/契约变更/15+3 用例/部署安全/1 假设）→ 大任务。垂直拆 3 片（fleet 生命周期线 → 网关认证隔离线 → 部署编排与 smoke 线），逐片过删后续门：(a) 各片删后续后全量 verify 仅缺未实现片的 ID（specs 缺 ID 不判红，已上报结果须全绿）成立；(b) 各片均有端到端可观察能力（片1 生命周期管理与审计归属、片2 登录进专属 Harness、片3 SMOKE 全链路），无铺管道片；片 2/3 依赖片 1/2 的产物属串行顺序而非前向依赖。无合并。
+
+- [x] 切片1 fleet 用户进程生命周期：新建 `packages/fleet/fleet-manager`（@deepseek-ai/dsh-fleet-manager）——进程注册表 `ensureProcess(subject)`、spawn `dsh --profile web`（OS 分配端口、注入该用户 `DSH_HOME` 与 fleet 身份 env）、空闲回收（home 保留）、崩溃重启（次数上限）、并发上限裁决（rejected(limit)）、结构化生命周期日志（provisioned/recycled/restarted/rejected）；小改 `packages/identity/anonymous-user-id` 支持读取 fleet 注入用户标识用于审计归属；同片 UT-S33-01/02/03、ST-S33-01/02 + OpenLogos reporter 写入 `logos/resources/verify/test-results.jsonl`
+- [x] 切片2 网关认证与跨用户隔离路由：新建 `packages/fleet/gateway`（@deepseek-ai/dsh-gateway）——OIDC 授权码流程（发现/回调/code 换 token，测试提供方可 mock）、网关会话 cookie、按身份经 fleet 注册表路由反代到用户进程 loopback 端口、跨用户归属判定 403 不转发、启动令牌仅回环内层；小改 `packages/bundle/web-app` startup 新增「信任 loopback 网关转发头」配置项；同片 UT-S31-01/02/03、UT-S32-01/02、ST-S31-01/02、ST-S32-01/02 + reporter
+- [ ] 切片3 fleet 部署编排与 smoke 闭环：本地 staging 部署编排（fleet-manager + gateway 启动配置与回滚脚本）、ST-S33-03 验收执行 CPU 约束 runner（小上限满载 + 串行执行 + CPU 峰值监控 ≤ 部署配置阈值）；实现/更新 smoke runner 覆盖 SMOKE-core-09/10/11（网关认证路由、双用户隔离抽查、生命周期与资源上限），结果写 `logos/resources/verify/smoke-results.jsonl`，接入 `logos.config.json` smoke 命令（`scripts/run-smoke.js`），完成后跑 smoke 覆盖预检
 
 ## [deploy] 部署任务
 - [ ] 按更新后的部署方案在 staging（本地 staging 验证环境）部署 fleet 形态：构建产物 → 启动 fleet 管理器与网关 → 双测试用户走通 SMOKE-core-09..11

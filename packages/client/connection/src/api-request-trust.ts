@@ -82,23 +82,58 @@ function isTrustedAuthority(hostUrl: URL, trustedHosts: readonly string[]): bool
   })
 }
 
+/** Fence options for deployments where a reverse proxy rewrites the authority. */
+export interface TrustFenceOptions {
+  /**
+   * Accept `x-forwarded-host`/`x-forwarded-proto` as the request authority.
+   * For a User Fleet gateway reverse proxying into this process over
+   * loopback: the browser's Host/Origin name the gateway authority, while the
+   * proxied request carries the loopback Host. Only enable this when the
+   * process binds loopback — every loopback process can otherwise forge the
+   * forwarded headers; authentication itself is unchanged and still requires
+   * the process cookie.
+   */
+  trustForwardedAuthority?: boolean
+}
+
+/** Authority named by the forwarded headers, or `undefined` when absent/malformed. */
+function forwardedAuthority(headers: ConnectionTrustRequest['headers']): URL | undefined {
+  const host = header(headers, 'x-forwarded-host')
+  if (host === undefined) return undefined
+  const proto = header(headers, 'x-forwarded-proto') ?? 'http'
+  if (proto !== 'http' && proto !== 'https') return undefined
+  try {
+    return new URL(`${proto}://${host}`)
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * Decide whether one /api request may reach the RPC bridge.
  * @param request - Node HTTP or Fetch request facts (headers).
  * @param trustedHosts - non-loopback authorities this deployment serves: exact `host:port`, or port-less `host` matching any port.
- * @returns true when the Host is ours (loopback or trusted) and any attached browser markers are same-origin.
+ * @param options - fence options; see {@link TrustFenceOptions}.
+ * @returns true when the authority is ours (loopback or trusted) and any attached browser markers are same-origin.
  */
-export function isTrustedApiRequest(request: ConnectionTrustRequest, trustedHosts: readonly string[]): boolean {
+export function isTrustedApiRequest(
+  request: ConnectionTrustRequest,
+  trustedHosts: readonly string[],
+  options: TrustFenceOptions = {},
+): boolean {
   // Host fence (DNS-rebinding defense), applied to every request: the browser
   // fills Host from the URL it believes it is talking to, so a rebound page
   // carries the attacker's domain here even though the socket lands on this
   // server. There is no marker shortcut — a browser read over plain HTTP
   // (images and navigations) arrives with neither Origin nor
   // Fetch-Metadata, indistinguishable from curl, and its response is readable
-  // by the rebound page.
+  // by the rebound page. A loopback gateway proxy rewrites Host to the
+  // loopback authority; when forwarded-authority trust is enabled, the
+  // gateway's forwarded authority binds the request instead.
   const host = header(request.headers, 'host')
   if (host === undefined) return false
-  const hostUrl = parseAuthority(host)
+  const hostUrl = (options.trustForwardedAuthority === true ? forwardedAuthority(request.headers) : undefined)
+    ?? parseAuthority(host)
   if (hostUrl === undefined) return false
   if (!isLoopbackHostname(hostUrl.hostname) && !isTrustedAuthority(hostUrl, trustedHosts)) return false
   // Cross-site fence: modern browsers label the initiator relationship on
