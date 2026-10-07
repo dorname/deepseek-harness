@@ -1,15 +1,6 @@
-# core: 部署后冒烟测试用例
+# delta — core-smoke-test-cases.md（变更 shared-persistence-backends）
 
-> 最后更新：2026-10-07
-> 来源：`logos/resources/prd/3-technical-plan/3-deployment/core-01-deployment-plan.md` §八。SMOKE-* 结果写入 `logos/resources/verify/smoke-results.jsonl`（`openlogos smoke` 判定）。
-
-## 一、冒烟测试范围
-
-| 环境 | 覆盖范围 | 说明 |
-|------|----------|------|
-| staging | 健康检查、核心入口、静态资源、配置与密钥、关键链路、日志、fleet 认证与隔离 | launch/发布前必跑；dsh 无集中服务器，staging = 发布验证环境（干净机器或 CI 容器）；fleet 用例按部署配置的小并发上限串行执行 |
-
-## 二、冒烟测试用例
+## MODIFIED — 二、冒烟测试用例
 
 | ID | 描述 | 来源 | 目标环境 | 前置条件 | 操作 | 预期结果 |
 |----|------|------|----------|----------|------|----------|
@@ -27,7 +18,7 @@
 | SMOKE-core-12 | 共享持久层双节点互见 | 部署方案 §七.9 / §八·共享持久层 | staging | 共享 Postgres 运行；两个 dsh Host 实例指向同库 | 节点 A 创建会话并提交 → 节点 B 打开同一用户同一会话 | B 读到与 A 一致的事件与头；串行执行，CPU 峰值 ≤ 部署配置阈值 |
 | SMOKE-core-13 | 每用户命名空间互不可见 | 部署方案 §七.10 / §八·共享持久层 | staging | 同上；两实例分别注入不同 fleet subject | A 域写 → B 域读同名键 → B 域写 → A 域读 | 双向均只见自己命名空间的值 |
 
-## 三、覆盖度校验
+## MODIFIED — 三、覆盖度校验
 
 - [x] 健康检查：SMOKE-core-01/02
 - [x] 核心入口：SMOKE-core-03
