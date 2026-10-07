@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>DeepSeek Harness Code Tour</title>
+<style>
+/* DeepSeek Harness Code Tour — 离线单文件样式 */
+
+:root {
+  --bg: #0d1117;
+  --bg-soft: #161b27;
+  --bg-card: #1a2130;
+  --bg-card-hover: #212a3d;
+  --line: #2c3648;
+  --text: #e6edf6;
+  --text-dim: #9aa7bc;
+  --text-faint: #6b7a93;
+  --accent: #38bdf8;
+
+  /* 层语义色：protocol / runtime / storage / extension / host / external */
+  --layer-protocol: #a78bfa;
+  --layer-runtime: #38bdf8;
+  --layer-storage: #34d399;
+  --layer-extension: #fbbf24;
+  --layer-host: #f472b6;
+  --layer-external: #94a3b8;
+
+  /* 关系语义色 */
+  --edge-main: #22d3ee;
+  --edge-support: #64748b;
+  --edge-orchestration: #a78bfa;
+  --edge-planned: #475569;
+
+  /* 依赖高亮 */
+  --hl-deps: #38bdf8;
+  --hl-dependents: #fb923c;
+
+  --ver-verified: #34d399;
+  --ver-partial: #fbbf24;
+  --ver-unverified: #f87171;
+
+  --mono: "SFMono-Regular", ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.6 "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* ── 顶栏 ─────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 52px;
+  padding: 0 16px;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--line);
+  position: relative;
+  z-index: 30;
+}
+.brand h1 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: .5px;
+  white-space: nowrap;
+}
+.brand em { font-style: normal; color: var(--accent); }
+.brand small {
+  display: block;
+  font-size: 10px;
+  color: var(--text-faint);
+  font-weight: normal;
+  letter-spacing: 0;
+}
+.tabs { display: flex; gap: 2px; flex: 1; min-width: 0; overflow-x: auto; }
+.tabs button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tabs button:hover { background: var(--bg-card); color: var(--text); }
+.tabs button.active { background: var(--bg-card); color: var(--accent); font-weight: 600; }
+
+.search-wrap { position: relative; width: 300px; flex-shrink: 0; }
+.search-wrap input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  outline: none;
+}
+.search-wrap input:focus { border-color: var(--accent); }
+.search-results {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 420px;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .5);
+  z-index: 50;
+}
+.search-results.open { display: block; }
+.search-hit {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+}
+.search-hit:last-child { border-bottom: 0; }
+.search-hit:hover { background: var(--bg-card-hover); }
+.search-hit .hit-kind {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 0 5px;
+  margin-right: 8px;
+  vertical-align: 1px;
+}
+.search-hit .hit-sub { display: block; font-size: 11px; color: var(--text-faint); font-family: var(--mono); }
+.search-empty { padding: 12px; color: var(--text-faint); }
+
+/* ── 主布局 ───────────────────────────────────────── */
+.shell { display: flex; height: calc(100% - 52px); }
+.main { flex: 1; min-width: 0; overflow: auto; padding: 18px; position: relative; }
+.side {
+  width: 380px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--line);
+  background: var(--bg-soft);
+  display: flex;
+  flex-direction: column;
+}
+.side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.side-head h2 { margin: 0; font-size: 14px; color: var(--text-dim); }
+.side-body { flex: 1; overflow-y: auto; padding: 14px 16px; }
+.detail-empty { color: var(--text-faint); padding: 8px 2px; }
+
+/* ── 通用组件 ─────────────────────────────────────── */
+.btn {
+  appearance: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.btn:hover { background: var(--bg-card-hover); border-color: var(--accent); }
+.btn.ghost { background: transparent; color: var(--text-dim); }
+.btn.ghost:hover { color: var(--text); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #06202e; font-weight: 600; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  border-radius: 4px;
+  padding: 1px 6px;
+  border: 1px solid;
+  vertical-align: 1px;
+}
+.badge.verified { color: var(--ver-verified); border-color: var(--ver-verified); }
+.badge.partial { color: var(--ver-partial); border-color: var(--ver-partial); }
+.badge.unverified { color: var(--ver-unverified); border-color: var(--ver-unverified); }
+
+.chip {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 8px;
+  margin: 0 4px 4px 0;
+}
+.chip.layer-protocol { color: var(--layer-protocol); border-color: var(--layer-protocol); }
+.chip.layer-runtime { color: var(--layer-runtime); border-color: var(--layer-runtime); }
+.chip.layer-storage { color: var(--layer-storage); border-color: var(--layer-storage); }
+.chip.layer-extension { color: var(--layer-extension); border-color: var(--layer-extension); }
+.chip.layer-host { color: var(--layer-host); border-color: var(--layer-host); }
+.chip.layer-external { color: var(--layer-external); border-color: var(--layer-external); }
+
+.file-link {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  word-break: break-all;
+}
+.file-link:hover { text-decoration: underline; }
+.sym { font-family: var(--mono); font-size: 12px; color: #c3e88d; }
+
+.detail h3 { margin: 4px 0 10px; font-size: 16px; }
+.detail dl { margin: 0; }
+.detail dt {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  margin-top: 14px;
+}
+.detail dd { margin: 3px 0 0; }
+.detail .rel-list { margin: 4px 0 0; padding: 0; list-style: none; }
+.detail .rel-list li { margin: 2px 0; }
+.rel-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--accent);
+  cursor: pointer;
+}
+.rel-link:hover { text-decoration: underline; }
+.evidence-block {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+/* ── 概览视图 ─────────────────────────────────────── */
+.hero h2 { margin: 0 0 6px; font-size: 22px; }
+.hero p.lead { color: var(--text-dim); max-width: 860px; margin: 0 0 4px; }
+.hero .one-line {
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 14px 0;
+  max-width: 860px;
+}
+.ov-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+  max-width: 1100px;
+}
+.ov-card {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.ov-card h4 { margin: 0 0 6px; font-size: 13px; color: var(--accent); }
+.ov-card p { margin: 0; font-size: 12.5px; color: var(--text-dim); }
+.ov-stats { margin: 18px 0 0; color: var(--text-faint); font-size: 12px; }
+.ov-stats b { color: var(--text); }
+.section-title { margin: 26px 0 10px; font-size: 15px; }
+
+/* ── 图画布（架构 / 依赖 / 执行流共用） ───────────── */
+.canvas-tools {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.canvas-tools .spacer { flex: 1; }
+.canvas-tools .hint { font-size: 11px; color: var(--text-faint); }
+.canvas-scroll { overflow-x: auto; padding-bottom: 8px; }
+.canvas {
+  position: relative;
+  min-width: 900px;
+  transition: transform .12s ease;
+  transform-origin: top left;
+}
+.canvas svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.edge-path { fill: none; stroke-width: 1.6; }
+.edge-path.edge-main { stroke: var(--edge-main); stroke-width: 2.2; }
+.edge-path.edge-support { stroke: var(--edge-support); }
+.edge-path.edge-orchestration { stroke: var(--edge-orchestration); stroke-dasharray: 6 4; }
+.edge-path.edge-planned { stroke: var(--edge-planned); stroke-dasharray: 4 4; }
+.edge-path.hl-deps { stroke: var(--hl-deps); stroke-width: 2.6; }
+.edge-path.hl-dependents { stroke: var(--hl-dependents); stroke-width: 2.6; }
+.edge-path.dimmed { opacity: .14; }
+.edge-label { font-size: 10px; fill: var(--text-faint); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
+
+/* 泳道架构图 */
+.lanes { display: flex; gap: 14px; align-items: stretch; }
+.lane { flex: 1; min-width: 168px; }
+.lane-head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-faint);
+  border-bottom: 1px dashed var(--line);
+  padding-bottom: 5px;
+  margin-bottom: 10px;
+}
+.node {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0 0 10px;
+  cursor: pointer;
+  transition: background .12s ease, border-color .12s ease;
+}
+.node:hover { background: var(--bg-card-hover); }
+.node.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+.node.hl-deps { border-color: var(--hl-deps); box-shadow: 0 0 0 1px var(--hl-deps); }
+.node.hl-dependents { border-color: var(--hl-dependents); box-shadow: 0 0 0 1px var(--hl-dependents); }
+.node.dimmed { opacity: .3; }
+.node .n-title { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.node .n-sub { font-size: 11px; color: var(--text-faint); font-family: var(--mono); margin-top: 2px; word-break: break-all; }
+.node .n-desc { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; }
+
+/* 依赖图节点复用 .node，网格布局 */
+.dep-grid { display: flex; gap: 14px; }
+.dep-col { flex: 1; min-width: 170px; }
+
+/* ── 执行流视图 ───────────────────────────────────── */
+.flow-lib { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.flow-card {
+  text-align: left;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.flow-card:hover { background: var(--bg-card-hover); border-color: var(--accent); }
+.flow-card h4 { margin: 0 0 4px; font-size: 14px; }
+.flow-card .fc-meta { font-size: 11px; color: var(--text-faint); margin-bottom: 6px; }
+.flow-card p { margin: 0; font-size: 12px; color: var(--text-dim); }
+.flow-head { margin: 0 0 10px; }
+.flow-head h3 { margin: 0 0 4px; font-size: 18px; }
+.flow-head p { margin: 0; color: var(--text-dim); font-size: 13px; }
+.flow-steps { position: relative; padding-left: 30px; }
+.flow-steps::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--line);
+}
+.flow-node {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0 0 14px;
+  cursor: pointer;
+  max-width: 720px;
+}
+.flow-node::before {
+  content: "";
+  position: absolute;
+  left: -25px;
+  top: 14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--edge-main);
+  box-shadow: 0 0 0 3px var(--bg);
+}
+.flow-node:hover { background: var(--bg-card-hover); }
+.flow-node.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+.flow-node .fn-idx {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--edge-main);
+  border: 1px solid var(--edge-main);
+  border-radius: 4px;
+  padding: 0 5px;
+  margin-right: 8px;
+}
+.flow-node .fn-title { font-weight: 600; font-size: 13px; }
+.flow-node .fn-meta { font-size: 11px; color: var(--text-faint); font-family: var(--mono); margin-top: 3px; word-break: break-all; }
+.flow-backedge-note {
+  max-width: 720px;
+  font-size: 11.5px;
+  color: var(--ver-partial);
+  border: 1px dashed var(--ver-partial);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: -6px 0 14px;
+}
+
+/* ── 模块视图 ─────────────────────────────────────── */
+.mod-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+
+/* ── 阅读路线 ─────────────────────────────────────── */
+.path-step {
+  display: flex;
+  gap: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  max-width: 920px;
+}
+.path-idx {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.path-body h4 { margin: 0 0 4px; font-size: 14px; }
+.path-body p { margin: 2px 0; font-size: 12.5px; color: var(--text-dim); }
+.path-body .why { color: var(--text); }
+.path-skip { color: var(--text-faint); font-size: 11.5px; }
+
+/* ── toast ────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+  z-index: 99;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── 窄屏 ─────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  body { overflow: auto; }
+  .shell { flex-direction: column; height: auto; }
+  .side { width: 100%; border-left: 0; border-top: 1px solid var(--line); max-height: 46vh; }
+  .search-wrap { width: 200px; }
+  .brand small { display: none; }
+}
+@media (max-width: 720px) {
+  .topbar { flex-wrap: wrap; height: auto; padding: 8px 12px; }
+  .tabs { order: 3; width: 100%; }
+  .search-wrap { flex: 1; width: auto; }
+  .search-results { width: 100%; }
+  .main { padding: 12px; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><h1>DSH <em>Code Tour</em><small>openlogos/align-core-specs · e6e0635c8f · 离线单文件</small></h1></div>
+  <nav class="tabs" id="tabs"></nav>
+  <div class="search-wrap">
+    <input id="search" type="search" placeholder="搜索模块 / 文件 / 符号…" autocomplete="off"/>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+</header>
+<div class="shell">
+  <main class="main" id="main"></main>
+  <aside class="side">
+    <div class="side-head"><h2>详情</h2><button class="btn ghost" id="btnBack" type="button">返回上一级</button></div>
+    <div class="side-body" id="detail"><div class="detail-empty">点击图中的节点，查看职责、文件、符号与证据。</div></div>
+  </aside>
+</div>
+<script>
+/* Code Tour Explorer — 读取内嵌 TOUR 数据，渲染概览/架构/依赖/执行流/模块/阅读路线六视图。 */
+const TOUR = {"meta":{"project":"DeepSeek Harness","branch":"openlogos/align-core-specs","commit":"e6e0635c8fa1084cf227f84b582ceae395a4d596","sources":["manifest","docs/architecture.md","README","source"],"depMainChain":["app-boot","web-app","cordis","agent-loop","session","session-persistence","session-persistence-jsonl","llm","llm-deepseek","tools","system-prompt"],"note":"验证策略：模块依赖逐条抄自各包 package.json 的 dependencies/peerDependencies（manifest 证据）；执行流步骤的文件/符号/行号由四路并行源码取证逐一核实（标注 verified），仅无法落到具体行号的步骤标 partial。overviewEdges 的边语义统一为「调用方 → 被调方」。"},"overviewNodes":[{"id":"browser","label":"浏览器","layer":"external","packages":["packages/client/*（63 个 UI 包）"],"responsibility":"加载 Web 客户端：登录、会话 UI、实时事件订阅与 RPC 调用。","modules":[],"keyFiles":["packages/client/connection/src/client/connection.ts"],"keySymbols":["ConnectionController","createWebConnectionRpc"],"dependsOn":["gateway","web-app"],"usedBy":[],"readingPriority":9,"verification":"verified","evidence":"packages/client/connection/src/client/rpc.ts:34-70 fetch POST 通道；connection.ts:77-285 重连主循环"},{"id":"oidc","label":"OIDC 提供方","layer":"external","packages":["外部 IdP（测试环境为 in-process 提供方）"],"responsibility":"颁发授权码与 id_token，是 fleet 网关登录的身份源。","modules":[],"keyFiles":["packages/fleet/gateway/src/oidc.ts"],"keySymbols":["discoverOidc"],"dependsOn":[],"usedBy":["gateway"],"readingPriority":9,"verification":"verified","evidence":"packages/fleet/gateway/src/oidc.ts:42-53 GET /.well-known/openid-configuration"},{"id":"model-api","label":"DeepSeek API","layer":"external","packages":["外部模型服务"],"responsibility":"接收 /messages HTTPS 流式请求并返回 SSE 事件流。","modules":[],"keyFiles":["packages/llm/llm-deepseek/src/adapter.ts"],"keySymbols":[],"dependsOn":[],"usedBy":["deepseek"],"readingPriority":9,"verification":"verified","evidence":"packages/llm/llm-deepseek/src/adapter.ts:120 fetch(/messages)（serialize.ts:56+ 构造请求体）"},{"id":"cli","label":"dsh CLI 启动器","layer":"host","packages":["apps/cli"],"responsibility":"解析 argv，把 `dsh web` 等位置参数展开为 --profile，按 profile 启动应用。","modules":["app-boot"],"keyFiles":["apps/cli/src/bin.ts","apps/cli/src/args.ts"],"keySymbols":["runCli","parseDshArgs"],"dependsOn":["app-boot"],"usedBy":[],"readingPriority":2,"verification":"verified","evidence":"bin.ts:26-74 runCli 按 mode 分派；args.ts:201-205 位置参数展开为 --profile"},{"id":"app-boot","label":"Profile/Bundle 组合","layer":"host","packages":["@deepseek-ai/dsh-app-boot · packages/boot/app-boot"],"responsibility":"按序叠加 bundle 层、profile patch、home patch 与 --patch overlay，boot() 挂载插件树。","modules":["app-boot","web-app"],"keyFiles":["packages/boot/app-boot/src/profile.ts","packages/boot/app-boot/src/index.ts"],"keySymbols":["loadProfile","boot","loadOverlayPatches"],"dependsOn":["web-app"],"usedBy":["cli"],"readingPriority":3,"verification":"verified","evidence":"profile.ts:781-807 loadProfile；index.ts:973-1014 boot()；index.ts:336-391 loadOverlayPatches"},{"id":"web-app","label":"dsh-web-app 运行实例","layer":"host","packages":["@deepseek-ai/dsh-web-app · packages/bundle/web-app"],"responsibility":"web profile 的宿主：startup 解析 --host/--port，WebServer 监听，就绪后向 stdout 打印 URL。","modules":["web-app"],"keyFiles":["packages/bundle/web-app/src/startup.ts","packages/host/webserver/src/index.ts","packages/bundle/web-app/src/index.ts"],"keySymbols":["WEB_STARTUP_SERVICE","WebServer","announceReady"],"dependsOn":["cordis"],"usedBy":["app-boot","browser","gateway","fleet-manager"],"readingPriority":4,"verification":"verified","evidence":"startup.ts:85-112；webserver index.ts:293-300 listen（端口回退 3080）；web-app index.ts:306-308 打印 dsh web: URL"},{"id":"gateway","label":"Fleet 网关","layer":"host","packages":["@deepseek-ai/dsh-gateway · packages/fleet/gateway"],"responsibility":"OIDC 授权码登录签发会话 cookie，按 cookie subject 反代到该用户自己的 dsh web 子进程（HTTP+WS）；容量满返回 503。","modules":["gateway","fleet-manager"],"keyFiles":["packages/fleet/gateway/src/gateway.ts","packages/fleet/gateway/src/session.ts","packages/fleet/gateway/src/oidc.ts"],"keySymbols":["FleetGateway","GatewaySessions","handleCallback"],"dependsOn":["oidc","fleet-manager","web-app"],"usedBy":["browser"],"readingPriority":6,"verification":"verified","evidence":"gateway.ts:150-168 verify→ensureProcess→proxy；163-165 rejected→503；session.ts:84-126 HMAC cookie"},{"id":"fleet-manager","label":"Fleet 进程管理器","layer":"host","packages":["@deepseek-ai/dsh-fleet-manager · packages/fleet/fleet-manager"],"responsibility":"每用户进程注册表：ensureProcess 惰性开通、空闲回收（保留 home）、崩溃重启（上限）、并发上限裁决、结构化生命周期日志。","modules":["fleet-manager"],"keyFiles":["packages/fleet/fleet-manager/src/fleet-manager.ts","packages/fleet/fleet-manager/src/process.ts"],"keySymbols":["FleetManager","ensureProcess","spawnDshWebProcess"],"dependsOn":["web-app"],"usedBy":["gateway"],"readingPriority":7,"verification":"verified","evidence":"fleet-manager.ts:123-138/153-162/209-228；process.ts:72-88 spawn dsh --profile web + DSH_HOME 注入"},{"id":"cordis","label":"Cordis 插件运行时","layer":"runtime","packages":["@deepseek-ai/cordis · vendor/cordis（rescope）"],"responsibility":"一切皆插件的框架：服务、类型化事件、可回滚 effect、瀑布语义；没有特权内核。","modules":["cordis"],"keyFiles":["vendor/README.md","docs/cordis-primer.md"],"keySymbols":["Context","Service"],"dependsOn":[],"usedBy":["web-app","agent-loop","tools"],"readingPriority":1,"verification":"verified","evidence":"docs/architecture.md §Cordis；全仓 harness 包 peerDependencies 声明 @deepseek-ai/cordis"},{"id":"agent-loop","label":"Agent 循环","layer":"runtime","packages":["@deepseek-ai/dsh-agent-loop · packages/core/agent-loop"],"responsibility":"ctx.agentLoop 默认驱动器：kick→turn→step 循环，串接提示词组装、请求准备、流式调用与工具执行。","modules":["agent-loop","session","tools","system-prompt","llm"],"keyFiles":["packages/core/agent-loop/src/index.ts","packages/core/agent-loop/src/agent.ts","packages/core/agent-loop/src/inbox.ts"],"keySymbols":["AgentLoop","ReactLoopAgent.turn","ReactLoopAgent.step","ReactLoopInbox"],"dependsOn":["system-prompt","tools","llm","session"],"usedBy":["cordis"],"readingPriority":5,"verification":"verified","evidence":"index.ts:330-893 AgentLoop（super(ctx,'agentLoop') 355）；agent.ts:252-265 kick、296-396 turn、398-544 step"},{"id":"tools","label":"工具注册表与守卫管线","layer":"runtime","packages":["@deepseek-ai/dsh-tools · packages/core/tools"],"responsibility":"ctx.tools：register/defineTool 注册，schema 进入提示词，execute 经 pre/execute/post 三道瀑布守卫执行。","modules":["tools"],"keyFiles":["packages/core/tools/src/index.ts","packages/core/tools/src/schema.ts"],"keySymbols":["ToolRuntime","ToolRuntime.execute","defineTool"],"dependsOn":[],"usedBy":["cordis","agent-loop"],"readingPriority":6,"verification":"verified","evidence":"index.ts:807-1985 ToolRuntime；1369-1371 execute；1505/1605/1782 三道瀑布"},{"id":"system-prompt","label":"系统提示词组装","layer":"runtime","packages":["@deepseek-ai/dsh-system-prompt · packages/core/system-prompt"],"responsibility":"ctx.systemPrompt：section/context/variable 注册与排序，assemble 收集工具 schema 产出最终提示词。","modules":["system-prompt"],"keyFiles":["packages/core/system-prompt/src/index.ts"],"keySymbols":["SystemPrompt","SystemPrompt.assemble","SystemPrompt.tools"],"dependsOn":[],"usedBy":["agent-loop"],"readingPriority":6,"verification":"verified","evidence":"index.ts:405 类声明；454 section；521-536 tools(provider)；558+ assemble"},{"id":"llm","label":"LLM 适配器 seam","layer":"protocol","packages":["@deepseek-ai/dsh-llm · packages/llm/llm"],"responsibility":"ctx.llm：适配器注册（registerAdapter 可原子替换路由）、llm/stream 瀑布、Message/StreamChunk 流词汇。","modules":["llm"],"keyFiles":["packages/llm/llm/src/index.ts","packages/llm/llm/src/types.ts"],"keySymbols":["LlmRuntime","LlmAdapter","StreamChunk"],"dependsOn":["deepseek"],"usedBy":["agent-loop"],"readingPriority":6,"verification":"verified","evidence":"index.ts:342+ LlmRuntime；389-418 registerAdapter；62-77 llm/stream；types.ts:452-464 StreamChunk"},{"id":"deepseek","label":"DeepSeek 适配器","layer":"protocol","packages":["@deepseek-ai/dsh-llm-deepseek · packages/llm/llm-deepseek"],"responsibility":"LlmAdapter 实现：serialize 请求体、fetch /messages、SSE 解析翻译为 StreamChunk，空闲看门狗与取消语义。","modules":["llm-deepseek"],"keyFiles":["packages/llm/llm-deepseek/src/adapter.ts","packages/llm/llm-deepseek/src/host.ts","packages/llm/llm-deepseek/src/sse.ts"],"keySymbols":["DeepSeekAdapter","registerDeepSeekProvider","translate"],"dependsOn":["model-api"],"usedBy":["llm"],"readingPriority":7,"verification":"verified","evidence":"adapter.ts:20-160；host.ts:18-49 registerAdapter；adapter.ts:147 yield* translate(parseSse(...))"},{"id":"session","label":"会话事件账本","layer":"storage","packages":["@deepseek-ai/dsh-session · packages/core/session"],"responsibility":"ctx.sessions：append-only SessionEvent 账本与内存 store；deriveMessages 从日志投影模型历史——模型可见即已落账。","modules":["session"],"keyFiles":["packages/core/session/src/index.ts","packages/core/session/src/types.ts"],"keySymbols":["SessionStore","Session.append","Session.deriveMessages","SessionEventMap"],"dependsOn":["persistence"],"usedBy":["agent-loop"],"readingPriority":4,"verification":"verified","evidence":"index.ts:921+ SessionStore；718-769 append 唯一入口；856-877 deriveMessages；types.ts:281-431 SessionEventMap"},{"id":"persistence","label":"世代 JSONL 持久化","layer":"storage","packages":["@deepseek-ai/dsh-session-persistence · packages/session/session-persistence","@deepseek-ai/dsh-session-persistence-jsonl · packages/session/session-persistence-jsonl"],"responsibility":"SessionPersistence 抽象契约（create/open/flush/stat/list）与 JSONL 后端：世代文件 session.vN.jsonl[.zstd]、只增不改的迁移链。","modules":["session-persistence","session-persistence-jsonl"],"keyFiles":["packages/session/session-persistence/src/index.ts","packages/session/session-persistence-jsonl/src/index.ts","packages/session/session-format/src/filename.ts"],"keySymbols":["SessionPersistence","JsonlSessionPersistence","JsonlSessionHandle"],"dependsOn":[],"usedBy":["session"],"readingPriority":7,"verification":"verified","evidence":"session-persistence index.ts:135-204 抽象契约；jsonl index.ts:245 实现；filename.ts:14-32 世代命名"}],"overviewEdges":[{"from":"browser","to":"gateway","kind":"main","label":"OIDC 登录 + 反代会话"},{"from":"gateway","to":"oidc","kind":"support","label":"授权码流程"},{"from":"gateway","to":"fleet-manager","kind":"main","label":"ensureProcess(subject)"},{"from":"gateway","to":"web-app","kind":"main","label":"回环反代用户进程"},{"from":"fleet-manager","to":"web-app","kind":"support","label":"spawn 每用户进程"},{"from":"browser","to":"web-app","kind":"main","label":"直连 127.0.0.1"},{"from":"cli","to":"app-boot","kind":"orchestration","label":"--profile 选择"},{"from":"app-boot","to":"web-app","kind":"orchestration","label":"bundle+patch 组合"},{"from":"web-app","to":"cordis","kind":"orchestration","label":"挂载插件树"},{"from":"cordis","to":"agent-loop","kind":"main","label":"运行 agent 会话"},{"from":"cordis","to":"tools","kind":"support","label":"服务容器"},{"from":"agent-loop","to":"system-prompt","kind":"support","label":"组装提示词"},{"from":"agent-loop","to":"tools","kind":"main","label":"tool/call → 管线"},{"from":"agent-loop","to":"llm","kind":"main","label":"模型请求"},{"from":"llm","to":"deepseek","kind":"support","label":"适配器绑定"},{"from":"deepseek","to":"model-api","kind":"main","label":"HTTPS 流式"},{"from":"agent-loop","to":"session","kind":"main","label":"事件账本"},{"from":"session","to":"persistence","kind":"support","label":"世代落盘"}],"modules":[{"id":"cordis","role":"runtime","packages":["@deepseek-ai/cordis · vendor/cordis"],"responsibility":"插件运行时：Context、Service、effect 注册与回退、事件与瀑布分发。","deps":[],"dependents":["scope","llm","llm-deepseek","session","session-persistence","session-persistence-jsonl","system-prompt","tools","agent","agent-loop","app-boot","web-app","identity"],"keyFiles":["vendor/README.md","docs/cordis-primer.md"],"keySymbols":["Context","Service"],"entryPoints":["docs/cordis-primer.md"],"evidence":"manifest：全仓 harness 包 peerDependencies 声明 @deepseek-ai/cordis（workspace:~）"},{"id":"scope","role":"runtime","packages":["@deepseek-ai/dsh-scope · packages/core/scope"],"responsibility":"按 agent 作用域隔离注册的原语：createScope 铸造拥有自身注册的 ctx。","deps":["cordis"],"dependents":["session","system-prompt","tools","agent","agent-loop"],"keyFiles":["packages/core/scope/src/index.ts"],"keySymbols":["createScope","scopeOf"],"entryPoints":["packages/core/scope/src/index.ts"],"evidence":"manifest peerDependencies：cordis；index.ts:137-147 createScope"},{"id":"llm","role":"protocol","packages":["@deepseek-ai/dsh-llm · packages/llm/llm"],"responsibility":"模型适配器 seam 与流词汇：registerAdapter、llm/stream 瀑布、Message/StreamChunk/GenerateOptions。","deps":["cordis"],"dependents":["session","session-persistence-jsonl","system-prompt","tools","agent","agent-loop","llm-deepseek"],"keyFiles":["packages/llm/llm/src/index.ts","packages/llm/llm/src/types.ts","packages/llm/llm/src/message.ts"],"keySymbols":["LlmRuntime","LlmAdapter","registerAdapter","StreamChunk"],"entryPoints":["packages/llm/llm/src/index.ts"],"evidence":"manifest dependencies：dsh-typert-protocol/dsh-timeout/dsh-util-crypto 等；peerDependencies：cordis"},{"id":"llm-deepseek","role":"protocol","packages":["@deepseek-ai/dsh-llm-deepseek · packages/llm/llm-deepseek"],"responsibility":"DeepSeek 提供方适配器：serialize/fetch /messages/SSE→StreamChunk，注册函数挂到 ctx.llm。","deps":["llm","cordis"],"dependents":[],"keyFiles":["packages/llm/llm-deepseek/src/adapter.ts","packages/llm/llm-deepseek/src/host.ts","packages/llm/llm-deepseek/src/serialize.ts","packages/llm/llm-deepseek/src/translate.ts"],"keySymbols":["DeepSeekAdapter","registerDeepSeekProvider","parseSse","translate"],"entryPoints":["packages/llm/llm-deepseek/src/host.ts"],"evidence":"manifest peerDependencies：dsh-llm、cordis；host.ts:39 ctx.llm.registerAdapter([provider], adapter)"},{"id":"session","role":"storage","packages":["@deepseek-ai/dsh-session · packages/core/session"],"responsibility":"append-only 会话事件账本：Session.append 唯一入口、deriveMessages 投影、SessionEventMap 类型账。","deps":["llm","scope","cordis"],"dependents":["session-persistence-jsonl","tools","agent","agent-loop"],"keyFiles":["packages/core/session/src/index.ts","packages/core/session/src/types.ts","packages/core/session/src/repair.ts"],"keySymbols":["SessionStore","Session.append","Session.deriveMessages","SESSION_FORMAT_VERSION"],"entryPoints":["packages/core/session/src/index.ts"],"evidence":"manifest dependencies：dsh-llm；peerDependencies：dsh-scope、cordis；types.ts:89 SESSION_FORMAT_VERSION=4"},{"id":"session-persistence","role":"storage","packages":["@deepseek-ai/dsh-session-persistence · packages/session/session-persistence"],"responsibility":"持久化抽象契约：create/open/flush/stat/list，共享句柄脚手架供新后端实现。","deps":["cordis"],"dependents":["session-persistence-jsonl","agent-loop"],"keyFiles":["packages/session/session-persistence/src/index.ts"],"keySymbols":["SessionPersistence","SessionHandle"],"entryPoints":["packages/session/session-persistence/src/index.ts"],"evidence":"index.ts:135-204 抽象 Service（create 150/open 165/flush 178/stat 194/list 201）"},{"id":"session-persistence-jsonl","role":"storage","packages":["@deepseek-ai/dsh-session-persistence-jsonl · packages/session/session-persistence-jsonl"],"responsibility":"JSONL 后端：世代文件 session.vN.jsonl[.zstd]、压缩、世代选择与相邻迁移链（v0→v4），已发布世代不改名不覆盖。","deps":["session-persistence","session","llm","cordis"],"dependents":[],"keyFiles":["packages/session/session-persistence-jsonl/src/index.ts","packages/session/session-persistence-jsonl/src/storage.ts","packages/session/session-persistence-jsonl/src/format.ts","packages/session/session-format/src/filename.ts"],"keySymbols":["JsonlSessionPersistence","JsonlSessionHandle","generationLogFilename"],"entryPoints":["packages/session/session-persistence-jsonl/src/index.ts"],"evidence":"manifest dependencies：dsh-session-format、dsh-session-format-catalog、dsh-session-format-v3-to-v4；index.ts:245/314/342/437/475"},{"id":"system-prompt","role":"runtime","packages":["@deepseek-ai/dsh-system-prompt · packages/core/system-prompt"],"responsibility":"提示词组装：section/context/variable 注册排序、工具 schema 提供口、assemble 瀑布与最终渲染。","deps":["llm","scope","cordis"],"dependents":["tools","agent","agent-loop"],"keyFiles":["packages/core/system-prompt/src/index.ts"],"keySymbols":["SystemPrompt","assemble","section","tools","renderPrompt"],"entryPoints":["packages/core/system-prompt/src/index.ts"],"evidence":"manifest：dependencies 仅 schemastery；peerDependencies：cordis、dsh-llm、dsh-scope"},{"id":"tools","role":"runtime","packages":["@deepseek-ai/dsh-tools · packages/core/tools"],"responsibility":"工具注册与守卫执行管线：register/defineTool/restrict/guard，execute 经 pre-execute→execute→post-execute 三道瀑布。","deps":["system-prompt","llm","session","scope","cordis"],"dependents":["agent-loop"],"keyFiles":["packages/core/tools/src/index.ts","packages/core/tools/src/schema.ts"],"keySymbols":["ToolRuntime","register","defineTool","execute","guard"],"entryPoints":["packages/core/tools/src/index.ts"],"evidence":"manifest peerDependencies：dsh-system-prompt/dsh-llm/dsh-scope/dsh-session/cordis 等；index.ts:807-1985"},{"id":"agent","role":"runtime","packages":["@deepseek-ai/dsh-agent · packages/core/agent"],"responsibility":"Agent 接口、live 注册表与 agent/* 事件域：inbox、step、status、request、continuation。","deps":["system-prompt","llm","session","scope","cordis"],"dependents":["agent-loop"],"keyFiles":["packages/core/agent/package.json"],"keySymbols":[],"entryPoints":["packages/core/agent/src/index.ts"],"evidence":"manifest peerDependencies：cordis/dsh-llm/dsh-scope/dsh-session/dsh-system-prompt/dsh-session-projection 等；符号清单未逐行取证（partial 级），故 keySymbols 留空","verification":"partial"},{"id":"agent-loop","role":"runtime","packages":["@deepseek-ai/dsh-agent-loop · packages/core/agent-loop"],"responsibility":"默认驱动器：kick→turn→step、inbox 队列与投影、请求冻结、工具调用恢复、turnBoundary 投影。","deps":["agent","session","llm","tools","system-prompt","scope","session-persistence","cordis"],"dependents":[],"keyFiles":["packages/core/agent-loop/src/index.ts","packages/core/agent-loop/src/agent.ts","packages/core/agent-loop/src/inbox.ts","packages/core/agent-loop/src/tool-calls.ts"],"keySymbols":["AgentLoop","ReactLoopAgent","ReactLoopInbox","appendToolCall"],"entryPoints":["packages/core/agent-loop/src/index.ts"],"evidence":"manifest peerDependencies 含 dsh-agent/dsh-llm/dsh-scope/dsh-session/dsh-session-persistence/dsh-session-projection/dsh-system-prompt/dsh-tools/cordis（session-projection 未单列模块，见 keyFiles）"},{"id":"app-boot","role":"host","packages":["@deepseek-ai/dsh-app-boot · packages/boot/app-boot"],"responsibility":"profile 模板与 bundle 层读取、patch 叠层、boot() 挂载根 include。","deps":["cordis"],"dependents":["web-app"],"keyFiles":["packages/boot/app-boot/src/index.ts","packages/boot/app-boot/src/profile.ts","packages/boot/app-boot/src/profile-context.ts"],"keySymbols":["boot","loadProfile","PROFILE_TEMPLATES","loadOverlayPatches","readProfilePatches"],"entryPoints":["packages/boot/app-boot/src/index.ts"],"evidence":"manifest dependencies：dsh-atomic-write、dsh-package-manifest；peerDependencies：cordis"},{"id":"web-app","role":"host","packages":["@deepseek-ai/dsh-web-app · packages/bundle/web-app"],"responsibility":"web profile bundle：startup/webserver/web-runtime 三行 patch，静态前端、/api 网关与 63 个 client 包的宿主。","deps":["app-boot","cordis"],"dependents":[],"keyFiles":["packages/bundle/web-app/src/startup.ts","packages/bundle/web-app/src/index.ts","packages/bundle/web-app/cordis.patch.yml","packages/bundle/web-app/package.json"],"keySymbols":["WEB_STARTUP_SERVICE","announceReady","trustLoopbackGateway"],"entryPoints":["packages/bundle/web-app/src/startup.ts"],"evidence":"package.json dsh.bundle.patch 为 5 个 patch 文件数组；dependencies 全量抄录于取证（140+ 包，图示仅主链 app-boot）"},{"id":"fleet-manager","role":"host","packages":["@deepseek-ai/dsh-fleet-manager · packages/fleet/fleet-manager"],"responsibility":"每用户 dsh web 子进程注册表：开通/回收/重启/上限裁决与结构化生命周期日志；非 cordis 插件，纯类库。","deps":[],"dependents":["gateway"],"keyFiles":["packages/fleet/fleet-manager/src/fleet-manager.ts","packages/fleet/fleet-manager/src/process.ts","packages/fleet/fleet-manager/src/config.ts"],"keySymbols":["FleetManager","ensureProcess","recycleIdle","handleExit","spawnDshWebProcess","FLEET_SUBJECT_PATTERN"],"entryPoints":["packages/fleet/fleet-manager/src/index.ts"],"evidence":"manifest dependencies 仅 @deepseek-ai/dsh-home-paths（无 cordis）；process.ts:72-88 spawn 与 env 注入"},{"id":"gateway","role":"host","packages":["@deepseek-ai/dsh-gateway · packages/fleet/gateway"],"responsibility":"多用户网关：OIDC 授权码登录、HMAC 会话 cookie、按 subject 反代 HTTP+WS、launch token 回环交换、503 容量裁决。","deps":["fleet-manager"],"dependents":[],"keyFiles":["packages/fleet/gateway/src/gateway.ts","packages/fleet/gateway/src/session.ts","packages/fleet/gateway/src/oidc.ts"],"keySymbols":["FleetGateway","GatewaySessions","exchangeCodeForSubject","extractSubject"],"entryPoints":["packages/fleet/gateway/src/gateway.ts"],"evidence":"manifest dependencies 仅 @deepseek-ai/dsh-fleet-manager；无跨用户归属检查——按 cookie subject 单向路由"},{"id":"identity","role":"extension","packages":["@deepseek-ai/dsh-anonymous-user-id · packages/identity/anonymous-user-id"],"responsibility":"审计归属：读 DSH_FLEET_USER_ID 返回 fleet 身份，否则匿名 id。","deps":["cordis"],"dependents":[],"keyFiles":["packages/identity/anonymous-user-id/src/index.ts"],"keySymbols":["resolveAuditUserId","DSH_FLEET_USER_ID_ENV"],"entryPoints":["packages/identity/anonymous-user-id/src/index.ts"],"evidence":"manifest dependencies：dsh-brand、dsh-home-paths、cordis；index.ts:29,125-138"}],"flows":{"agent-turn":{"id":"agent-turn","title":"Agent Turn 主链","priority":"P0","summary":"一次 turn 的完整执行链：唤醒入队 → turn/start → 认领输入与 pre-step → 组装提示词 → 请求准备与冻结 → 流式调用 → 工具管线 → 落账收尾。工具欠一次请求时回到认领步骤开下一个 step（黄色回边）。","nodes":[{"id":"ft-01","label":"消息入队与唤醒驱动器","crate":"agent-loop","file":"packages/core/agent-loop/src/inbox.ts","symbol":"ReactLoopInbox.send / ReactLoopAgent.wakeDriver","responsibility":"send 持久化入队（agent/inbox/spliced），wakeup 启动 driver 调 kick。","verification":"verified","evidence":"inbox.ts:154-174,198-243（235 append）；agent.ts:154-161,214-235"},{"id":"ft-02","label":"kick：while(await turn()) 驱动","crate":"agent-loop","file":"packages/core/agent-loop/src/agent.ts","symbol":"ReactLoopAgent.kick","responsibility":"连续驱动 turn，直到没有欠账输入。","verification":"verified","evidence":"agent.ts:252-265"},{"id":"ft-03","label":"append turn/start","crate":"agent-loop","file":"packages/core/agent-loop/src/agent.ts","symbol":"ReactLoopAgent.turn","responsibility":"turn 打开持久边界，写 { turn }。","verification":"verified","evidence":"agent.ts:296-396（append 'turn/start' at 305）"},{"id":"ft-04","label":"claim 输入 + agent/pre-step 瀑布","crate":"agent-loop","file":"packages/core/agent-loop/src/agent.ts","symbol":"ReactLoopAgent.preStep","responsibility":"inbox.claim 认领 next-step 批次；监听器可改写或拒绝（拒绝/空首认领 → 直接关闭 turn）。","verification":"verified","evidence":"agent.ts:267-286（waterfall 276-282）；inbox.ts:109-114 claim"},{"id":"ft-05","label":"组装提示词与工具 schema","crate":"system-prompt","file":"packages/core/system-prompt/src/index.ts","symbol":"SystemPrompt.assemble","responsibility":"收集 section 与工具 schema 提供口，按序渲染；工具侧经 SystemPrompt.tools(wireSchemas) 注册。","verification":"verified","evidence":"system-prompt index.ts:558-595；tools index.ts:854,1008-1029"},{"id":"ft-06","label":"append step/start","crate":"agent-loop","file":"packages/core/agent-loop/src/agent.ts","symbol":"ReactLoopAgent.turn","responsibility":"pre-step 决议 enter 后写 { turn, step }。","verification":"verified","evidence":"agent.ts:329"},{"id":"ft-07","label":"agent/request 瀑布 + prepareCall","crate":"agent-loop","file":"packages/core/agent-loop/src/agent.ts","symbol":"ReactLoopAgent.prepareRequest","responsibility":"seedConfig 冻结后由中间件提案路由；prepareCall 绑定 adapter 与 config，取消不提交任何账目。","verification":"verified","evidence":"agent.ts:576-587（llm.prepareCall）；llm index.ts prepareCall:278"},{"id":"ft-08","label":"派生并冻结模型历史","crate":"session","file":"packages/core/session/src/index.ts","symbol":"Session.deriveMessages","responsibility":"buildRequest 内 deepFreeze(header)、deriveMessages()、冻结边界消息——请求不可变。","verification":"verified","evidence":"agent.ts:599-687（670/671/677）；session index.ts:856-877"},{"id":"ft-09","label":"llm/stream 瀑布 + 流式调用","crate":"llm","file":"packages/llm/llm/src/index.ts","symbol":"LlmRuntime / Events['llm/stream']","responsibility":"loopCtx.llm.stream(request) 经 preparedCall 绑定；llm/stream 瀑布可拦截每次流式调用。","verification":"verified","evidence":"agent.ts:436；llm index.ts:62-77,342+"},{"id":"ft-10","label":"DeepSeek SSE 适配","crate":"llm-deepseek","file":"packages/llm/llm-deepseek/src/adapter.ts","symbol":"DeepSeekAdapter.request","responsibility":"fetch /messages → parseSse → translate 为 StreamChunk；空闲看门狗与 TIMEOUT/ABORTED/TRANSPORT 映射。","verification":"verified","evidence":"adapter.ts:75-159（120 fetch、147 yield* translate）；sse.ts:13+；translate.ts:104+"},{"id":"ft-11","label":"助手消息落账","crate":"session","file":"packages/core/session/src/index.ts","symbol":"Session.append","responsibility":"完整紧凑流作为一条 assistant/message 提交（或 log-only assistant/attempt）；append 是所有事件的唯一入口。","verification":"partial","evidence":"append 唯一入口 index.ts:718-769 已验证；assistant 落账的具体调用行未逐行取证，行为依据 docs/architecture.md §Session log"},{"id":"ft-12","label":"tool/call 落账","crate":"agent-loop","file":"packages/core/agent-loop/src/tool-calls.ts","symbol":"appendToolCall","responsibility":"写 { turn, step, callId, name, arguments } 并返回 seq（result 以 sourceEventSeqs 引用）。","verification":"verified","evidence":"tool-calls.ts:263-266"},{"id":"ft-13","label":"工具守卫管线执行","crate":"tools","file":"packages/core/tools/src/index.ts","symbol":"ToolRuntime.execute","responsibility":"tools/pre-execute（守卫/审批）→ tools/execute around（工具体）→ tools/post-execute（accept/replace/block）。","verification":"verified","evidence":"index.ts:1369-1371,1493-1558,1601-1631,1564-1592,1781-1810"},{"id":"ft-14","label":"tool/result 落账","crate":"agent-loop","file":"packages/core/agent-loop/src/tool-calls.ts","symbol":"appendToolResult","responsibility":"结果带 sourceEventSeqs 关联 call；step 抛错时 ToolCallRecovery 补齐缺失结果。","verification":"verified","evidence":"tool-calls.ts:269-290；agent.ts:344-349"},{"id":"ft-15","label":"step/end + agent/turn-stopping","crate":"agent-loop","file":"packages/core/agent-loop/src/agent.ts","symbol":"ReactLoopAgent.turn","responsibility":"step 收尾落账；turn 结束且队列空时串行派发 turn-stopping（无 next()）。","verification":"verified","evidence":"agent.ts:356（finally append step/end）、360（dispatch.serial）"},{"id":"ft-16","label":"append turn/end","crate":"agent-loop","file":"packages/core/agent-loop/src/agent.ts","symbol":"ReactLoopAgent.turn","responsibility":"turn 关闭持久边界，写 { turn, reason }。","verification":"verified","evidence":"agent.ts:385"}],"edges":[["ft-01","ft-02"],["ft-02","ft-03"],["ft-03","ft-04"],["ft-04","ft-05"],["ft-05","ft-06"],["ft-06","ft-07"],["ft-07","ft-08"],["ft-08","ft-09"],["ft-09","ft-10"],["ft-10","ft-11"],["ft-11","ft-12"],["ft-12","ft-13"],["ft-13","ft-14"],["ft-14","ft-15"],["ft-15","ft-16"],{"from":"ft-14","to":"ft-04","kind":"loop","label":"工具欠一次请求 / 新输入到达 → 认领 → 下一个 step"}]},"boot-profile":{"id":"boot-profile","title":"Profile 启动链","priority":"P1","summary":"dsh CLI 如何把 `dsh web` 变成一台监听中的 Web 服务器：argv 解析 → profile 模板 → bundle 层与 patch 叠层 → boot() 挂载插件树 → 监听并广播就绪 URL。headless/sdk/acp 走同一组合机制、不同 bundle。","nodes":[{"id":"bp-01","label":"runCli 解析 argv","crate":"app-boot","file":"apps/cli/src/bin.ts","symbol":"runCli","responsibility":"bin 入口（lib/bin.js），按 mode 分派 profile/plugin/dump。","verification":"verified","evidence":"apps/cli/package.json bin 13-15；bin.ts:26-74"},{"id":"bp-02","label":"位置参数展开为 --profile","crate":"app-boot","file":"apps/cli/src/args.ts","symbol":"parseDshArgs","responsibility":"`dsh web` 展开为 expanded=['--profile','web',...]——不是显式子命令。","verification":"verified","evidence":"args.ts:146-212（展开 201-205）"},{"id":"bp-03","label":"runProfile 装配组合","crate":"app-boot","file":"apps/cli/src/profile-boot.ts","symbol":"runProfile","responsibility":"初始化 profile 目录，调 composeProfile 后 boot。","verification":"verified","evidence":"profile-boot.ts:244-326（boot 调用 296）；initProfile 经 initializeProfileFromDefault 101-151"},{"id":"bp-04","label":"composeProfile 叠层","crate":"app-boot","file":"apps/cli/src/profile-boot.ts","symbol":"composeProfile","responsibility":"按序叠加：各 bundle patch → profile cordis.patch.yml → home patch → --patch overlay。","verification":"verified","evidence":"profile-boot.ts:197-209；loadOverlayPatches app-boot index.ts:336-391；readProfilePatches profile-context.ts:63-68"},{"id":"bp-05","label":"loadProfile 读 bundle 清单","crate":"app-boot","file":"packages/boot/app-boot/src/profile.ts","symbol":"loadProfile / bundlePatchPaths","responsibility":"PROFILE_TEMPLATES 定义 web=[dsh-base,dsh-web-app] 等 5 模板；dsh.bundle.patch 按序展开为层。","verification":"verified","evidence":"profile.ts:179-195,781-807（bundlePatchPaths 73-77）"},{"id":"bp-06","label":"boot() 挂载插件树","crate":"app-boot","file":"packages/boot/app-boot/src/index.ts","symbol":"boot","responsibility":"new Context + Loader，await ctx.plugin(Loader) 后 mountRootInclude 挂根 include。","verification":"verified","evidence":"index.ts:973-1014（mountRootInclude 539）"},{"id":"bp-07","label":"web-startup 解析启动参数","crate":"web-app","file":"packages/bundle/web-app/src/startup.ts","symbol":"WEB_STARTUP_SERVICE","responsibility":"inject cmdlineArgs，解析 --host/--port/--public-url/--trust-loopback-gateway 后 provide 服务。","verification":"verified","evidence":"startup.ts:16-22,85-112（trustLoopbackGateway 39-40）"},{"id":"bp-08","label":"WebServer 监听","crate":"web-app","file":"packages/host/webserver/src/index.ts","symbol":"WebServer.listen","responsibility":"cordis.patch.yml 行 webserver→dsh-host-webserver；port 取 ctx.webStartup.port ?? 3080。","verification":"verified","evidence":"webserver index.ts:125-156,293-300；web-app cordis.patch.yml:168-205"},{"id":"bp-09","label":"announceReady 打印就绪 URL","crate":"web-app","file":"packages/bundle/web-app/src/index.ts","symbol":"announceReady","responsibility":"Loader settle 后 console.log(`dsh web: ${authenticatedUrl}...`)——fleet-manager 的 URL_PATTERN 就靠这一行。","verification":"verified","evidence":"web-app index.ts:255-337（URL 打印 306-308）"}],"edges":[["bp-01","bp-02"],["bp-02","bp-03"],["bp-03","bp-04"],["bp-04","bp-05"],["bp-05","bp-06"],["bp-06","bp-07"],["bp-07","bp-08"],["bp-08","bp-09"]]},"tool-pipeline":{"id":"tool-pipeline","title":"工具守卫执行管线","priority":"P1","summary":"一个 tool/call 如何受三道瀑布守卫地执行：pre-execute（审批/守卫）→ execute around（工具体）→ post-execute（accept/replace/block），结果冻结快照通知 tools/result 并落账 tool/result。","nodes":[{"id":"tp-01","label":"execute 入口","crate":"tools","file":"packages/core/tools/src/index.ts","symbol":"ToolRuntime.execute","responsibility":"单一入口 prepareExecution(exec, completeScheduledExecution)。","verification":"verified","evidence":"index.ts:1369-1371"},{"id":"tp-02","label":"tools/pre-execute 瀑布","crate":"tools","file":"packages/core/tools/src/index.ts","symbol":"ToolRuntime.prepareExecution","responsibility":"守卫与审批闸门：guard/restrict 注册的守卫在此裁决，拒绝即不执行。","verification":"verified","evidence":"index.ts:1493-1558（waterfall 1505-1508；guard 1136-1142、restrict 1097-1124）"},{"id":"tp-03","label":"tools/execute around + 工具体","crate":"tools","file":"packages/core/tools/src/index.ts","symbol":"ToolRuntime.dispatchScheduledExecution","responsibility":"around 瀑布包裹 dispatchToolBody：信号融合、UNKNOWN_TOOL、错误转 toolErrorResult。","verification":"verified","evidence":"index.ts:1601-1631（1605-1608）；dispatchToolBody 1564-1592"},{"id":"tp-04","label":"tools/post-execute 瀑布","crate":"tools","file":"packages/core/tools/src/index.ts","symbol":"ToolRuntime.postExecute","responsibility":"监听器可 accept/replace/block 结果。","verification":"verified","evidence":"index.ts:1781-1810（1782-1785）"},{"id":"tp-05","label":"tools/result 冻结快照通知","crate":"tools","file":"packages/core/tools/src/index.ts","symbol":"ToolRuntime.notifyResult","responsibility":"Object.freeze(exec) 后 emit tools/result；监听器失败仅告警不影响主流程。","verification":"verified","evidence":"index.ts:1695-1714（1703-1705）"},{"id":"tp-06","label":"tool/result 落账回环","crate":"agent-loop","file":"packages/core/agent-loop/src/tool-calls.ts","symbol":"appendToolResult","responsibility":"结果落账并驱动循环：若工具欠一次请求，回 execute 入口所在 step 再来一轮。","verification":"verified","evidence":"tool-calls.ts:269-290"}],"edges":[["tp-01","tp-02"],["tp-02","tp-03"],["tp-03","tp-04"],["tp-04","tp-05"],["tp-05","tp-06"],{"from":"tp-06","to":"tp-01","kind":"loop","label":"工具欠一次请求 → 下一个 step"}]},"fleet-gateway":{"id":"fleet-gateway","title":"Fleet 网关多用户隔离线","priority":"P1","summary":"浏览器 → 网关：OIDC 授权码登录签发 HMAC 会话 cookie → 按 cookie subject 经 fleet-manager 开通/复用该用户自己的 dsh web 子进程 → 回环交换 launch token → 反代 HTTP+WS。网关不做跨用户 URL 归属检查：一切严格按 subject 单向路由，容量满 503，空闲回收，崩溃重启。","nodes":[{"id":"fg-01","label":"未登录 → redirectToLogin 302","crate":"gateway","file":"packages/fleet/gateway/src/gateway.ts","symbol":"FleetGateway.redirectToLogin","responsibility":"randomBytes state + buildAuthorizationUrl 跳转 OIDC 提供方。","verification":"verified","evidence":"gateway.ts:209-223；oidc.ts:61-72"},{"id":"fg-02","label":"OIDC 发现","crate":"gateway","file":"packages/fleet/gateway/src/oidc.ts","symbol":"discoverOidc","responsibility":"GET /.well-known/openid-configuration 取 authorize/token 端点。","verification":"verified","evidence":"oidc.ts:42-53"},{"id":"fg-03","label":"回调：state 校验 + code 换 token","crate":"gateway","file":"packages/fleet/gateway/src/gateway.ts","symbol":"FleetGateway.handleCallback","responsibility":"校验 pendingLogins state；exchangeCodeForSubject POST token 端点；extractSubject 校验 iss/aud/exp 取 sub。","verification":"verified","evidence":"gateway.ts:171-206；oidc.ts:125-150,91-115"},{"id":"fg-04","label":"签发会话 cookie","crate":"gateway","file":"packages/fleet/gateway/src/session.ts","symbol":"GatewaySessions.issue / verify","responsibility":"v1.payload.HMAC-SHA256 签名，HttpOnly SameSite=Lax；verify 用 timingSafeEqual 验签 + 过期窗。","verification":"verified","evidence":"session.ts:12,54-56,84-90,97-126"},{"id":"fg-05","label":"按 subject 路由","crate":"gateway","file":"packages/fleet/gateway/src/gateway.ts","symbol":"FleetGateway.handle","responsibility":"sessions.verify → ensureProcess(session.subject) → proxy；rejected → 503 fleet at capacity。","verification":"verified","evidence":"gateway.ts:150-168（503 at 163-165）"},{"id":"fg-06","label":"ensureProcess 开通/复用","crate":"fleet-manager","file":"packages/fleet/fleet-manager/src/fleet-manager.ts","symbol":"FleetManager.ensureProcess","responsibility":"注册表命中即复用；并发达 maxUsers 裁决 rejected(limit)；开通/重启写生命周期日志。","verification":"verified","evidence":"fleet-manager.ts:123-138,187-207"},{"id":"fg-07","label":"spawn dsh --profile web 子进程","crate":"fleet-manager","file":"packages/fleet/fleet-manager/src/process.ts","symbol":"spawnDshWebProcess","responsibility":"OS 分配端口（--port 0），注入 DSH_HOME 与 DSH_FLEET_USER_ID，stdout 正则解析回环 URL 判定就绪。","verification":"verified","evidence":"process.ts:60,72-88,102-137"},{"id":"fg-08","label":"launch token 回环换内层 cookie","crate":"gateway","file":"packages/fleet/gateway/src/gateway.ts","symbol":"FleetGateway.exchangeLaunchToken","responsibility":"GET 127.0.0.1:port 的 launchUrl，收 303 Set-Cookie 入该 subject 的 cookie jar——启动令牌不出回环。","verification":"verified","evidence":"gateway.ts:333-362"},{"id":"fg-09","label":"反代 HTTP + WS 升级","crate":"gateway","file":"packages/fleet/gateway/src/gateway.ts","symbol":"FleetGateway.proxy / handleUpgrade","responsibility":"按 subject 转发到用户进程端口；401 触发 launch token 重放；剔除 Set-Cookie；WS 双向 pipe。","verification":"verified","evidence":"gateway.ts:246-309,371-415"},{"id":"fg-10","label":"空闲回收 / 崩溃重启","crate":"fleet-manager","file":"packages/fleet/fleet-manager/src/fleet-manager.ts","symbol":"FleetManager.recycleIdle / handleExit","responsibility":"recycle 循环按 idleRecycleMs 回收（home 保留）；exit 监听滑动窗口重启（上限 maxRestarts）。","verification":"verified","evidence":"fleet-manager.ts:153-171,209-228,230-244"}],"edges":[["fg-01","fg-02"],["fg-02","fg-03"],["fg-03","fg-04"],["fg-04","fg-05"],["fg-05","fg-06"],["fg-06","fg-07"],["fg-07","fg-08"],["fg-08","fg-09"],["fg-09","fg-10"],{"from":"fg-10","to":"fg-06","kind":"loop","label":"再次登录 → ensureProcess 重新开通"}]},"session-persist":{"id":"session-persist","title":"会话持久化与重放","priority":"P2","summary":"事件如何变成可重放的世代文件：Session.append 唯一入口 → 句柄落盘 JSONL → 世代文件 session.vN.jsonl[.zstd] → open 时世代选择与相邻迁移 → deriveMessages 从日志投影模型历史。","nodes":[{"id":"sp-01","label":"Session.append 唯一入口","crate":"session","file":"packages/core/session/src/index.ts","symbol":"Session.append","responsibility":"快照 data、deepFreeze 事件、经 session/event 发布。","verification":"verified","evidence":"index.ts:718-769"},{"id":"sp-02","label":"句柄落盘","crate":"session-persistence-jsonl","file":"packages/session/session-persistence-jsonl/src/storage.ts","symbol":"JsonlSessionHandle.append","responsibility":"agent-loop 经 handle.append 写 JSONL 帧。","verification":"verified","evidence":"storage.ts:85；agent-loop index.ts:702 使用"},{"id":"sp-03","label":"世代文件命名","crate":"session-persistence-jsonl","file":"packages/session/session-format/src/filename.ts","symbol":"sessionFormatLogFilename / generationLogFilename","responsibility":"v0 为 session.jsonl，v1+ 为 session.vN.jsonl[.zstd]；已发布世代不改名不覆盖。","verification":"verified","evidence":"filename.ts:14-32；jsonl format.ts:42-59"},{"id":"sp-04","label":"open：世代选择与迁移","crate":"session-persistence-jsonl","file":"packages/session/session-persistence-jsonl/src/index.ts","symbol":"JsonlSessionPersistence.open","responsibility":"选最高规范世代，拒绝未来版本，静态相邻迁移链组合到当前逻辑格式；写式 open 独占发布后继世代。","verification":"verified","evidence":"index.ts:342；manifest 依赖 dsh-session-format-v3-to-v4"},{"id":"sp-05","label":"stat / list 头扫描","crate":"session-persistence-jsonl","file":"packages/session/session-persistence-jsonl/src/index.ts","symbol":"JsonlSessionPersistence.stat / list","responsibility":"仅重扫目录头并翻译历史头，不加载事件。","verification":"verified","evidence":"index.ts:437,475"},{"id":"sp-06","label":"deriveMessages 投影模型历史","crate":"session","file":"packages/core/session/src/index.ts","symbol":"Session.deriveMessages","responsibility":"沿 surface.nodes 增量派生冻结 Message[]——模型可见即已落账。","verification":"verified","evidence":"index.ts:856-877"},{"id":"sp-07","label":"中断 turn 修复","crate":"session","file":"packages/core/session/src/repair.ts","symbol":"interruptedTurnClosers","responsibility":"为被中断的 turn 合成缺失 tool 错误/step/end/turn/end（仅限已封口的受限重启场景）。","verification":"verified","evidence":"repair.ts:209"}],"edges":[["sp-01","sp-02"],["sp-02","sp-03"],["sp-03","sp-04"],["sp-04","sp-05"],["sp-05","sp-06"],["sp-06","sp-07"]]}},"readingPath":[{"id":"step-1","module":"为什么一切皆插件","why":"先建立世界观：dsh 没有特权内核，扩展点就是事件域，这决定后续每次改动往哪放。","whatToRead":["docs/architecture.md","docs/cordis-primer.md"],"whatToUnderstand":["服务/事件/effect 三种注册","瀑布监听器必须调 next() 否则短路","Model-visible ⟺ logged 不变式"],"skip":["vendor/cordis 源码细节"]},{"id":"step-2","module":"profile → bundle → patch 组合","why":"理解一次 dsh 启动到底挂载了什么，之后所有包都在这棵树上。","whatToRead":["packages/boot/app-boot/src/profile.ts","packages/boot/app-boot/src/index.ts","packages/bundle/web-app/cordis.patch.yml"],"whatToUnderstand":["PROFILE_TEMPLATES 五个模板","层叠顺序：bundle → profile patch → home → --patch","boot() = Context + Loader + mountRootInclude"],"skip":["sdk-minimal 的独立树特例"]},{"id":"step-3","module":"会话事件账本","why":"账本是上下文的唯一事实源，先懂账本再读循环，顺序不能反。","whatToRead":["packages/core/session/src/index.ts","packages/core/session/src/types.ts"],"whatToUnderstand":["Session.append 是唯一入口（718-769）","deriveMessages 如何投影模型历史（856-877）","SessionEventMap required-on-read 默认与 ignorable 信封"],"skip":["迁移链 v0→v3 的具体步骤"]},{"id":"step-4","module":"Agent 循环","why":"turn/step 驱动器串起所有扩展点，是行为变化的最高频落点。","whatToRead":["packages/core/agent-loop/src/agent.ts","packages/core/agent-loop/src/inbox.ts"],"whatToUnderstand":["kick→turn→step 三层循环","pre-step 拒绝/空认领直接关 turn","请求在 deriveMessages 后冻结、取消不提交"],"skip":["ToolCallRecovery 的边界细节"]},{"id":"step-5","module":"工具守卫管线","why":"新工具的审批、守卫与结果改写都在这条管线挂接。","whatToRead":["packages/core/tools/src/index.ts","packages/core/tools/src/schema.ts"],"whatToUnderstand":["register 返回 disposer、注册即 effect","pre-execute → execute → post-execute 三道瀑布的裁决权","wireSchemas 如何把 schema 送进提示词"],"skip":["ptc 模式的 collapse/sdk section"]},{"id":"step-6","module":"LLM seam 与 DeepSeek 适配器","why":"看一个 seam 的三角色如何分工：llm 定义接口，llm-deepseek 实现，agent-loop 消费。","whatToRead":["packages/llm/llm/src/index.ts","packages/llm/llm-deepseek/src/adapter.ts","packages/llm/llm-deepseek/src/host.ts"],"whatToUnderstand":["registerAdapter 按 providers 路由、可原子替换","StreamChunk 七种块","SSE→StreamChunk 的翻译层"],"skip":["账户/密钥发现包"]},{"id":"step-7","module":"Fleet 多用户隔离线","why":"最新的完整 seam 实例：网关 + 进程管理器把单用户产品变成每用户独立 Harness。","whatToRead":["packages/fleet/gateway/src/gateway.ts","packages/fleet/fleet-manager/src/fleet-manager.ts","packages/fleet/fleet-manager/src/process.ts"],"whatToUnderstand":["按 cookie subject 单向路由，无跨用户归属检查","launch token 只在回环交换","生命周期四事件 provisioned/recycled/restarted/rejected"],"skip":["staging 编排脚本 scripts/fleet-staging/"]},{"id":"step-8","module":"世代持久化","why":"理解「已提交世代永不改」的约束，才能安全改动会话格式。","whatToRead":["packages/session/session-persistence/src/index.ts","packages/session/session-persistence-jsonl/src/index.ts","packages/session/session-format/src/filename.ts"],"whatToUnderstand":["create/open/flush/stat/list 契约","世代命名与 .zstd 压缩","相邻迁移链一次组合、写式 open 独占发布后继"],"skip":["zstd 原生插件细节"]}]};
+
+/* ── 基础工具 ─────────────────────────────────────────── */
+const $ = (sel, root) => (root || document).querySelector(sel);
+const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+
+function el(tag, attrs, children) {
+  const node = document.createElement(tag);
+  if (attrs) {
+    for (const key of Object.keys(attrs)) {
+      const value = attrs[key];
+      if (value === null || value === undefined || value === false) continue;
+      if (key === 'class') node.className = value;
+      else if (key === 'text') node.textContent = value;
+      else if (key.startsWith('on') && typeof value === 'function') node.addEventListener(key.slice(2), value);
+      else node.setAttribute(key, value === true ? '' : String(value));
+    }
+  }
+  (children || []).forEach(child => {
+    if (child === null || child === undefined || child === false) return;
+    node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child);
+  });
+  return node;
+}
+
+const LAYER_LABELS = {
+  protocol: '协议适配', runtime: '运行时', storage: '存储',
+  extension: '扩展', host: '宿主', external: '外部',
+};
+const LANE_ORDER = ['external', 'host', 'runtime', 'protocol', 'storage'];
+const VIEW_TITLES = {
+  overview: '概览', architecture: '系统架构', deps: '依赖图',
+  flows: '执行流', modules: '模块浏览器', path: '阅读路线',
+};
+
+function layerClass(layer) { return 'layer-' + layer; }
+function verBadge(verification) {
+  if (!verification) return '';
+  const label = { verified: '已验证', partial: '部分验证', unverified: '未验证' }[verification] || verification;
+  return el('span', { class: 'badge ' + verification, text: label });
+}
+function fileBtn(path) {
+  if (!path) return null;
+  return el('button', {
+    class: 'file-link', type: 'button', 'data-file': path, text: path,
+    title: '点击复制路径',
+  });
+}
+
+let toastTimer = null;
+function toast(message) {
+  let node = $('.toast');
+  if (!node) { node = el('div', { class: 'toast' }); document.body.appendChild(node); }
+  node.textContent = message;
+  node.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => node.classList.remove('show'), 1800);
+}
+
+function copyText(text) {
+  const done = () => toast('已复制：' + text);
+  const fail = () => toast(text);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, fail);
+  } else { fail(); }
+}
+
+/* ── 状态与历史 ───────────────────────────────────────── */
+const state = {
+  view: 'overview',
+  flowId: null,
+  depsMode: 'main',
+  sel: null,          // { kind, id, flowId? }
+  history: [],
+};
+
+const STORAGE_KEY = 'dsh-code-tour-state';
+function saveState() {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+      view: state.view, flowId: state.flowId, depsMode: state.depsMode, sel: state.sel,
+    }));
+  } catch (err) { /* 隐身模式等场景下 sessionStorage 不可用，状态保持降级为内存态 */ }
+}
+function restoreState() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (saved && VIEW_TITLES[saved.view]) {
+      state.view = saved.view;
+      state.flowId = saved.flowId || null;
+      state.depsMode = saved.depsMode || 'main';
+      state.sel = saved.sel || null;
+    }
+  } catch (err) { /* 损坏的存档视为无状态 */ }
+}
+
+function snapshot() {
+  return { view: state.view, flowId: state.flowId, depsMode: state.depsMode, sel: state.sel };
+}
+function pushHistory() {
+  state.history.push(snapshot());
+  if (state.history.length > 60) state.history.shift();
+}
+function goBack() {
+  const prev = state.history.pop();
+  if (!prev) { toast('已在最上层'); return; }
+  state.view = prev.view;
+  state.flowId = prev.flowId;
+  state.depsMode = prev.depsMode;
+  state.sel = prev.sel;
+  render();
+}
+function apply(next) {
+  pushHistory();
+  Object.assign(state, next);
+  saveState();
+  render();
+}
+
+/* ── 数据索引 ─────────────────────────────────────────── */
+const overviewById = {};
+TOUR.overviewNodes.forEach(node => { overviewById[node.id] = node; });
+const moduleById = {};
+TOUR.modules.forEach(mod => { moduleById[mod.id] = mod; });
+const flowById = TOUR.flows || {};
+
+function flowsForModule(moduleId) {
+  return Object.keys(flowById).filter(flowId =>
+    flowById[flowId].nodes.some(node => node.crate === moduleId));
+}
+function flowNodeNeighbors(flowId, nodeId) {
+  const flow = flowById[flowId];
+  const ups = [];
+  const downs = [];
+  flow.edges.forEach(edge => {
+    const from = Array.isArray(edge) ? edge[0] : edge.from;
+    const to = Array.isArray(edge) ? edge[1] : edge.to;
+    if (to === nodeId) ups.push(from);
+    if (from === nodeId) downs.push(to);
+  });
+  return {
+    ups: ups.map(id => flow.nodes.find(node => node.id === id)),
+    downs: downs.map(id => flow.nodes.find(node => node.id === id)),
+  };
+}
+
+/* ── 顶栏 ─────────────────────────────────────────────── */
+function renderTabs() {
+  const tabs = $('#tabs');
+  tabs.innerHTML = '';
+  Object.keys(VIEW_TITLES).forEach(view => {
+    const button = el('button', {
+      'data-view': view,
+      class: view === state.view ? 'active' : '',
+      text: VIEW_TITLES[view],
+    });
+    tabs.appendChild(button);
+  });
+}
+
+/* ── 详情面板 ─────────────────────────────────────────── */
+function relItem(kind, id, label) {
+  return el('li', {}, [el('button', {
+    class: 'rel-link', type: 'button',
+    'data-kind': kind, 'data-id': id, text: label,
+  })]);
+}
+
+function renderDetail() {
+  const box = $('#detail');
+  box.innerHTML = '';
+  const sel = state.sel;
+  if (!sel) {
+    box.appendChild(el('div', { class: 'detail-empty', text: '点击图中的节点，查看职责、文件、符号与证据。' }));
+    return;
+  }
+  const wrap = el('div', { class: 'detail' });
+  if (sel.kind === 'overview-node') {
+    const node = overviewById[sel.id];
+    if (!node) { box.appendChild(el('div', { class: 'detail-empty', text: '未知节点' })); return; }
+    wrap.appendChild(el('h3', { text: node.label }));
+    wrap.appendChild(el('div', {}, [verBadge(node.verification), ' ', el('span', { class: 'chip ' + layerClass(node.layer), text: LAYER_LABELS[node.layer] || node.layer })]));
+    const dl = el('dl');
+    dl.appendChild(el('dt', { text: '职责' }));
+    dl.appendChild(el('dd', { text: node.responsibility || '—' }));
+    if (node.keyFiles && node.keyFiles.length) {
+      dl.appendChild(el('dt', { text: '关键文件' }));
+      const dd = el('dd');
+      node.keyFiles.forEach(path => dd.appendChild(el('div', {}, [fileBtn(path)])));
+      dl.appendChild(dd);
+    }
+    if (node.keySymbols && node.keySymbols.length) {
+      dl.appendChild(el('dt', { text: '关键符号' }));
+      dl.appendChild(el('dd', {}, node.keySymbols.map(sym => el('div', { class: 'sym', text: sym }))));
+    }
+    dl.appendChild(el('dt', { text: '上游（它调用的组件）' }));
+    const depsList = el('dd', {}, [el('ul', { class: 'rel-list' })]);
+    const depsUl = depsList.firstChild;
+    (node.dependsOn || []).forEach(id => depsUl.appendChild(relItem('overview-node', id, (overviewById[id] || {}).label || id)));
+    if (!(node.dependsOn || []).length) depsUl.appendChild(el('li', { text: '—', style: 'color:var(--text-faint)' }));
+    dl.appendChild(depsList);
+    dl.appendChild(el('dt', { text: '下游（调用它的组件）' }));
+    const usedList = el('dd', {}, [el('ul', { class: 'rel-list' })]);
+    const usedUl = usedList.firstChild;
+    (node.usedBy || []).forEach(id => usedUl.appendChild(relItem('overview-node', id, (overviewById[id] || {}).label || id)));
+    if (!(node.usedBy || []).length) usedUl.appendChild(el('li', { text: '—', style: 'color:var(--text-faint)' }));
+    dl.appendChild(usedList);
+    wrap.appendChild(dl);
+    if (node.evidence) wrap.appendChild(el('div', { class: 'evidence-block', text: '证据：' + node.evidence }));
+  } else if (sel.kind === 'module') {
+    const mod = moduleById[sel.id];
+    if (!mod) { box.appendChild(el('div', { class: 'detail-empty', text: '未知模块' })); return; }
+    wrap.appendChild(el('h3', { text: mod.id }));
+    wrap.appendChild(el('div', {}, [verBadge(mod.verification), ' ', el('span', { class: 'chip ' + layerClass(mod.role), text: LAYER_LABELS[mod.role] || mod.role })]));
+    const dl = el('dl');
+    dl.appendChild(el('dt', { text: '职责' }));
+    dl.appendChild(el('dd', { text: mod.responsibility || '—' }));
+    if (mod.keyFiles && mod.keyFiles.length) {
+      dl.appendChild(el('dt', { text: '关键文件' }));
+      const dd = el('dd');
+      mod.keyFiles.forEach(path => dd.appendChild(el('div', {}, [fileBtn(path)])));
+      dl.appendChild(dd);
+    }
+    if (mod.keySymbols && mod.keySymbols.length) {
+      dl.appendChild(el('dt', { text: '关键符号' }));
+      dl.appendChild(el('dd', {}, mod.keySymbols.map(sym => el('div', { class: 'sym', text: sym }))));
+    }
+    if (mod.entryPoints && mod.entryPoints.length) {
+      dl.appendChild(el('dt', { text: '入口' }));
+      const dd = el('dd');
+      mod.entryPoints.forEach(path => dd.appendChild(el('div', {}, [fileBtn(path)])));
+      dl.appendChild(dd);
+    }
+    dl.appendChild(el('dt', { text: '直接依赖（manifest）' }));
+    const depsWrap = el('dd', {}, [el('ul', { class: 'rel-list' })]);
+    const depsUl = depsWrap.firstChild;
+    (mod.deps || []).forEach(id => depsUl.appendChild(relItem('module', id, id)));
+    if (!(mod.deps || []).length) depsUl.appendChild(el('li', { text: '—', style: 'color:var(--text-faint)' }));
+    dl.appendChild(depsWrap);
+    dl.appendChild(el('dt', { text: '被依赖（dependents）' }));
+    const depsOnWrap = el('dd', {}, [el('ul', { class: 'rel-list' })]);
+    const depOnUl = depsOnWrap.firstChild;
+    (mod.dependents || []).forEach(id => depOnUl.appendChild(relItem('module', id, id)));
+    if (!(mod.dependents || []).length) depOnUl.appendChild(el('li', { text: '—', style: 'color:var(--text-faint)' }));
+    dl.appendChild(depsOnWrap);
+    const related = flowsForModule(sel.id);
+    if (related.length) {
+      dl.appendChild(el('dt', { text: '相关执行流' }));
+      const flowWrap = el('dd', {}, [el('ul', { class: 'rel-list' })]);
+      const flowUl = flowWrap.firstChild;
+      related.forEach(flowId => flowUl.appendChild(el('li', {}, [el('button', {
+        class: 'rel-link', type: 'button', 'data-flow': flowId, text: flowById[flowId].title,
+      })])));
+      dl.appendChild(flowWrap);
+    }
+    wrap.appendChild(dl);
+    if (mod.evidence) wrap.appendChild(el('div', { class: 'evidence-block', text: '证据：' + mod.evidence }));
+  } else if (sel.kind === 'flow-node') {
+    const flow = flowById[sel.flowId];
+    const node = flow && flow.nodes.find(item => item.id === sel.id);
+    if (!node) { box.appendChild(el('div', { class: 'detail-empty', text: '未知步骤' })); return; }
+    wrap.appendChild(el('h3', { text: node.label }));
+    wrap.appendChild(el('div', {}, [verBadge(node.verification)]));
+    const dl = el('dl');
+    dl.appendChild(el('dt', { text: '所在模块' }));
+    const crateDd = el('dd');
+    if (node.crate && moduleById[node.crate]) {
+      crateDd.appendChild(relItem('module', node.crate, node.crate).firstChild);
+    } else {
+      crateDd.textContent = node.crate || '—';
+    }
+    dl.appendChild(crateDd);
+    if (node.file) {
+      dl.appendChild(el('dt', { text: '文件' }));
+      dl.appendChild(el('dd', {}, [fileBtn(node.file)]));
+    }
+    if (node.symbol) {
+      dl.appendChild(el('dt', { text: '符号' }));
+      dl.appendChild(el('dd', {}, [el('span', { class: 'sym', text: node.symbol })]));
+    }
+    dl.appendChild(el('dt', { text: '职责' }));
+    dl.appendChild(el('dd', { text: node.responsibility || '—' }));
+    const neighbors = flowNodeNeighbors(sel.flowId, sel.id);
+    dl.appendChild(el('dt', { text: '上游' }));
+    const upWrap = el('dd', {}, [el('ul', { class: 'rel-list' })]);
+    neighbors.ups.forEach(up => upWrap.firstChild.appendChild(relItem('flow-node', up.id, up.label)));
+    if (!neighbors.ups.length) upWrap.firstChild.appendChild(el('li', { text: '—', style: 'color:var(--text-faint)' }));
+    dl.appendChild(upWrap);
+    dl.appendChild(el('dt', { text: '下游' }));
+    const downWrap = el('dd', {}, [el('ul', { class: 'rel-list' })]);
+    neighbors.downs.forEach(down => downWrap.firstChild.appendChild(relItem('flow-node', down.id, down.label)));
+    if (!neighbors.downs.length) downWrap.firstChild.appendChild(el('li', { text: '—', style: 'color:var(--text-faint)' }));
+    dl.appendChild(downWrap);
+    wrap.appendChild(dl);
+    if (node.evidence) wrap.appendChild(el('div', { class: 'evidence-block', text: '证据：' + node.evidence }));
+  } else if (sel.kind === 'path-step') {
+    const step = TOUR.readingPath[sel.id];
+    if (!step) { box.appendChild(el('div', { class: 'detail-empty', text: '未知步骤' })); return; }
+    wrap.appendChild(el('h3', { text: (sel.id + 1) + '. ' + step.module }));
+    const dl = el('dl');
+    dl.appendChild(el('dt', { text: '为什么先读' }));
+    dl.appendChild(el('dd', { text: step.why || '—' }));
+    if (step.whatToRead && step.whatToRead.length) {
+      dl.appendChild(el('dt', { text: '读什么' }));
+      const dd = el('dd');
+      step.whatToRead.forEach(path => dd.appendChild(el('div', {}, [fileBtn(path)])));
+      dl.appendChild(dd);
+    }
+    if (step.whatToUnderstand && step.whatToUnderstand.length) {
+      dl.appendChild(el('dt', { text: '要理解什么' }));
+      dl.appendChild(el('dd', {}, step.whatToUnderstand.map(item => el('div', { text: '· ' + item }))));
+    }
+    if (step.skip && step.skip.length) {
+      dl.appendChild(el('dt', { text: '可以先跳过' }));
+      dl.appendChild(el('dd', { text: step.skip.join('；') }));
+    }
+    wrap.appendChild(dl);
+  }
+  box.appendChild(wrap);
+}
+
+/* ── SVG 连线 ─────────────────────────────────────────── */
+const EDGE_COLORS = {
+  main: '#22d3ee', support: '#64748b', orchestration: '#a78bfa',
+  planned: '#475569', loop: '#fbbf24', 'hl-deps': '#38bdf8', 'hl-dependents': '#fb923c',
+};
+function edgeKey(edge) {
+  return (Array.isArray(edge) ? edge[0] : edge.from) + '→' + (Array.isArray(edge) ? edge[1] : edge.to);
+}
+function edgeEnds(edge) {
+  return Array.isArray(edge) ? [edge[0], edge[1]] : [edge.from, edge.to];
+}
+
+function drawEdges(canvas, edges, highlight) {
+  const svg = canvas.querySelector('svg.edges');
+  if (!svg) return;
+  svg.innerHTML = '';
+  const width = canvas.offsetWidth;
+  const height = canvas.offsetHeight;
+  svg.setAttribute('width', String(width));
+  svg.setAttribute('height', String(height));
+  svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+  const defs = elSVG('defs', {});
+  let markers = '';
+  Object.keys(EDGE_COLORS).forEach(kind => {
+    markers += '<marker id="arrow-' + kind + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1 L 9 5 L 0 9 z" fill="' + EDGE_COLORS[kind] + '"/></marker>';
+  });
+  defs.innerHTML = markers;
+  svg.appendChild(defs);
+
+  const boxes = {};
+  $$('[data-node-id]', canvas).forEach(node => {
+    boxes[node.getAttribute('data-node-id')] = {
+      x: node.offsetLeft, y: node.offsetTop, w: node.offsetWidth, h: node.offsetHeight,
+    };
+  });
+
+  const used = {};
+  edges.forEach(edge => {
+    const parts = edgeEnds(edge);
+    const key = edgeKey(edge);
+    const kind = (edge && edge.kind) || 'main';
+    const a = boxes[parts[0]];
+    const b = boxes[parts[1]];
+    if (!a || !b) return;
+    const hlKind = highlight && highlight.set[key];
+    const markerKind = hlKind || kind;
+    let pathD;
+    let labelAt = null;
+    const loop = kind === 'loop' || b.y + b.h <= a.y + 4;
+    if (loop) {
+      const serial = (used[key] = (used[key] || 0) + 1);
+      const sx = a.x + a.w;
+      const sy = a.y + a.h / 2;
+      const ex = b.x + b.w;
+      const ey = b.y + b.h / 2;
+      const reach = Math.max(a.x + a.w, b.x + b.w);
+      const dx = 46 + serial * 22 + Math.max(0, (sx - ex)) * 0.25;
+      const mx = reach + dx;
+      pathD = 'M ' + sx + ' ' + sy + ' C ' + mx + ' ' + sy + ', ' + mx + ' ' + ey + ', ' + ex + ' ' + ey;
+      labelAt = { x: mx + 4, y: (sy + ey) / 2 };
+    } else {
+      const sameLane = Math.abs(a.x - b.x) < a.w / 2;
+      let sx; let sy; let ex; let ey;
+      if (sameLane) {
+        sx = a.x + a.w; sy = a.y + a.h / 2;
+        ex = b.x + b.w; ey = b.y + b.h / 2;
+        const mx = Math.max(sx, ex) + 26;
+        pathD = 'M ' + sx + ' ' + sy + ' C ' + mx + ' ' + sy + ', ' + mx + ' ' + ey + ', ' + ex + ' ' + ey;
+        labelAt = { x: mx + 4, y: (sy + ey) / 2 };
+      } else {
+        sx = a.x + a.w / 2; sy = a.y + a.h;
+        ex = b.x + b.w / 2; ey = b.y;
+        const bend = sy + (ey - sy) * 0.45;
+        pathD = 'M ' + sx + ' ' + sy + ' C ' + sx + ' ' + bend + ', ' + ex + ' ' + bend + ', ' + ex + ' ' + ey;
+        labelAt = { x: (sx + ex) / 2, y: bend - 4 };
+      }
+    }
+    const dimmed = highlight && !hlKind && !highlight.keep.has(key);
+    const path = elSVG('path', {
+      d: pathD,
+      class: 'edge-path ' + (hlKind ? 'hl-' + hlKind : 'edge-' + kind) + (dimmed ? ' dimmed' : ''),
+    });
+    if (!dimmed) path.setAttribute('marker-end', 'url(#arrow-' + markerKind + ')');
+    svg.appendChild(path);
+    if (edge.label && labelAt) {
+      const text = elSVG('text', { class: 'edge-label', x: labelAt.x, y: labelAt.y, 'text-anchor': 'middle' });
+      text.textContent = edge.label;
+      svg.appendChild(text);
+    }
+  });
+}
+
+function elSVG(tag, attrs) {
+  const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const key of Object.keys(attrs || {})) {
+    if (attrs[key] !== null && attrs[key] !== undefined) node.setAttribute(key, attrs[key]);
+  }
+  return node;
+}
+
+/* ── 缩放 ─────────────────────────────────────────────── */
+function activeCanvas() { return $('#main .canvas'); }
+function applyZoom(canvas, scale) {
+  canvas.__scale = scale;
+  canvas.style.transform = 'scale(' + scale + ')';
+  const holder = canvas.parentElement;
+  holder.style.width = canvas.offsetWidth * scale + 'px';
+  holder.style.height = canvas.offsetHeight * scale + 'px';
+}
+function onZoomClick(event) {
+  const button = event.target.closest('[data-zoom]');
+  if (!button) return;
+  const canvas = activeCanvas();
+  if (!canvas) return;
+  const current = canvas.__scale || 1;
+  const mode = button.getAttribute('data-zoom');
+  const next = mode === 'in' ? Math.min(2, current * 1.15)
+    : mode === 'out' ? Math.max(0.5, current / 1.15) : 1;
+  applyZoom(canvas, next);
+}
+
+/* ── 视图：概览 ───────────────────────────────────────── */
+function renderOverview(main) {
+  const hero = el('div', { class: 'hero' });
+  hero.appendChild(el('h2', { text: 'DeepSeek Harness 如何工作' }));
+  hero.appendChild(el('p', {
+    class: 'lead',
+    text: 'dsh 是一个全插件 Cordis agent harness：没有需要打补丁的特权内核，模型适配器、工具注册表、会话日志乃至 agent 循环本身都是挂在同一上下文上的插件，全部可以由配置替换。',
+  }));
+  hero.appendChild(el('div', {
+    class: 'one-line',
+    text: '一条主线：dsh CLI 按 profile 组合 bundle 与 patch → 挂载插件树 → agent-loop 驱动 turn（组装提示词 → 流式请求模型 → 执行工具）→ 每一步都追加进 append-only 会话日志，模型可见的一切都能从日志重建。',
+  }));
+  const grid = el('div', { class: 'ov-grid' });
+  const cards = [
+    ['一切皆插件', 'vendor/cordis 提供服务、类型化事件与可回滚 effect；注册即 effect，插件卸载即回退。扩展点就是事件域：session/* 落账、agent/* 观察、能力事件挂接策略。'],
+    ['profile + bundle 组合', 'profile 列出 bundle 叠加顺序，bundle 是"配置行 + 代码"的分发单元；每层 patch 按 id 整行替换或插入，dsh --dump-config 可见本机启动树。'],
+    ['事件账本即上下文', 'core/session 维护 append-only SessionEvent 日志；deriveMessages 从日志投影模型历史，持久化、fork、导出全部派生自账本。'],
+    ['能力 seam 三角色', 'Service Definition / Provider / Consumer 三位一体：换一个 fs 或 subprocess provider，Bash、PTY、LSP 一起换世界。'],
+    ['多用户 fleet 隔离线', 'fleet/gateway 以 OIDC 登录签发会话 cookie，按 subject 经 fleet-manager 路由到该用户自己的 dsh web 子进程（独立 $DSH_HOME），空闲回收、崩溃重启、并发上限。'],
+  ];
+  cards.forEach(pair => {
+    grid.appendChild(el('div', { class: 'ov-card' }, [
+      el('h4', { text: pair[0] }),
+      el('p', { text: pair[1] }),
+    ]));
+  });
+  hero.appendChild(grid);
+  const stats = el('p', { class: 'ov-stats' });
+  const flowCount = Object.keys(flowById).length;
+  const verifiedFlowNodes = Object.keys(flowById).reduce((sum, id) =>
+    sum + flowById[id].nodes.filter(node => node.verification === 'verified').length, 0);
+  const allFlowNodes = Object.keys(flowById).reduce((sum, id) => sum + flowById[id].nodes.length, 0);
+  stats.innerHTML = '';
+  stats.appendChild(el('span', {}, [
+    el('b', { text: String(TOUR.overviewNodes.length) }), ' 个系统组件 · ',
+    el('b', { text: String(TOUR.modules.length) }), ' 个核心模块 · ',
+    el('b', { text: String(flowCount) }), ' 条执行流（',
+    el('b', { text: String(verifiedFlowNodes) }), '/' + allFlowNodes + ' 步骤已验证） · 分支 ',
+    el('b', { text: TOUR.meta.branch }),
+  ]));
+  hero.appendChild(stats);
+  hero.appendChild(el('h3', { class: 'section-title', text: '主执行链' }));
+  const chain = el('div', { class: 'btn-row' });
+  ['浏览器', 'dsh CLI/profile', 'agent-loop', '模型 + 工具', '会话日志'].forEach((item, index, arr) => {
+    chain.appendChild(el('span', { class: 'chip layer-runtime', text: item }));
+    if (index < arr.length - 1) chain.appendChild(el('span', { class: 'chip', text: '→' }));
+  });
+  hero.appendChild(chain);
+  main.appendChild(hero);
+  // 首屏即见架构：概览底部内嵌同一张泳道图（与「系统架构」页共享绘制逻辑）。
+  hero.appendChild(el('h3', { class: 'section-title', text: '系统架构一览（点击节点看详情，或切到「系统架构」页）' }));
+  const parts = buildArchitectureCanvas(
+    '实线青=主链 · 灰=支撑 · 虚线紫=编排入口；边=调用方→被调方',
+  );
+  main.appendChild(parts.tools);
+  main.appendChild(parts.scroll);
+  requestAnimationFrame(() => {
+    drawEdges(parts.canvas, TOUR.overviewEdges, overviewHighlight());
+  });
+}
+
+/* ── 视图：系统架构（泳道） ───────────────────────────── */
+function nodeCard(node, kind) {
+  // 选中语义与 deps 视图一致：蓝=选中节点的上游（它调用），橙=下游（调用它），其余变暗。
+  let extra = '';
+  const sel = state.sel && state.sel.kind === kind ? state.sel : null;
+  if (sel && sel.id !== node.id) {
+    const selected = overviewById[sel.id];
+    if (selected) {
+      if ((selected.dependsOn || []).includes(node.id)) extra = ' hl-deps';
+      else if ((selected.usedBy || []).includes(node.id)) extra = ' hl-dependents';
+      else extra = ' dimmed';
+    }
+  }
+  return el('div', {
+    class: 'node' + (sel && sel.id === node.id ? ' selected' : '') + extra,
+    'data-kind': kind, 'data-id': node.id, 'data-node-id': node.id,
+    style: 'border-left-color:var(--layer-' + node.layer + ')',
+  }, [
+    el('div', { class: 'n-title', text: node.label }),
+    el('div', { class: 'n-sub', text: (node.packages || []).join(' ') || '' }),
+    el('div', { class: 'n-desc', text: node.responsibility || '' }),
+  ]);
+}
+
+function buildArchitectureCanvas(hint) {
+  const tools = el('div', { class: 'canvas-tools' }, [
+    el('button', { class: 'btn', type: 'button', 'data-zoom': 'in', text: '＋ 放大' }),
+    el('button', { class: 'btn', type: 'button', 'data-zoom': 'out', text: '－ 缩小' }),
+    el('button', { class: 'btn', type: 'button', 'data-zoom': 'reset', text: '1:1' }),
+    el('span', { class: 'spacer' }),
+    el('span', { class: 'hint', text: hint }),
+  ]);
+  const scroll = el('div', { class: 'canvas-scroll' });
+  const holder = el('div');
+  const canvas = el('div', { class: 'canvas' });
+  const lanesWrap = el('div', { class: 'lanes' });
+  LANE_ORDER.forEach(layer => {
+    const lane = el('div', { class: 'lane' });
+    lane.appendChild(el('div', {
+      class: 'lane-head', style: 'color:var(--layer-' + layer + ')',
+      text: LAYER_LABELS[layer],
+    }));
+    TOUR.overviewNodes.filter(node => node.layer === layer)
+      .sort((x, y) => (x.readingPriority || 9) - (y.readingPriority || 9))
+      .forEach(node => lane.appendChild(nodeCard(node, 'overview-node')));
+    lanesWrap.appendChild(lane);
+  });
+  canvas.appendChild(lanesWrap);
+  canvas.appendChild(elSVG('svg', { class: 'edges' }));
+  holder.appendChild(canvas);
+  scroll.appendChild(holder);
+  return { tools, scroll, canvas };
+}
+
+function renderArchitecture(main) {
+  const parts = buildArchitectureCanvas(
+    '边=调用方→被调方：实线青=主链 · 灰=支撑 · 虚线紫=编排；选中节点：蓝=它调用的组件，橙=调用它的组件',
+  );
+  main.appendChild(parts.tools);
+  main.appendChild(parts.scroll);
+  requestAnimationFrame(() => {
+    drawEdges(parts.canvas, TOUR.overviewEdges, overviewHighlight());
+    if (parts.canvas.__scale) applyZoom(parts.canvas, parts.canvas.__scale);
+  });
+}
+
+function overviewHighlight() {
+  if (!state.sel || state.sel.kind !== 'overview-node') return null;
+  const node = overviewById[state.sel.id];
+  if (!node) return null;
+  const set = {};
+  const keep = new Set();
+  // 边语义为“调用方 → 被调方”：出边是它调用的组件（上游），入边是调用它的组件（下游）。
+  TOUR.overviewEdges.forEach(edge => {
+    const parts = edgeEnds(edge);
+    const key = edgeKey(edge);
+    keep.add(key);
+    if (parts[0] === node.id && (node.dependsOn || []).includes(parts[1])) set[key] = 'deps';
+    if (parts[1] === node.id && (node.usedBy || []).includes(parts[0])) set[key] = 'dependents';
+  });
+  return { set, keep };
+}
+
+/* ── 视图：依赖图 ─────────────────────────────────────── */
+const DEP_ROLES = ['runtime', 'protocol', 'host', 'storage', 'extension', 'external'];
+function depEdgesFor(mode) {
+  const mainChain = TOUR.meta.depMainChain || [];
+  return TOUR.modules.reduce((acc, mod) => {
+    (mod.deps || []).forEach(dep => {
+      const inMain = mainChain.includes(mod.id) && mainChain.includes(dep);
+      const adjacentToSel = state.sel && state.sel.kind === 'module' &&
+        (mod.id === state.sel.id || dep === state.sel.id);
+      if (mode === 'main' && !inMain && !adjacentToSel) return;
+      acc.push({ from: dep, to: mod.id, kind: 'main', label: '' });
+    });
+    return acc;
+  }, []);
+}
+
+function renderDeps(main) {
+  const tools = el('div', { class: 'canvas-tools' }, [
+    el('button', {
+      class: 'btn' + (state.depsMode === 'main' ? ' primary' : ''), type: 'button',
+      'data-deps-mode': 'main', text: '核心主链',
+    }),
+    el('button', {
+      class: 'btn' + (state.depsMode === 'full' ? ' primary' : ''), type: 'button',
+      'data-deps-mode': 'full', text: '完整直接依赖',
+    }),
+    el('span', { class: 'spacer' }),
+    el('span', { class: 'hint', text: '箭头 A → B 表示 B 直接依赖 A；蓝色=选中模块的依赖（流入），橙色=依赖它的模块（流出）' }),
+  ]);
+  const scroll = el('div', { class: 'canvas-scroll' });
+  const holder = el('div');
+  const canvas = el('div', { class: 'canvas' });
+  const grid = el('div', { class: 'dep-grid' });
+  const selId = state.sel && state.sel.kind === 'module' ? state.sel.id : null;
+  DEP_ROLES.forEach(role => {
+    const mods = TOUR.modules.filter(mod => (mod.role || 'runtime') === role);
+    if (!mods.length) return;
+    const col = el('div', { class: 'dep-col' });
+    col.appendChild(el('div', {
+      class: 'lane-head', style: 'color:var(--layer-' + role + ')',
+      text: LAYER_LABELS[role],
+    }));
+    mods.forEach(mod => {
+      const isSel = selId === mod.id;
+      const isDep = selId && (moduleById[selId].deps || []).includes(mod.id);
+      const isDependent = selId && (moduleById[selId].dependents || []).includes(mod.id);
+      const cls = 'node' + (isSel ? ' selected' : '') +
+        (isDep ? ' hl-deps' : '') + (isDependent ? ' hl-dependents' : '') +
+        (selId && !isSel && !isDep && !isDependent ? ' dimmed' : '');
+      col.appendChild(el('div', {
+        class: cls, 'data-kind': 'module', 'data-id': mod.id, 'data-node-id': mod.id,
+        style: 'border-left-color:var(--layer-' + role + ')',
+      }, [
+        el('div', { class: 'n-title', text: mod.id }),
+        el('div', { class: 'n-sub', text: (mod.packages || [mod.id]).join(' ') }),
+        el('div', { class: 'n-desc', text: mod.responsibility || '' }),
+      ]));
+    });
+    grid.appendChild(col);
+  });
+  canvas.appendChild(grid);
+  canvas.appendChild(elSVG('svg', { class: 'edges' }));
+  holder.appendChild(canvas);
+  scroll.appendChild(holder);
+  main.appendChild(tools);
+  main.appendChild(scroll);
+  requestAnimationFrame(() => {
+    drawEdges(canvas, depEdgesFor(state.depsMode), moduleHighlight());
+    if (canvas.__scale) applyZoom(canvas, canvas.__scale);
+  });
+}
+
+function moduleHighlight() {
+  if (!state.sel || state.sel.kind !== 'module') return null;
+  const mod = moduleById[state.sel.id];
+  if (!mod) return null;
+  const set = {};
+  const keep = new Set();
+  TOUR.modules.forEach(item => {
+    (item.deps || []).forEach(dep => {
+      const key = dep + '→' + item.id;
+      keep.add(key);
+      if (item.id === mod.id) set[key] = 'deps';
+      if (dep === mod.id) set[key] = 'dependents';
+    });
+  });
+  return { set, keep };
+}
+
+/* ── 视图：执行流 ─────────────────────────────────────── */
+function renderFlows(main) {
+  if (!state.flowId || !flowById[state.flowId]) {
+    main.appendChild(el('div', { class: 'flow-head' }, [
+      el('h3', { text: '执行流库（Flow Library）' }),
+      el('p', { text: '选择一条执行流，按真实调用顺序逐步钻取；黄色虚线为回边（工具欠一次请求、重试、循环）。' }),
+    ]));
+    const lib = el('div', { class: 'flow-lib' });
+    Object.keys(flowById).forEach(flowId => {
+      const flow = flowById[flowId];
+      lib.appendChild(el('button', {
+        class: 'flow-card', type: 'button', 'data-flow': flowId,
+      }, [
+        el('h4', { text: flow.title }),
+        el('div', { class: 'fc-meta', text: flow.priority + ' · ' + flow.nodes.length + ' 步' }),
+        el('p', { text: flow.summary }),
+      ]));
+    });
+    main.appendChild(lib);
+    return;
+  }
+  const flow = flowById[state.flowId];
+  main.appendChild(el('div', { class: 'flow-head' }, [
+    el('h3', { text: flow.title }),
+    el('p', { text: flow.priority + ' · ' + flow.summary }),
+  ]));
+  const tools = el('div', { class: 'canvas-tools' }, [
+    el('button', { class: 'btn', type: 'button', 'data-zoom': 'in', text: '＋ 放大' }),
+    el('button', { class: 'btn', type: 'button', 'data-zoom': 'out', text: '－ 缩小' }),
+    el('button', { class: 'btn', type: 'button', 'data-zoom': 'reset', text: '1:1' }),
+    el('span', { class: 'spacer' }),
+    el('span', { class: 'hint', text: '点击步骤看 crate / 文件 / 符号 / 上下游 / 证据' }),
+  ]);
+  const scroll = el('div', { class: 'canvas-scroll' });
+  const holder = el('div');
+  const canvas = el('div', { class: 'canvas' });
+  const steps = el('div', { class: 'flow-steps' });
+  flow.nodes.forEach((node, index) => {
+    steps.appendChild(el('div', {
+      class: 'flow-node' + (state.sel && state.sel.kind === 'flow-node' && state.sel.id === node.id ? ' selected' : ''),
+      'data-kind': 'flow-node', 'data-id': node.id, 'data-node-id': node.id,
+    }, [
+      el('span', { class: 'fn-idx', text: String(index + 1) }),
+      el('span', { class: 'fn-title', text: node.label }),
+      el('div', { class: 'fn-meta', text: [node.crate, node.file, node.symbol].filter(Boolean).join(' · ') }),
+    ]));
+  });
+  canvas.appendChild(steps);
+  canvas.appendChild(elSVG('svg', { class: 'edges' }));
+  holder.appendChild(canvas);
+  scroll.appendChild(holder);
+  main.appendChild(tools);
+  main.appendChild(scroll);
+  requestAnimationFrame(() => {
+    drawEdges(canvas, flow.edges, null);
+    if (canvas.__scale) applyZoom(canvas, canvas.__scale);
+  });
+}
+
+/* ── 视图：模块浏览器 ─────────────────────────────────── */
+function renderModules(main) {
+  main.appendChild(el('div', { class: 'flow-head' }, [
+    el('h3', { text: '模块浏览器' }),
+    el('p', { text: '核心模块的 manifest 级依赖；点击模块查看关键文件、符号与相关执行流，或在依赖图中定位。' }),
+  ]));
+  const list = el('div', { class: 'mod-list' });
+  TOUR.modules.forEach(mod => {
+    list.appendChild(el('div', {
+      class: 'node', 'data-kind': 'module', 'data-id': mod.id,
+      style: 'border-left-color:var(--layer-' + (mod.role || 'runtime') + ');cursor:pointer;margin:0',
+    }, [
+      el('div', { class: 'n-title', text: mod.id }),
+      el('div', { class: 'n-sub', text: (mod.packages || []).join(' ') }),
+      el('div', { class: 'n-desc', text: mod.responsibility || '' }),
+      el('div', { class: 'n-desc', text: 'deps: ' + ((mod.deps || []).join(', ') || '—') }),
+    ]));
+  });
+  main.appendChild(list);
+}
+
+/* ── 视图：阅读路线 ───────────────────────────────────── */
+function renderPath(main) {
+  main.appendChild(el('div', { class: 'flow-head' }, [
+    el('h3', { text: '推荐阅读路线' }),
+    el('p', { text: '自顶向下的钻取顺序；每步只读少量文件与符号。' }),
+  ]));
+  TOUR.readingPath.forEach((step, index) => {
+    const body = el('div', { class: 'path-body' }, [
+      el('h4', { text: step.module }),
+      el('p', { class: 'why', text: '为什么：' + (step.why || '—') }),
+    ]);
+    (step.whatToRead || []).forEach(path => {
+      body.appendChild(el('p', {}, [fileBtn(path)]));
+    });
+    (step.whatToUnderstand || []).forEach(item => body.appendChild(el('p', { text: '理解：' + item })));
+    if (step.skip && step.skip.length) {
+      body.appendChild(el('p', { class: 'path-skip', text: '先跳过：' + step.skip.join('；') }));
+    }
+    main.appendChild(el('div', {
+      class: 'path-step', 'data-kind': 'path-step', 'data-id': String(index),
+    }, [el('div', { class: 'path-idx', text: String(index + 1) }), body]));
+  });
+}
+
+/* ── 主渲染 ───────────────────────────────────────────── */
+function render() {
+  renderTabs();
+  const main = $('#main');
+  main.innerHTML = '';
+  if (state.view === 'overview') renderOverview(main);
+  else if (state.view === 'architecture') renderArchitecture(main);
+  else if (state.view === 'deps') renderDeps(main);
+  else if (state.view === 'flows') renderFlows(main);
+  else if (state.view === 'modules') renderModules(main);
+  else if (state.view === 'path') renderPath(main);
+  renderDetail();
+}
+
+/* ── 搜索 ─────────────────────────────────────────────── */
+function buildSearchIndex() {
+  const index = [];
+  TOUR.overviewNodes.forEach(node => index.push({
+    kind: 'overview-node', id: node.id, title: node.label,
+    sub: [node.file || (node.keyFiles || [])[0], node.responsibility].filter(Boolean).join(' · '),
+    haystack: [node.id, node.label, node.responsibility, (node.keyFiles || []).join(' '), (node.keySymbols || []).join(' ')].join(' ').toLowerCase(),
+  }));
+  TOUR.modules.forEach(mod => index.push({
+    kind: 'module', id: mod.id, title: mod.id,
+    sub: [(mod.packages || []).join(' '), mod.responsibility].filter(Boolean).join(' · '),
+    haystack: [mod.id, (mod.packages || []).join(' '), mod.responsibility, (mod.keyFiles || []).join(' '), (mod.keySymbols || []).join(' ')].join(' ').toLowerCase(),
+  }));
+  Object.keys(flowById).forEach(flowId => {
+    flowById[flowId].nodes.forEach(node => index.push({
+      kind: 'flow-node', id: node.id, flowId, title: node.label,
+      sub: [node.crate, node.file, node.symbol].filter(Boolean).join(' · '),
+      haystack: [node.label, node.crate, node.file, node.symbol, node.responsibility].filter(Boolean).join(' ').toLowerCase(),
+    }));
+  });
+  return index;
+}
+let SEARCH_INDEX = [];
+
+function openSearchHit(hit) {
+  if (hit.kind === 'overview-node') {
+    apply({ view: 'architecture', flowId: null, sel: { kind: 'overview-node', id: hit.id } });
+  } else if (hit.kind === 'module') {
+    apply({ view: 'deps', flowId: null, sel: { kind: 'module', id: hit.id } });
+  } else if (hit.kind === 'flow-node') {
+    apply({ view: 'flows', flowId: hit.flowId, sel: { kind: 'flow-node', id: hit.id, flowId: hit.flowId } });
+  }
+}
+
+function setupSearch() {
+  const input = $('#search');
+  const results = $('#searchResults');
+  SEARCH_INDEX = buildSearchIndex();
+  const close = () => results.classList.remove('open');
+  const run = () => {
+    const query = input.value.trim().toLowerCase();
+    results.innerHTML = '';
+    if (query.length < 1) { close(); return; }
+    const hits = SEARCH_INDEX.filter(item => item.haystack.includes(query)).slice(0, 24);
+    if (!hits.length) {
+      results.appendChild(el('div', { class: 'search-empty', text: '无匹配' }));
+    }
+    hits.forEach(hit => {
+      results.appendChild(el('button', {
+        class: 'search-hit', type: 'button',
+        onmousedown: event => { event.preventDefault(); openSearchHit(hit); close(); input.blur(); },
+      }, [
+        el('span', { class: 'hit-kind', text: VIEW_TITLES[{ 'overview-node': 'architecture', 'module': 'deps', 'flow-node': 'flows' }[hit.kind]] }),
+        el('span', { text: hit.title }),
+        el('span', { class: 'hit-sub', text: hit.sub }),
+      ]));
+    });
+    results.classList.add('open');
+  };
+  input.addEventListener('input', run);
+  input.addEventListener('focus', run);
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { close(); input.blur(); }
+    if (event.key === 'Enter') {
+      const first = $('.search-hit', results);
+      if (first) first.dispatchEvent(new MouseEvent('mousedown'));
+    }
+  });
+  document.addEventListener('click', event => {
+    if (!event.target.closest('.search-wrap')) close();
+  });
+}
+
+/* ── 事件委托 ─────────────────────────────────────────── */
+function handleClick(event) {
+  const target = event.target;
+  const fileLink = target.closest('[data-file]');
+  if (fileLink) { copyText(fileLink.getAttribute('data-file')); return; }
+  const zoomBtn = target.closest('[data-zoom]');
+  if (zoomBtn) { onZoomClick(event); return; }
+  const depsModeBtn = target.closest('[data-deps-mode]');
+  if (depsModeBtn) {
+    apply({ view: 'deps', depsMode: depsModeBtn.getAttribute('data-deps-mode'), sel: state.sel });
+    return;
+  }
+  const flowCard = target.closest('[data-flow]');
+  if (flowCard) {
+    apply({ view: 'flows', flowId: flowCard.getAttribute('data-flow'), sel: null });
+    return;
+  }
+  const viewBtn = target.closest('[data-view]');
+  if (viewBtn) {
+    const view = viewBtn.getAttribute('data-view');
+    apply({ view, flowId: view === 'flows' ? state.flowId : null, sel: state.sel && state.sel.kind === 'module' && view !== 'deps' ? state.sel : (view === 'deps' ? state.sel : null) });
+    return;
+  }
+  const clickable = target.closest('[data-kind]');
+  if (clickable) {
+    const kind = clickable.getAttribute('data-kind');
+    const id = clickable.getAttribute('data-id');
+    const sel = kind === 'flow-node'
+      ? { kind, id, flowId: state.flowId }
+      : { kind, id: kind === 'path-step' ? Number(id) : id };
+    const same = state.sel && state.sel.kind === sel.kind && String(state.sel.id) === String(sel.id);
+    apply({ sel: same ? null : sel });
+    return;
+  }
+}
+
+let resizeTimer = null;
+function onResize() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    const canvas = activeCanvas();
+    if (!canvas) return;
+    canvas.style.transform = '';
+    if (canvas.__scale) applyZoom(canvas, canvas.__scale);
+    if (state.view === 'architecture') drawEdges(canvas, TOUR.overviewEdges, overviewHighlight());
+    else if (state.view === 'deps') drawEdges(canvas, depEdgesFor(state.depsMode), moduleHighlight());
+    else if (state.view === 'flows' && state.flowId) drawEdges(canvas, flowById[state.flowId].edges, null);
+  }, 150);
+}
+
+/* ── 启动 ─────────────────────────────────────────────── */
+function boot() {
+  restoreState();
+  $('#btnBack').addEventListener('click', goBack);
+  document.addEventListener('click', handleClick);
+  window.addEventListener('resize', onResize);
+  setupSearch();
+  render();
+}
+
+boot();
+</script>
+</body>
+</html>
