@@ -68,9 +68,13 @@ domain.table('workspaces').update(id, (r) => ({ ...r, path: newPath }))
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-storage-domain)是所有受支持字段及其 JSDoc 的完整真源。
 
+### 每用户命名空间
+
+当进程运行在 fleet 部署之下时，facility 会从以 `DSH_FLEET_USER_ID` 注入的认证 subject 派生每用户命名空间：每个领域 unit 都以由 subject 派生的名字（`<unit>_u<16 hex>`）打开，因此多个用户可以共享同一存储介质而看不到彼此的数据——领域声明、领域实现与后端都对命名空间无感知。没有该环境变量的进程以原名打开 unit，单机行为不变。以保留后缀形状 `_u<16 hex>` 结尾的 spec 名在任何模式下都拒绝 `reserved-unit-name`，因此默认命名空间的打开永远不会在同一介质上与命名空间化的 unit 混同。
+
 ### 可观察行为与失败
 
-每次写入都要等后端确认已持久化后才完成，并按写入顺序各发出一次 `domain/changed` 事件。失败携带稳定的 `DomainError` 代码：`already-open`（名称已打开或仍在关闭）、`facet-unsupported`（已路由后端不提供 `kv` 分面）、`invalid-record`（已存记录或全局不符合其 schema，并指明表与键）、`missing-key`（对不存在的记录执行 `update`）与 `closed`（关闭后的任何使用）。`version-mismatch` 等后端失败会原样透传。
+每次写入都要等后端确认已持久化后才完成，并按写入顺序各发出一次 `domain/changed` 事件。失败携带稳定的 `DomainError` 代码：`already-open`（名称已打开或仍在关闭）、`reserved-unit-name`（名称以命名空间保留后缀形状结尾）、`facet-unsupported`（已路由后端不提供 `kv` 分面）、`invalid-record`（已存记录或全局不符合其 schema，并指明表与键）、`missing-key`（对不存在的记录执行 `update`）与 `closed`（关闭后的任何使用）。`version-mismatch` 等后端失败会原样透传。
 
 -----
 
@@ -91,7 +95,7 @@ domain.table('workspaces').update(id, (r) => ({ ...r, path: newPath }))
 
 ### 打开顺序
 
-`DomainFacility.open(spec)` 按严格顺序执行，任一步骤失败都会让整个调用失败：拒绝已打开或仍在关闭的名称（`already-open`）；解析路由（`backend-not-found`）；要求 `kv` 分面（`facet-unsupported`）；打开单元（后端 `version-mismatch`／`malformed-medium` 透传）；加载并根据 spec 的 schema 校验每条已存记录与全局（`invalid-record`）；构造领域。调用方持有句柄；设施会在卸载时关闭任何仍打开的领域，已关闭领域的名称只在资源销毁完成后才能重新打开。
+`DomainFacility.open(spec)` 按严格顺序执行，任一步骤失败都会让整个调用失败：拒绝已打开或仍在关闭的名称（`already-open`）或以命名空间保留后缀形状结尾的名称（`reserved-unit-name`）；解析路由（`backend-not-found`）；要求 `kv` 分面（`facet-unsupported`）；打开单元——fleet 注入 subject 时以派生命名空间名打开（后端 `version-mismatch`／`malformed-medium` 透传）；加载并根据 spec 的 schema 校验每条已存记录与全局（`invalid-record`）；构造领域。调用方持有句柄；设施会在卸载时关闭任何仍打开的领域，已关闭领域的名称只在资源销毁完成后才能重新打开。
 
 ### 源码地图
 

@@ -9,6 +9,7 @@ export type DomainErrorCode =
   | 'facet-unsupported'
   | 'invalid-record'
   | 'missing-key'
+  | 'reserved-unit-name'
   | 'closed'
 
 /** Location of the record that failed schema validation at the durable boundary. */

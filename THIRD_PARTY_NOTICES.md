@@ -117,6 +117,7 @@ External packages installed for runtime use or distributed inside the prebuilt b
 | [`papaparse`](https://github.com/mholt/PapaParse) | MIT |
 | [`pdfjs-dist`](https://github.com/mozilla/pdf.js) | Apache-2.0 |
 | [`picomatch`](https://github.com/micromatch/picomatch) | MIT |
+| [`postgres`](https://github.com/porsager/postgres) | Unlicense |
 | [`react`](https://github.com/facebook/react) | MIT |
 | [`react-dom`](https://github.com/facebook/react) | MIT |
 | [`readable-stream`](https://github.com/nodejs/readable-stream) | MIT |
@@ -230,6 +231,7 @@ External packages **directly declared** for development, tests, types, or toolin
 | [`debug`](https://github.com/debug-js/debug) | MIT |
 | [`electron`](https://github.com/electron/electron) | MIT |
 | [`electron-builder`](https://github.com/electron-userland/electron-builder) | MIT |
+| [`embedded-postgres`](https://github.com/leinelissen/embedded-postgres) | MIT |
 | [`esbuild`](https://github.com/evanw/esbuild) | MIT |
 | [`eslint-plugin-sonarjs`](https://github.com/SonarSource/SonarJS) | LGPL-3.0-only |
 | [`extract-zip`](https://github.com/maxogden/extract-zip) | BSD-2-Clause |

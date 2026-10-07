@@ -15,9 +15,11 @@ import { descriptorOf } from './spec.ts'
 import type { DomainSpec } from './spec.ts'
 import { DomainImpl } from './domain.ts'
 import type { Domain } from './domain.ts'
+import { assertNamespaceSafeUnitName, namespaceUnitName, resolveNamespaceSubject } from './namespace.ts'
 
 export { DomainError } from './error.ts'
 export type { DomainErrorCode, DomainErrorOptions, InvalidRecordDetail } from './error.ts'
+export { NAMESPACE_ENV, assertNamespaceSafeUnitName, namespaceUnitName, resolveNamespaceSubject } from './namespace.ts'
 export { defineDomain, domainTable, descriptorOf } from './spec.ts'
 export type {
   DomainSpec, DomainGlobalSpec, DomainTableSpec,
@@ -70,24 +72,35 @@ export class DomainFacility {
   private readonly domains = new Map<string, DomainImpl>()
   /** Names reserved by an in-flight or completed open, so concurrent opens of one name fail loud. */
   private readonly reserved = new Set<string>()
+  /** Fleet subject for per-user namespaces; `undefined` keeps the plain-name default namespace. */
+  private readonly namespaceSubject: string | undefined
 
   /**
    * @param ctx - Context of the domain plugin; open-domain effects and change
    * events attach here.
    * @param config - Validated plugin config.
+   * @param env - Environment providing the fleet subject (tests inject a
+   * fixture; production reads the process environment).
    */
   constructor(
     private readonly ctx: Context,
     private readonly config: Config,
-  ) {}
+    env: NodeJS.ProcessEnv = process.env,
+  ) {
+    this.namespaceSubject = resolveNamespaceSubject(env)
+  }
 
   /**
    * Open one declared domain. Steps, each failing the whole call: reject a
-   * name that is already open (`already-open`); resolve the backend route
-   * (`backend-not-found` passes through from the hub); require its `kv` facet
-   * (`facet-unsupported`); open the unit projected from the spec (backend
-   * `version-mismatch`/`malformed-medium` pass through); load and validate
-   * every stored record against the spec's zod schemas (`invalid-record`
+   * name that is already open (`already-open`); reject a name carrying the
+   * namespace-reserved suffix shape (`reserved-unit-name`); resolve the
+   * backend route (`backend-not-found` passes through from the hub); require
+   * its `kv` facet (`facet-unsupported`); open the unit projected from the
+   * spec — under a fleet-injected subject the unit opens under its
+   * subject-derived namespace name, so domains never share a medium's data
+   * across users (backend `version-mismatch`/`malformed-medium` pass
+   * through); load and validate every stored record against the spec's zod
+   * schemas (`invalid-record`
    * with the offending table and key — unless the spec declares
    * `invalidRecords: 'backup-and-skip'` and the unit can move documents aside, in
    * which case the failing record is backed up, logged, and skipped);
@@ -114,7 +127,15 @@ export class DomainFacility {
           `backend '${backendName}' routed for domain '${spec.name}' has no kv facet`,
         )
       }
-      const unit = await backend.kv.open(descriptorOf(spec))
+      // Namespace injection point: under a fleet-injected subject every unit
+      // opens under its subject-derived name, so domains, backends, and the
+      // rest of this method stay unaware of namespaces.
+      assertNamespaceSafeUnitName(spec.name)
+      const descriptor = descriptorOf(spec)
+      const unitDescriptor = this.namespaceSubject === undefined
+        ? descriptor
+        : { ...descriptor, name: namespaceUnitName(spec.name, this.namespaceSubject) }
+      const unit = await backend.kv.open(unitDescriptor)
       try {
         const snapshot = await unit.loadAll()
         const tables = new Map<string, Map<string, unknown>>()

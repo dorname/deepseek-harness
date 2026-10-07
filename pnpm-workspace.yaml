@@ -53,6 +53,7 @@ allowBuilds:
   electron-winstaller: false
   # Store-index rewriting only needs msgpackr's portable JavaScript codec.
   msgpackr-extract: false
+  '@embedded-postgres/linux-x64': set this to true or false
 
 minimumReleaseAgeExclude:
   # Office engines and their API are qualified and released together by the kit repository.
@@ -105,3 +106,8 @@ patchedDependencies:
   '@yao-pkg/pkg@6.21.0': patches/@yao-pkg__pkg@6.21.0.patch
   exceljs@4.4.0: patches/exceljs@4.4.0.patch
   node-pty@1.2.0-beta.15: patches/node-pty@1.2.0-beta.15.patch
+# Embedded Postgres binaries for shared-persistence contract tests and the
+# staging smoke library: the only postinstall rehydrates symlinks inside the
+# package's own native/ directory (pg archives cannot store symlinks).
+onlyBuiltDependencies:
+  - '@embedded-postgres/linux-x64'

@@ -316,6 +316,7 @@
     { "path": "./packages/session-query/tool-session-query" },
     { "path": "./packages/storage/storage" },
     { "path": "./packages/storage/storage-json" },
+    { "path": "./packages/storage/storage-postgres" },
     { "path": "./packages/storage/storage-sqlite" },
     { "path": "./packages/storage/storage-domain" },
     { "path": "./packages/feedback/message-feedback" },

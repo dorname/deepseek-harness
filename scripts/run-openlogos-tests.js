@@ -1,7 +1,8 @@
 /**
  * OpenLogos verify pre-run: regenerate the acceptance ledger
  * (`logos/resources/verify/test-results.jsonl`) in one pass. The ledger holds
- * (a) every fleet-domain UT/ST record reported by the vitest suites,
+ * (a) every change-domain UT/ST record reported by the vitest suites (fleet
+ *     gateway/manager, shared-persistence namespaces),
  * (b) `ST-S33-03` from the CPU-constrained acceptance runner, and (c) explicit
  * `skip` records for the reverse-engineered baseline cases (core S01–S30):
  * those behaviors are owned by the repository's existing per-package test
@@ -60,8 +61,9 @@ const run = (name, command, args, extraEnv = {}) => {
 // The ledger describes exactly one complete run: truncate, then repopulate.
 writeFileSync(ledgerPath, '')
 
-const vitestStatus = run('fleet vitest suites', 'pnpm', ['exec', 'vitest', 'run',
+const vitestStatus = run('openlogos vitest suites', 'pnpm', ['exec', 'vitest', 'run',
   'packages/fleet/gateway/tests/gateway.spec.ts', 'packages/fleet/fleet-manager/tests/fleet-manager.spec.ts',
+  'packages/storage/storage-domain/tests/namespace.spec.ts', 'packages/storage/storage-postgres/tests/namespace-postgres.spec.ts',
 ], { OPENLOGOS_RESULT_FILE: ledgerPath })
 const acceptanceStatus = run('ST-S33-03 acceptance runner', 'node',
   ['--import', 'tsx/esm', 'scripts/fleet-staging/acceptance-st-s33-03.ts'], { OPENLOGOS_RESULT_FILE: ledgerPath })

@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The storage group keeps non-session application data across restarts, including workspace records and session sidecars. Choose `storage-json` for human-readable files or `storage-sqlite` for point updates in one database; `storage-domain` adds schema-validated typed records and change notifications, while `storage` selects the configured backend. These packages are optional and host-side: they do not expose tools, prompt content, or session events to the model. Use the group when application state must outlive a process, and omit it when the composition has no such data.
+The storage group keeps non-session application data across restarts, including workspace records and session sidecars. Choose `storage-json` for human-readable files, `storage-sqlite` for point updates in one database, or `storage-postgres` to share one database across several dsh nodes; `storage-domain` adds schema-validated typed records and change notifications, while `storage` selects the configured backend. These packages are optional and host-side: they do not expose tools, prompt content, or session events to the model. Use the group when application state must outlive a process, and omit it when the composition has no such data.
 
 ## Table of Contents
 
@@ -27,6 +27,7 @@ The storage group keeps non-session application data across restarts, including 
 | [`storage`](storage/README.md) | Connects registered backends with mounted data-form facilities | `ctx.storage` |
 | [`storage-json`](storage-json/README.md) | Stores each unit as one human-readable JSON file | registers backend `json` |
 | [`storage-sqlite`](storage-sqlite/README.md) | Stores units as JSON documents in one SQLite database | registers backend `sqlite` |
+| [`storage-postgres`](storage-postgres/README.md) | Stores units as JSON documents in one shared PostgreSQL database | registers backend `postgres` |
 | [`storage-domain`](storage-domain/README.md) | Provides schema-validated, change-emitting KV domains over routed backends | `ctx.storageDomain` |
 
 -----

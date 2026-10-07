@@ -68,9 +68,13 @@ The domain plugin's configuration decides which backend serves which domain — 
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-storage-domain) is the exhaustive source for every accepted field and its JSDoc.
 
+### Per-user namespaces
+
+When the process runs under a fleet deployment, the facility derives a per-user namespace from the authenticated subject injected as `DSH_FLEET_USER_ID`: every domain unit opens under its subject-derived name (`<unit>_u<16 hex>`), so several users can share one storage medium without seeing each other's data — domain declarations, domain implementations, and backends stay unaware of namespaces. A process without that variable opens units under their plain names, unchanged single-machine behavior. Spec names ending in the reserved suffix shape `_u<16 hex>` reject `reserved-unit-name` in every mode, so a default-namespace open can never alias a namespaced unit on the same medium.
+
 ### Observable behavior and failures
 
-Every write resolves only after the backend acknowledges durability, and each emits one `domain/changed` event in write order. Failures carry stable `DomainError` codes: `already-open` (the name is open or still closing), `facet-unsupported` (the routed backend serves no `kv` facet), `invalid-record` (a stored record or global fails its schema, naming the table and key), `missing-key` (an `update` on an absent record), and `closed` (any use after close). Backend failures such as `version-mismatch` pass through unchanged.
+Every write resolves only after the backend acknowledges durability, and each emits one `domain/changed` event in write order. Failures carry stable `DomainError` codes: `already-open` (the name is open or still closing), `reserved-unit-name` (the name ends in the namespace-reserved suffix shape), `facet-unsupported` (the routed backend serves no `kv` facet), `invalid-record` (a stored record or global fails its schema, naming the table and key), `missing-key` (an `update` on an absent record), and `closed` (any use after close). Backend failures such as `version-mismatch` pass through unchanged.
 
 -----
 
@@ -91,7 +95,7 @@ The domain layer is a single implementation, not an abstracted seam: consumers d
 
 ### Open sequence
 
-`DomainFacility.open(spec)` runs a strict sequence, each step failing the whole call: reject a name already open or still closing (`already-open`); resolve the route (`backend-not-found`); require the `kv` facet (`facet-unsupported`); open the unit (backend `version-mismatch`/`malformed-medium` pass through); load and validate every stored record and the global against the spec's schemas (`invalid-record`); construct the domain. The caller owns the handle; the facility closes any domain left open when it unmounts, and a closed domain's name frees for reopening only after teardown completes.
+`DomainFacility.open(spec)` runs a strict sequence, each step failing the whole call: reject a name already open or still closing (`already-open`) or carrying the namespace-reserved suffix shape (`reserved-unit-name`); resolve the route (`backend-not-found`); require the `kv` facet (`facet-unsupported`); open the unit — under a fleet-injected subject under its namespace-derived name (backend `version-mismatch`/`malformed-medium` pass through); load and validate every stored record and the global against the spec's schemas (`invalid-record`); construct the domain. The caller owns the handle; the facility closes any domain left open when it unmounts, and a closed domain's name frees for reopening only after teardown completes.
 
 ### Source map
 
