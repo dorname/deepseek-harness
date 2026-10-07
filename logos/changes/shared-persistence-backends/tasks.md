@@ -12,7 +12,10 @@
 - [x] 产出 delta 文件到 `deltas/test/smoke/` — core-smoke-test-cases.md：MODIFIED「二、冒烟测试用例」表追加 SMOKE-core-12/13（整表守恒携带既有 11 行）与「三、覆盖度校验」更新
 
 ## [code] 代码实现
-（本段在 plan 段留空：本提案需要代码实现，但 `[code]` 切片由 merge 后的 `slice-planner` 基于已合并规格和真实 UT/ST ID 统一规划。此处仅保留 `## [code]` 标题，勿提前填写切片项。）
+> 删后续自检（六维评分 11 → 大任务，垂直拆 3 片）：切片1（共享域 KV + 命名空间）删后续可独立过全量 verify（S35 用例自成闭环，embedded-postgres 测试 helper 随片建立自用），端到端可观察（双连接同库互不可见）；切片2（共享会话世代）删切片3 后 verify 绿（契约套 + ST 自成闭环，依赖切片1 的 helper 属被依赖片排前、非前向依赖），端到端可观察（双节点互见/崩溃恢复/写互斥）；切片3（共享附件/溢出 + smoke）收尾全规格落地，端到端可观察（跨节点取回 + SMOKE-core-12/13 接入）。无横向片（无独立"基建/接线/写测试"片），无前向依赖。
+- [ ] 切片1：共享域 KV 后端与每用户命名空间——新增 `packages/storage/storage-postgres`（`StorageBackend.kv`，表结构镜像 sqlite 物化习惯 + unit 版本戳），`storage-domain` 提供方按 `DSH_FLEET_USER_ID` 派生用户专属命名空间 unit 名（确定性安全编码进 `UNIT_NAME_RE`，冲突 loud fail；未注入走默认命名空间）；建立嵌入式 Postgres 测试 helper（`@embedded-postgres/linux-x64`，二进制缺失显式 skip）；同步 UT/ST + OpenLogos reporter（覆盖 UT-S35-01..05、ST-S35-01）
+- [ ] 切片2：共享会话世代后端——新增 `packages/session/session-persistence-postgres`（继承 `SessionPersistence`，世代行 + 尾表 + advisory lock 写互斥 + 独占发布同事务，复用 `storage-contract` 校验原语）；接入既有缝契约套 `runPersistenceContract`（工厂含 reopen/corruptTail）与 `runLiveWritePathContract`；同步 UT/ST + OpenLogos reporter（覆盖 UT-S34-01..08、ST-S34-01..03）
+- [ ] 切片3：共享附件/溢出后端与 smoke 接入——新增 `packages/attachment/attachment-postgres`（最小实现 imageLimits/validateImage/saveImage/readImage，命名空间随属主）与 `packages/spill/spill-postgres`（saveText 落共享表）；实现/更新 smoke runner 支持 SMOKE-core-12（双节点互见）与 SMOKE-core-13（命名空间互不可见），写 `logos/resources/verify/smoke-results.jsonl` reporter 并接入 `scripts/run-smoke.js`，完成后跑 smoke 覆盖预检（CPU 阈值约束下串行执行）；同步 UT/ST + OpenLogos reporter（覆盖 UT-S36-01..05、ST-S36-01..02；SMOKE-core-12/13 于 [deploy] 阶段在 staging 执行）
 
 ## [deploy] 部署任务
 - [ ] 按更新后的部署方案在 staging（本地 staging 验证环境）部署共享持久层：起共享 Postgres（免 root 二进制）→ 两个 dsh Host 实例指向同库 → 双节点打开同一用户历史会话 + SMOKE-core-12/13 走通

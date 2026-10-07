@@ -362,8 +362,6 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 - 开源社区驱动；CI 承担全平台矩阵与覆盖率门禁（per-file 100% on `packages/*/*/src`）。
 
 ### 5.3 "不做"清单
-
-### 5.3 "不做"清单
 - 不做厂商托管多租户 SaaS 后端（多用户能力以**自托管 fleet** 形态交付：认证网关 + 每用户独立进程与数据目录，见 S31–S33；由厂商运营的托管 SaaS 仍不在产品范围）。
 - 不做模型训练/微调；harness 只消费模型 API。
 - 不内置 IDE；编辑器集成走 ACP/SDK/hooks 桥，不重复造 IDE。

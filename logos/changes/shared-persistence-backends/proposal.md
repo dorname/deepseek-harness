@@ -40,6 +40,6 @@
 
 ## 变更概述
 
-本次变更为 M2 共享持久层：新增 `session-persistence-postgres`（世代元数据 + 代际指针 + 世代事件字节的 Postgres 承载，通过既有缝契约套约束崩溃一致性与单写者语义）、`storage-postgres`（域 KV 共享后端，`storage-domain` 与各域实现零改动）、`attachment-postgres`/`spill-postgres`（附件与溢出共享承载）；`storage-domain` 提供方统一注入每用户键前缀 `<uid>:`，域实现不感知命名空间（G1-3 在共享层内成立）。
+本次变更为 M2 共享持久层：新增 `session-persistence-postgres`（世代元数据 + 代际指针 + 世代事件字节的 Postgres 承载，通过既有缝契约套约束崩溃一致性与单写者语义）、`storage-postgres`（域 KV 共享后端，`storage-domain` 与各域实现零改动）、`attachment-postgres`/`spill-postgres`（附件与溢出共享承载）；`storage-domain` 提供方为每个域 unit 派生用户专属命名空间，域实现不感知命名空间（G1-3 在共享层内成立）。
 
 范围裁剪（均记录于方案原文授权内）：全文检索按 §6-3 的「按用户分库」选项（现状每 home 独立 SQLite 即满足，Postgres FTS 集中化延后）；集中凭证 KMS（§6-5「可选」）延后；世代字节先随 Postgres blob 列存储，对象存储拆分（§6-1 的「与」选项）作为后续部署变体，本提案保持「不自创协议、复用缝契约」的既定路线。测试基建引入 `@embedded-postgres/linux-x64` 免 root Postgres 二进制供契约测试与双节点 smoke 使用，二进制缺失时相关用例显式 skip（可见、不假绿）。
