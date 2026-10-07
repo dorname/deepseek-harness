@@ -19,5 +19,5 @@
 - [x] 切片3 fleet 部署编排与 smoke 闭环：本地 staging 部署编排（fleet-manager + gateway 启动配置与回滚脚本）、ST-S33-03 验收执行 CPU 约束 runner（小上限满载 + 串行执行 + CPU 峰值监控 ≤ 部署配置阈值）；实现/更新 smoke runner 覆盖 SMOKE-core-09/10/11（网关认证路由、双用户隔离抽查、生命周期与资源上限），结果写 `logos/resources/verify/smoke-results.jsonl`，接入 `logos.config.json` smoke 命令（`scripts/run-smoke.js`），完成后跑 smoke 覆盖预检
 
 ## [deploy] 部署任务
-- [ ] 按更新后的部署方案在 staging（本地 staging 验证环境）部署 fleet 形态：构建产物 → 启动 fleet 管理器与网关 → 双测试用户走通 SMOKE-core-09..11
-- [ ] 确认配置项、服务启动与回滚预案（停 fleet 管理器并回收用户进程与 homes）
+- [x] 按更新后的部署方案在 staging（本地 staging 验证环境）部署 fleet 形态：构建产物 → 启动 fleet 管理器与网关 → 双测试用户走通 SMOKE-core-09..11
+- [x] 确认配置项、服务启动与回滚预案（停 fleet 管理器并回收用户进程与 homes）
