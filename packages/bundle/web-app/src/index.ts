@@ -83,12 +83,16 @@ export const Config: z<Config> = z.object({
   trustLoopbackGateway: z.boolean().default(false),
 })
 
-/** Bind-dependent Web values shared by the trust fence and URL display. */
-export interface WebRuntimeValues {
+/** Bind-derived trust snapshot the /api fence and the URL display share. */
+export interface LanTrustSnapshot {
   /** LAN IPv4 literals sampled once when the server binds all interfaces. */
   lanAddresses: string[]
   /** LAN literals followed by explicit invocation authorities. */
   trustedHosts: string[]
+}
+
+/** Bind-dependent Web values shared by the trust fence and URL display. */
+export interface WebRuntimeValues extends LanTrustSnapshot {
   /** Whether the /api fence binds the loopback gateway's forwarded authority. */
   trustLoopbackGateway: boolean
 }
@@ -143,7 +147,7 @@ try {
  * @param extra - explicit `--trusted-host` values, in argument order.
  * @returns the LAN display addresses and invocation-derived fence authorities.
  */
-export function resolveLanTrust(bindHost: string, extra: readonly string[]): WebRuntimeValues {
+export function resolveLanTrust(bindHost: string, extra: readonly string[]): LanTrustSnapshot {
   const lanAddresses = bindHost === ALL_INTERFACES_HOST
     ? Object.values(networkInterfaces()).flat()
       .filter((iface): iface is NonNullable<typeof iface> => iface !== undefined && iface.family === 'IPv4' && !iface.internal)

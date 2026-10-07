@@ -1,0 +1,15 @@
+{
+  "stagingRoot": null,
+  "maxUsers": 2,
+  "idleRecycleMs": 10000,
+  "maxRestarts": 3,
+  "restartWindowMs": 60000,
+  "stopTimeoutMs": 10000,
+  "portReadyTimeoutMs": 60000,
+  "cpuThresholdPercent": 80,
+  "oidc": {
+    "issuer": null,
+    "clientId": "dsh-fleet-staging-gateway",
+    "clientSecret": "staging-local-only-not-a-production-secret"
+  }
+}

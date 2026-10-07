@@ -1,0 +1,10 @@
+{"id":"SMOKE-core-01","status":"pass","timestamp":"2026-10-07T04:31:35.013Z","duration_ms":81,"scenario":"cli version health check"}
+{"id":"SMOKE-core-02","status":"pass","timestamp":"2026-10-07T04:31:35.129Z","duration_ms":116,"scenario":"web profile dump-config"}
+{"id":"SMOKE-core-03","status":"pass","timestamp":"2026-10-07T04:31:36.885Z","duration_ms":1756,"scenario":"web core entry and static assets"}
+{"id":"SMOKE-core-04","status":"pass","timestamp":"2026-10-07T04:31:40.782Z","duration_ms":3897,"scenario":"no-credential boot guides instead of crashing"}
+{"id":"SMOKE-core-05","status":"pass","timestamp":"2026-10-07T04:31:42.769Z","duration_ms":1987,"scenario":"proxy trust fence accepts trusted Host and rejects foreign Host"}
+{"id":"SMOKE-core-06","status":"skip","timestamp":"2026-10-07T04:31:42.770Z","duration_ms":1,"scenario":"headless minimal task (real API)"}
+{"id":"SMOKE-core-07","status":"skip","timestamp":"2026-10-07T04:31:42.770Z","duration_ms":0,"scenario":"TS SDK minimal run (real API)"}
+{"id":"SMOKE-core-09","status":"pass","timestamp":"2026-10-07T04:31:44.468Z","duration_ms":1698,"scenario":"fleet gateway authentication and per-user routing"}
+{"id":"SMOKE-core-10","status":"pass","timestamp":"2026-10-07T04:31:46.210Z","duration_ms":1742,"scenario":"cross-user isolation spot check"}
+{"id":"SMOKE-core-11","status":"pass","timestamp":"2026-10-07T04:32:06.082Z","duration_ms":19872,"scenario":"fleet lifecycle; CPU peak 20.3% <= 80%"}

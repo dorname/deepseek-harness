@@ -119,8 +119,8 @@ function harness(config: { maxUsers?: number; idleRecycleMs?: number; maxRestart
     {
       homesDir: tempDir(),
       idleRecycleMs: config.idleRecycleMs ?? 1_000,
-      maxUsers: config.maxUsers,
-      maxRestarts: config.maxRestarts,
+      ...(config.maxUsers === undefined ? {} : { maxUsers: config.maxUsers }),
+      ...(config.maxRestarts === undefined ? {} : { maxRestarts: config.maxRestarts }),
       restartWindowMs: 10_000,
     },
     {

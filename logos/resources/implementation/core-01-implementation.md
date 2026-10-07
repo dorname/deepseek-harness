@@ -36,6 +36,9 @@
 | S28 搜索 | `packages/session-query/*`（sqlite FTS5 + 5 个工具） | 单测 |
 | S29 交付物 | `packages/deliverables/*`（tool-present、workspace-changes） | 单测 |
 | S30 附件 | `packages/attachment/*` | 单测 |
+| S31 网关登录 | `packages/fleet/gateway`（OIDC 授权码 + 网关会话）、`packages/bundle/web-app`（`--trust-loopback-gateway`）、`packages/client/connection`（信任转发 authority） | UT/ST-S31（JSONL reporter）+ `SMOKE-core-09` |
+| S32 跨用户隔离 | `packages/fleet/gateway`（按主体严格路由、回环启动令牌 jar） | UT/ST-S32（JSONL reporter）+ `SMOKE-core-10` |
+| S33 fleet 生命周期 | `packages/fleet/fleet-manager`（开通/回收/重启/上限）、`packages/identity/anonymous-user-id`（fleet 审计归属） | UT/ST-S33（JSONL reporter）+ `SMOKE-core-11`、`ST-S33-03` CPU 约束 runner（`scripts/fleet-staging/`） |
 
 ## 二、横切机制实现
 
@@ -60,4 +63,4 @@
 
 ## 四、OpenLogos reporter 接入现状
 
-按 `logos/spec/test-results.md`，生成的测试代码须将用例 ID + 结果写入 `logos/resources/verify/test-results.jsonl`。存量测试体系（vitest）尚未按 `UT-*/ST-*` ID 输出 JSONL——属于后续变更（接入 reporter 或桥接现有 runner）的实现项；本清单为其提供用例 ID 来源（`logos/resources/test/core-S*-test-cases.md`）。
+按 `logos/spec/test-results.md`，生成的测试代码须将用例 ID + 结果写入 `logos/resources/verify/test-results.jsonl`。fleet 域（S31–S33）的 vitest 套件已通过 `OPENLOGOS_RESULT_FILE` 环境门控的 reporter 按 `UT-*/ST-*` ID 追加 JSONL；`scripts/run-openlogos-tests.js`（`verify.pre_run_command`）负责清空账本、运行 fleet 套件与 `ST-S33-03` 验收 runner，并对 S01–S30 逆向基线用例补写显式 `skip` 记录（其行为由存量包测试承担）。`scripts/run-smoke.js`（`smoke.command`）串行执行 `scripts/smoke-core.ts`，把 `SMOKE-core-*` 结果写入 `logos/resources/verify/smoke-results.jsonl`。存量 S01–S30 域的 reporter 桥接仍属后续变更；本清单为其提供用例 ID 来源（`logos/resources/test/core-S*-test-cases.md`）。

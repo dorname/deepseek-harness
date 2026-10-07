@@ -87,9 +87,10 @@
     "sandbox_mode": "auto",
     "sandbox_root": "/private/tmp",
     "sandbox_deny_workspace_write": true,
-    "pre_run_command": "npm test"
+    "pre_run_command": "node scripts/run-openlogos-tests.js"
   },
   "smoke": {
+    "command": "node scripts/run-smoke.js",
     "result_path": "logos/resources/verify/smoke-results.jsonl",
     "report_path": "logos/resources/verify/smoke-report.md",
     "sandbox_mode": "auto",

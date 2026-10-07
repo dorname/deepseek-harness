@@ -232,7 +232,7 @@ async function startFakeUserProcess(subject: string): Promise<FakeUserProcess> {
       if (token === 'reset') {
         // Kill the exchange connection with a hard reset and no response, the
         // way a process dying between a rejected jar and the exchange behaves.
-        response.socket.resetAndDestroy()
+        response.socket?.resetAndDestroy()
         return
       }
       if (token === 'bare-303') {
@@ -862,7 +862,7 @@ describe('FleetGateway upgrades (unit)', () => {
 async function upgradeThrough(base: string, path: string, cookie: string | undefined, tail?: string): Promise<string | undefined> {
   const url = new URL(base)
   return await new Promise<string | undefined>((resolve) => {
-    const socket = connect({ host: url.hostname, port: url.port }, () => {
+    const socket = connect({ host: url.hostname, port: Number(url.port) }, () => {
       // The tail rides in the same write so the server buffers it as upgrade
       // `head` bytes rather than post-upgrade stream data.
       socket.write(`GET ${path} HTTP/1.1\r\nhost: ${url.host}\r\nupgrade: websocket\r\nconnection: Upgrade\r\nsec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==\r\nsec-websocket-version: 13\r\nset-cookie: upgrade-check=1\r\n${cookie === undefined ? '' : `cookie: ${cookie}\r\n`}\r\n${tail ?? ''}`)
