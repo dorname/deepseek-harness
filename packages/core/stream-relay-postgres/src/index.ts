@@ -63,8 +63,46 @@ export class PostgresStreamRelay extends StreamRelay {
 
   private readonly ready: Promise<postgresType.Sql>
   private closing: Promise<void> | undefined
-  /** One shared LISTEN subscription; per-session subscribers multiplex over it. */
+  /** One shared LISTEN subscription on its own client; per-session subscribers multiplex over it. */
   private listening: Promise<postgresType.ListenMeta> | undefined
+  /** The dedicated LISTEN client; it ends with the subscription, not with the pool. */
+  private listenClient: postgresType.Sql | undefined
+  /** Every subscription's LISTEN handle, so one subscriber's unsubscribe only drops its own. */
+  private readonly subscribers = new Set<{ stopped: boolean }>()
+
+  /**
+   * Drop the shared LISTEN subscription and end the connection pool. The
+   * context effect calls this; an explicit call lets a driver sequence the
+   * relay pool before other providers stop theirs — a LISTEN handle keeps
+   * `sql.end` pending while it remains attached.
+   */
+  async closePool(): Promise<void> {
+    this.closing ??= (async () => {
+      this.listening = undefined
+      // The LISTEN handle lives on a dedicated client; ending that client
+      // releases the listen connection without waiting on the pool's own
+      // statement traffic. Unsubscribe first so no catch-up runs against a
+      // closing pool.
+      this.subscribers.forEach((subscriber) => {
+        subscriber.stopped = true
+      })
+      this.subscribers.clear()
+      if (this.listenClient !== undefined) {
+        const client = this.listenClient
+        this.listenClient = undefined
+        await client.end({ timeout: 5 }).catch(() => undefined)
+      }
+      try {
+        const sql = await this.ready
+        await sql.end({ timeout: 5 })
+      } catch {
+        // The pool never connected; that failure already rejected the first
+        // caller, and there is nothing left to release here.
+      }
+      console.error('['+this.name+'.closePool] done')
+    })()
+    await this.closing
+  }
 
   constructor(ctx: Context, public config: Config) {
     super(ctx)
@@ -74,16 +112,7 @@ export class PostgresStreamRelay extends StreamRelay {
     // unhandled-rejection crash when the failure precedes the first use.
     this.ready.catch(() => {})
     ctx.effect(() => async () => {
-      this.closing ??= (async () => {
-        try {
-          const sql = await this.ready
-          await sql.end({ timeout: 5 })
-        } catch {
-          // The pool never connected; that failure already rejected the first
-          // caller, and there is nothing left to release here.
-        }
-      })()
-      await this.closing
+      await this.closePool()
     }, 'stream-relay-postgres connection pool')
   }
 
@@ -172,7 +201,7 @@ export class PostgresStreamRelay extends StreamRelay {
     pollMs = 0,
     signal?: AbortSignal,
   ): Promise<() => void> {
-    const sql = await this.ready
+    await this.ready
     let cursor = afterSeq
     let stopped = false
     let draining: Promise<void> = Promise.resolve()
@@ -205,11 +234,17 @@ export class PostgresStreamRelay extends StreamRelay {
     // Shared LISTEN multiplexed across this provider's subscribers; the wake
     // payload names the session, so unrelated wakes cost one cursor read.
     // ListenRequest is thenable and carries `unlisten` after it resolves.
-    const listener = await (this.listening ??= Promise.resolve(
-      sql.listen(RELAY_WAKE_CHANNEL, (payload: string) => {
-        if (payload === id && !stopped) scheduleCatchUp()
-      }),
-    ))
+    if (this.listening === undefined) {
+      this.listenClient = postgres(this.config.connectionString, { max: 1 })
+      this.listening = Promise.resolve(
+        this.listenClient.listen(RELAY_WAKE_CHANNEL, (payload: string) => {
+          if (payload === id && !stopped) scheduleCatchUp()
+        }),
+      )
+    }
+    const listener = await this.listening
+    const handle = { stopped }
+    this.subscribers.add(handle)
     // Late join replays immediately; the poll tick is the lost-wake fallback.
     scheduleCatchUp()
     const poll = pollMs > 0
@@ -223,7 +258,10 @@ export class PostgresStreamRelay extends StreamRelay {
       stopped = true
       if (poll !== undefined) clearInterval(poll)
       signal?.removeEventListener('abort', unsubscribe)
-      void listener.unlisten()
+      this.subscribers.delete(handle)
+      // Only the LAST subscriber's unsubscribe releases the shared LISTEN
+      // handle; an earlier one must not end a wake still in use.
+      if (this.subscribers.size === 0) void listener.unlisten()
     }
     signal?.addEventListener('abort', unsubscribe, { once: true })
     return unsubscribe

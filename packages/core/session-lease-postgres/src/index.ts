@@ -58,6 +58,21 @@ export class PostgresSessionLease extends SessionLease {
   private readonly ready: Promise<postgresType.Sql>
   private closing: Promise<void> | undefined
 
+  /** End the connection pool explicitly; the context effect also closes it. */
+  async closePool(): Promise<void> {
+    this.closing ??= (async () => {
+      try {
+        const sql = await this.ready
+        await sql.end({ timeout: 5 })
+      } catch {
+        // The pool never connected; that failure already rejected the first
+        // caller, and there is nothing left to release here.
+      }
+      console.error('['+this.name+'.closePool] done')
+    })()
+    await this.closing
+  }
+
   constructor(ctx: Context, public config: Config) {
     super(ctx)
     this.ready = this.connect(config.connectionString, config.max ?? 2)
@@ -66,16 +81,7 @@ export class PostgresSessionLease extends SessionLease {
     // unhandled-rejection crash when the failure precedes the first use.
     this.ready.catch(() => {})
     ctx.effect(() => async () => {
-      this.closing ??= (async () => {
-        try {
-          const sql = await this.ready
-          await sql.end({ timeout: 5 })
-        } catch {
-          // The pool never connected; that failure already rejected the first
-          // caller, and there is nothing left to release here.
-        }
-      })()
-      await this.closing
+      await this.closePool()
     }, 'session-lease-postgres connection pool')
   }
 

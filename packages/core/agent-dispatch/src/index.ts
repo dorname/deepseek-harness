@@ -74,6 +74,8 @@ export class PostgresAgentDispatch {
 
   private readonly ready: Promise<postgresType.Sql>
   private closing: Promise<void> | undefined
+  /** LISTEN handle of the active loop, so teardown can drop it before closing. */
+  private loopListener: { unlisten(): Promise<void> } | undefined
 
   constructor(
     private readonly ctx: Context,
@@ -167,6 +169,7 @@ export class PostgresAgentDispatch {
     const listener = await sql.listen(WAKE_CHANNEL, () => {
       fireWake?.()
     })
+    this.loopListener = listener
     try {
       while (!signal.aborted) {
         const taken = await this.take(sql)
@@ -187,8 +190,28 @@ export class PostgresAgentDispatch {
         await this.drive(SessionId(session), nodeId, ttlMs, idleGraceMs, signal)
       }
     } finally {
+      this.loopListener = undefined
       await listener.unlisten()
     }
+  }
+
+  /**
+   * End the connection pool explicitly; the context effect also closes it,
+   * but an explicit close lets a driver sequence teardown before other pools.
+   */
+  async closePool(): Promise<void> {
+    this.closing ??= (async () => {
+      await this.loopListener?.unlisten().catch(() => undefined)
+      this.loopListener = undefined
+      try {
+        const sql = await this.ready
+        await sql.end({ timeout: 5 })
+      } catch {
+        // The pool never connected; that failure already rejected the first
+        // caller, and there is nothing left to release here.
+      }
+    })()
+    await this.closing
   }
 
   /**
@@ -233,7 +256,6 @@ export class PostgresAgentDispatch {
     }, Math.max(50, Math.floor(ttlMs / 3)))
     let handle: AgentHandle | undefined
     try {
-      handle = await this.ctx.agents.resume({ resumeSessionId: session })
       // This runner is the session's owner: relay its live events and frames
       // so replicas' follow streams see the turn in real time. The relay is
       // optional — a deployment without one keeps its local-only view.
@@ -248,11 +270,15 @@ export class PostgresAgentDispatch {
           void relay.publish(session, 'stream-frame', frame as unknown as JsonValue).catch(() => undefined)
         })
       }
+      const resume = this.ctx.get('agents')?.resume.bind(this.ctx.get('agents'))
+      if (resume !== undefined) {
+        handle = await resume({ resumeSessionId: session })
+      }
       const lost = lease.waitLost(session, nodeId, Math.max(50, Math.floor(ttlMs / 5)), loopSignal)
       lost.then(() => {
         handle?.agent.cancel({ kind: 'disposed' }, { keepInbox: true })
       }, () => undefined)
-      await handle.agent.whenIdle()
+      await handle?.agent.whenIdle()
       await new Promise(resolve => setTimeout(resolve, idleGraceMs))
     } catch (error: unknown) {
       if (loopSignal.aborted) return

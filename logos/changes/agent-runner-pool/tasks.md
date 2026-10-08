@@ -16,7 +16,7 @@
 > 删后续自检（六维评分 → 大任务，垂直拆 3 片）：切片1（租约 + 中继，两缝各自契约自成闭环，删后续独立过 verify；端到端可观察——双连接竞争恰一胜者、双订阅同帧序）；切片2（派发 + runner 编排 + session-controller 接入，依赖切片1 的两缝属被依赖片排前，删切片3 后 verify 绿（kill-runner 接管、inbox 接续可观察））；切片3（staging 部署 + smoke 接入，端到端可观察——SMOKE-core-14/15 走通）。无横向片，无前向依赖。
 - [x] 切片1：会话租约与流中继——新增 `packages/core/session-lease`（Service Definition：acquire/renew/release/ownerOf/waitLost）与 `packages/core/session-lease-postgres`（租约表 + 原子过期接管）；新增 `packages/core/stream-relay`（Service Definition：publish/subscribe）与 `packages/core/stream-relay-postgres`（`stream_relay_log` 表 + LISTEN/NOTIFY 唤醒 + 序号追赶）；嵌入式 Postgres 测试 helper 随包建立（复用 M2 模式，二进制缺失显式 skip）；同步 UT/ST + OpenLogos reporter（覆盖 UT-S37-01..05、UT-S39-01..04、ST-S37-01..03、ST-S39-01..02）
 - [x] 切片2：派发队列与 runner 编排——新增 `packages/core/agent-dispatch`（队列表 + publish + Runner 编排循环：consume→acquire→`agents.resume`→waitLost 即 cancel→空闲 release）；`packages/api/session-controller` follow 数据面加 relay 增量源（冷读共享层后从 relay 追加）；同步 UT/ST + OpenLogos reporter（覆盖 UT-S38-01..05、ST-S38-01..03）
-- [ ] 切片3：staging 部署与 smoke 接入——staging driver（共享 PG + runner A/runner B/副本进程，串行操作 + CPU 监控）；实现 smoke runner 支持 SMOKE-core-14（kill runner 接管续跑）与 SMOKE-core-15（双副本同看流），接入 `scripts/run-smoke.js`；完成后跑 smoke 覆盖预检（CPU 阈值约束下串行执行）
+- [x] 切片3：staging 部署与 smoke 接入——staging driver（共享 PG + runner A/runner B/副本进程，串行操作 + CPU 监控）；实现 smoke runner 支持 SMOKE-core-14（kill runner 接管续跑）与 SMOKE-core-15（双副本同看流），接入 `scripts/run-smoke.js`；完成后跑 smoke 覆盖预检（CPU 阈值约束下串行执行）
 
 ## [deploy] 部署任务
 - [ ] 按更新后的部署方案在 staging 部署执行池：起共享 Postgres（免 root 二进制）→ runner A 与 runner B 进程指向同库 → kill 正在执行的 runner A → runner B 在租约过期内接管并接续 inbox 未消费输入 + 双副本同看流走通（SMOKE-core-14/15）
