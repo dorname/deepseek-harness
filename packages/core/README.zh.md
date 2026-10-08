@@ -36,6 +36,7 @@ kind: "package-group"
 | [`session-lease-postgres/`](session-lease-postgres/README.zh.md) | PostgreSQL 租约提供方：原子获取、心跳续约、过期接管 | 注册到 `ctx.sessionLease` |
 | [`stream-relay/`](stream-relay/README.zh.md) | Service Definition：会话事件与 assistant-stream 帧的跨节点中继 | `ctx.streamRelay` |
 | [`stream-relay-postgres/`](stream-relay-postgres/README.zh.md) | PostgreSQL 中继提供方：每会话单调日志 + LISTEN/NOTIFY 唤醒 | 注册到 `ctx.streamRelay` |
+| [`agent-dispatch/`](agent-dispatch/README.zh.md) | 派发队列与 runner 编排：投递会话 id、取租约、从共享 inbox 接续、丢租约即取消 | `ctx.agentDispatch` |
 
 `scope` 提供共享作用域原语；`agent` 负责公开的 `Agent` 约定，而 `agent-loop` 是其默认实现，因此扩展插件依赖 `agent`，驱动器保持可替换。`agent-default-model` 负责入口在会话自身没有选择时应用的部署选择。可运行组合位于 [`packages/bundle`](../bundle/README.zh.md)；本分组只负责可替换的主干组件。
 

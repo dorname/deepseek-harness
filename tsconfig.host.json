@@ -283,6 +283,7 @@
     { "path": "./packages/llm/deepseek-llm-api-extensions" },
     { "path": "./packages/llm/token-meter" },
     { "path": "./packages/core/session" },
+    { "path": "./packages/core/agent-dispatch" },
     { "path": "./packages/core/session-lease" },
     { "path": "./packages/core/session-lease-postgres" },
     { "path": "./packages/core/stream-relay" },

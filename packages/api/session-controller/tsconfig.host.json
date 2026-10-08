@@ -23,6 +23,7 @@
     "src/skill-catalog.ts"
   ],
   "references": [
+    { "path": "../../core/stream-relay" },
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },
     { "path": "../../core/agent" },

@@ -16,6 +16,7 @@ import type {
   SessionSeqCursor,
 } from '@deepseek-ai/dsh-session'
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
+import type { StreamRelay, RelayRecord } from '@deepseek-ai/dsh-stream-relay'
 import type {} from '@deepseek-ai/dsh-subagent'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
@@ -128,6 +129,7 @@ export class SessionHistoryController {
         readonly frame: SessionAssistantStreamFrame
         readonly ordinal: number
       }
+      | { readonly type: 'relay'; readonly record: RelayRecord }
     >()
     let snapshotCursor: SessionSeqCursor | undefined
     let assistantStreamOrdinal = 0
@@ -148,12 +150,27 @@ export class SessionHistoryController {
       buffered.pushBack({ type: 'event', event })
       notify()
     }, { global: true })
+    // Non-owner replica: when a stream relay is mounted, records published by
+    // the owning runner feed the same buffered queue, ordered by the relay's
+    // per-session sequence — the local `session/event` listener never fires
+    // for a session this process never runs, and the two sources never
+    // overlap because the owning process is the only local publisher.
+    const relay: StreamRelay | undefined = this.ctx.get('streamRelay')
+    let disposeRelay: (() => void) | undefined
+    if (relay !== undefined) {
+      disposeRelay = undefined
+      void relay.subscribe(target, 0, (record) => {
+        buffered.pushBack({ type: 'relay', record })
+        notify()
+      }, 100, signal).then((unsubscribe) => {
+        disposeRelay = unsubscribe
+      }, () => undefined)
+    }
     const disposeCreated = this.ctx.on('session/created', (session) => {
       if (session.id !== target) return
       // Constructor seed events have no session/event notification. Normally
       // only the end-seed suffix is new; if persistence advanced after the
       // opening observation, replay everything beyond that snapshot cursor.
-      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const suffix = session.snapshotEvents(snapshotCursor === undefined
         ? session.firstLiveSeq
         : SessionLogOffset(snapshotCursor + 1))
@@ -223,6 +240,19 @@ export class SessionHistoryController {
           }
           continue
         }
+        if (item.type === 'relay') {
+          // A relayed `session/event` carries the same serialized event the
+          // owning process logged; a `stream-frame` carries one wire frame.
+          // Both arrive in per-session sequence and land in the same output
+          // shapes the local listeners would have produced.
+          const payload = item.record.payload
+          if (item.record.kind === 'session-event' && typeof payload === 'object' && payload !== null) {
+            yield { type: 'event', event: payload as unknown as SessionEventEntry['event'] }
+          } else if (item.record.kind === 'stream-frame') {
+            yield { type: 'assistant-stream', frame: payload as unknown as SessionAssistantStreamFrame }
+          }
+          continue
+        }
         const expectedSeq = SessionSeq(nextOffset)
         if (item.event.seq < expectedSeq) continue
         if (item.event.seq !== expectedSeq) {
@@ -237,6 +267,7 @@ export class SessionHistoryController {
       disposeCreated()
       disposeEvent()
       disposeAssistantStream?.()
+      disposeRelay?.()
     }
   }
 

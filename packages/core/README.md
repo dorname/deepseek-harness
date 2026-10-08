@@ -36,6 +36,7 @@ Use the core packages to build or extend an agent that records durable session h
 | [`session-lease-postgres/`](session-lease-postgres/README.md) | PostgreSQL lease provider: atomic acquire, heartbeat renew, expired takeover | registers on `ctx.sessionLease` |
 | [`stream-relay/`](stream-relay/README.md) | Service Definition: cross-node relay for session events and assistant-stream frames | `ctx.streamRelay` |
 | [`stream-relay-postgres/`](stream-relay-postgres/README.md) | PostgreSQL relay provider: monotonic per-session log with LISTEN/NOTIFY wakeups | registers on `ctx.streamRelay` |
+| [`agent-dispatch/`](agent-dispatch/README.md) | Dispatch queue and runner orchestration: publish session ids, lease them, resume from the shared inbox, cancel on lease loss | `ctx.agentDispatch` |
 
 `scope` supplies the shared scoping primitive; `agent` owns the public `Agent` contract, while `agent-loop` is its default implementation, so extension plugins depend on `agent` and the driver stays swappable. `agent-default-model` owns the deployment selection an entry point applies when a session has none of its own. Runnable compositions live under [`packages/bundle`](../bundle/README.md); this group owns only the swappable spine pieces.
 
