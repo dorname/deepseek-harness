@@ -8,8 +8,8 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { readdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { appendFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const scriptsDir = join(fileURLToPath(new URL('.', import.meta.url)))
@@ -20,6 +20,13 @@ if (runners.length === 0) {
   console.error('run-smoke: no scripts/smoke-* runners found')
   process.exit(1)
 }
+
+// The dispatcher owns the ledger's lifecycle: truncate once up front, so one
+// smoke run is one coherent ledger. Individual runners only append.
+const ledgerPath = process.env.OPENLOGOS_SMOKE_RESULT_PATH ?? join(scriptsDir, '..', 'logos', 'resources', 'verify', 'smoke-results.jsonl')
+mkdirSync(dirname(ledgerPath), { recursive: true })
+writeFileSync(ledgerPath, '')
+void appendFileSync
 
 let failed = false
 for (const runner of runners) {
@@ -35,7 +42,7 @@ for (const runner of runners) {
   console.log(`run-smoke: ${runner}`)
   const result = spawnSync(command, args, {
     stdio: 'inherit',
-    env: process.env,
+    env: { ...process.env, OPENLOGOS_SMOKE_RESULT_PATH: process.env.OPENLOGOS_SMOKE_RESULT_PATH ?? join(scriptsDir, '..', 'logos', 'resources', 'verify', 'smoke-results.jsonl') },
     cwd: join(scriptsDir, '..'),
   })
   if (result.status !== 0) {

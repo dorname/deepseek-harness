@@ -43,6 +43,7 @@ interface CaseOutcome {
 
 /** Append one ledger record; the smoke dispatcher owns truncation at start. */
 function report(id: string, outcome: CaseOutcome): void {
+  appendFileSync('/tmp/m3-report-probe.log', `${id} → ${RESULT_PATH} cwd=${process.cwd()}\n`)
   const record: Record<string, unknown> = {
     id,
     status: outcome.status ?? 'pass',

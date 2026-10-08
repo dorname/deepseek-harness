@@ -14,7 +14,7 @@
  */
 
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { createServer, request, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -476,7 +476,6 @@ const cases: Array<{ id: string; scenario: string; run: () => CaseOutcome | void
 /** Run the battery serially, writing one ledger record per case. */
 async function main(): Promise<void> {
   mkdirSync(join(RESULT_PATH, '..'), { recursive: true })
-  writeFileSync(RESULT_PATH, '')
   let failures = 0
   let skips = 0
   for (const entry of cases) {

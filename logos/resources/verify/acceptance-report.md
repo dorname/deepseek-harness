@@ -6,12 +6,12 @@
 
 | Metric | Value |
 |--------|-------|
-| Defined cases | 113 |
+| Defined cases | 135 |
 | Manual cases (excluded) | 2 |
-| Executed cases | 113 |
-| Passed | 38 |
+| Executed cases | 135 |
+| Passed | 55 |
 | Failed | 0 |
-| Skipped | 75 |
+| Skipped | 80 |
 | Uncovered | 0 |
 | Coverage | 100% |
 | Pass rate | 100% |
@@ -94,6 +94,11 @@
 - ST-S29-02
 - ST-S30-01
 - ST-S30-02
+- UT-S37-05
+- UT-S38-03
+- UT-S38-04
+- UT-S38-05
+- UT-S39-04
 
 ## Design-time Coverage (Layer 1)
 
@@ -110,5 +115,6 @@
 | ✅ | 日志与监控：SMOKE-core-08 [manual]（人工查日志） | smoke/core-smoke-test-cases.md |
 | ✅ | fleet 认证与隔离：SMOKE-core-09/10/11（串行执行，CPU 峰值受部署配置阈值约束） | smoke/core-smoke-test-cases.md |
 | ✅ | 共享持久层：SMOKE-core-12/13（双节点串行执行，嵌入式 Postgres 与双实例同时运行时监控 CPU 不超部署配置阈值） | smoke/core-smoke-test-cases.md |
+| ✅ | 执行池：SMOKE-core-14/15（kill-runner 接管续跑与双副本流式实时；runner 操作串行触发，多进程运行时监控 CPU 不超部署配置阈值） | smoke/core-smoke-test-cases.md |
 
-**9/9** assertions confirmed.
+**10/10** assertions confirmed.

@@ -12,7 +12,7 @@
     "prd": {
       "label": {
         "en": "Product Docs",
-        "zh": "产品文档"
+        "zh": "\u4ea7\u54c1\u6587\u6863"
       },
       "path": "./resources/prd",
       "pattern": "**/*.{md,html,htm,pdf}"
@@ -20,7 +20,7 @@
     "api": {
       "label": {
         "en": "API Docs",
-        "zh": "API 文档"
+        "zh": "API \u6587\u6863"
       },
       "path": "./resources/api",
       "pattern": "**/*.{yaml,yml,json}"
@@ -28,7 +28,7 @@
     "test": {
       "label": {
         "en": "Test Cases",
-        "zh": "测试用例"
+        "zh": "\u6d4b\u8bd5\u7528\u4f8b"
       },
       "path": "./resources/test",
       "pattern": "**/*.md"
@@ -36,7 +36,7 @@
     "scenario": {
       "label": {
         "en": "Scenarios",
-        "zh": "业务场景"
+        "zh": "\u4e1a\u52a1\u573a\u666f"
       },
       "path": "./resources/scenario",
       "pattern": "**/*.json"
@@ -44,7 +44,7 @@
     "database": {
       "label": {
         "en": "Database",
-        "zh": "数据库"
+        "zh": "\u6570\u636e\u5e93"
       },
       "path": "./resources/database",
       "pattern": "**/*.sql"
@@ -52,7 +52,7 @@
     "implementation": {
       "label": {
         "en": "Implementation",
-        "zh": "实现清单"
+        "zh": "\u5b9e\u73b0\u6e05\u5355"
       },
       "path": "./resources/implementation",
       "pattern": "**/*.md"
@@ -60,7 +60,7 @@
     "verify": {
       "label": {
         "en": "Verify Reports",
-        "zh": "验收报告"
+        "zh": "\u9a8c\u6536\u62a5\u544a"
       },
       "path": "./resources/verify",
       "pattern": "**/*.{jsonl,md}"
@@ -68,7 +68,7 @@
     "changes": {
       "label": {
         "en": "Change Proposals",
-        "zh": "变更提案"
+        "zh": "\u53d8\u66f4\u63d0\u6848"
       },
       "path": "./changes",
       "pattern": "**/*.{md,json}"
@@ -85,7 +85,7 @@
   "verify": {
     "result_path": "logos/resources/verify/test-results.jsonl",
     "sandbox_mode": "auto",
-    "sandbox_root": "/private/tmp",
+    "sandbox_root": "/tmp/openlogos-sandbox",
     "sandbox_deny_workspace_write": true,
     "pre_run_command": "node scripts/run-openlogos-tests.js"
   },
@@ -94,7 +94,7 @@
     "result_path": "logos/resources/verify/smoke-results.jsonl",
     "report_path": "logos/resources/verify/smoke-report.md",
     "sandbox_mode": "auto",
-    "sandbox_root": "/private/tmp",
+    "sandbox_root": "/tmp/openlogos-sandbox",
     "sandbox_deny_workspace_write": true
   }
 }
