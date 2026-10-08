@@ -120,8 +120,10 @@ async function main(): Promise<void> {
         const reader = await b.ctx.sessionPersistence.open(header.id, 'read')
         const events = await reader.read()
         await reader.close()
-        assert(events.events.length === 2, `node B read ${String(events.events.length)} events, expected 2`)
-        assert(events.events[0]?.seq === 0 && events.events[1]?.seq === 1, 'node B observed different event seqs')
+        const seqs = events.events.map(event => event.seq)
+        const wrote = oneTurnLog().map(event => event.seq)
+        assert(JSON.stringify(seqs) === JSON.stringify(wrote),
+          `node B read ${JSON.stringify(seqs)}, node A wrote ${JSON.stringify(wrote)}`)
       } finally {
         await a.dispose()
         await b.dispose()

@@ -1,24 +1,12 @@
-{"id":"SMOKE-core-01","status":"pass","timestamp":"2026-10-07T07:38:32.273Z","duration_ms":69,"scenario":"cli version health check"}
-{"id":"SMOKE-core-02","status":"pass","timestamp":"2026-10-07T07:38:32.377Z","duration_ms":103,"scenario":"web profile dump-config"}
-{"id":"SMOKE-core-03","status":"pass","timestamp":"2026-10-07T07:38:34.000Z","duration_ms":1623,"scenario":"web core entry and static assets"}
-{"id":"SMOKE-core-04","status":"pass","timestamp":"2026-10-07T07:38:37.636Z","duration_ms":3635,"scenario":"no-credential boot guides instead of crashing"}
-{"id":"SMOKE-core-05","status":"pass","timestamp":"2026-10-07T07:38:41.595Z","duration_ms":3959,"scenario":"proxy trust fence accepts trusted Host and rejects foreign Host"}
-{"id":"SMOKE-core-06","status":"skip","timestamp":"2026-10-07T07:38:41.596Z","duration_ms":1,"scenario":"headless minimal task (real API)"}
-{"id":"SMOKE-core-07","status":"skip","timestamp":"2026-10-07T07:38:41.596Z","duration_ms":0,"scenario":"TS SDK minimal run (real API)"}
-{"id":"SMOKE-core-09","status":"pass","timestamp":"2026-10-07T07:38:43.313Z","duration_ms":1717,"scenario":"fleet gateway authentication and per-user routing"}
-{"id":"SMOKE-core-10","status":"pass","timestamp":"2026-10-07T07:38:46.344Z","duration_ms":3031,"scenario":"cross-user isolation spot check"}
-{"id":"SMOKE-core-11","status":"pass","timestamp":"2026-10-07T07:39:08.913Z","duration_ms":22569,"scenario":"fleet lifecycle; CPU peak 18.2% <= 80%"}
-{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:33:01.540Z","duration_ms":82,"scenario":"two nodes converge on one committed session"}
-{"id":"SMOKE-core-13","status":"fail","timestamp":"2026-10-08T04:33:01.594Z","duration_ms":53,"scenario":"per-user namespaces stay mutually invisible","error":"invalid plugin, expect function or object with an \"apply\" method, received undefined"}
-{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:33:44.808Z","duration_ms":82,"scenario":"two nodes converge on one committed session"}
-{"id":"SMOKE-core-13","status":"fail","timestamp":"2026-10-08T04:33:44.839Z","duration_ms":31,"scenario":"per-user namespaces stay mutually invisible","error":"invalid plugin, expect function or object with an \"apply\" method, received undefined"}
-{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:34:31.222Z","duration_ms":85,"scenario":"two nodes converge on one committed session"}
-{"id":"SMOKE-core-13","status":"fail","timestamp":"2026-10-08T04:34:31.258Z","duration_ms":36,"scenario":"per-user namespaces stay mutually invisible","error":"cannot get property \"connectionString\" without inject"}
-{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:35:22.239Z","duration_ms":85,"scenario":"two nodes converge on one committed session"}
-{"id":"SMOKE-core-13","status":"fail","timestamp":"2026-10-08T04:35:22.300Z","duration_ms":60,"scenario":"per-user namespaces stay mutually invisible","error":"kv table name '0' in unit 'smoke_u67abe3db2bd7760d' violates /^[a-z][a-z0-9_]*$/"}
-{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:35:56.189Z","duration_ms":89,"scenario":"two nodes converge on one committed session"}
-{"id":"SMOKE-core-13","status":"fail","timestamp":"2026-10-08T04:35:56.227Z","duration_ms":38,"scenario":"per-user namespaces stay mutually invisible","error":"Cannot find package 'zod' imported from /home/kyle/deepseek-harness/scripts/smoke-shared-persistence.ts"}
-{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:36:58.973Z","duration_ms":84,"scenario":"two nodes converge on one committed session"}
-{"id":"SMOKE-core-13","status":"pass","timestamp":"2026-10-08T04:36:59.104Z","duration_ms":130,"scenario":"per-user namespaces stay mutually invisible"}
-{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:40:18.571Z","duration_ms":75,"scenario":"two nodes converge on one committed session"}
-{"id":"SMOKE-core-13","status":"pass","timestamp":"2026-10-08T04:40:18.695Z","duration_ms":123,"scenario":"per-user namespaces stay mutually invisible"}
+{"id":"SMOKE-core-01","status":"pass","timestamp":"2026-10-08T07:08:19.175Z","duration_ms":79,"scenario":"cli version health check"}
+{"id":"SMOKE-core-02","status":"pass","timestamp":"2026-10-08T07:08:19.294Z","duration_ms":119,"scenario":"web profile dump-config"}
+{"id":"SMOKE-core-03","status":"pass","timestamp":"2026-10-08T07:08:21.251Z","duration_ms":1957,"scenario":"web core entry and static assets"}
+{"id":"SMOKE-core-04","status":"pass","timestamp":"2026-10-08T07:08:25.184Z","duration_ms":3932,"scenario":"no-credential boot guides instead of crashing"}
+{"id":"SMOKE-core-05","status":"pass","timestamp":"2026-10-08T07:08:27.105Z","duration_ms":1921,"scenario":"proxy trust fence accepts trusted Host and rejects foreign Host"}
+{"id":"SMOKE-core-06","status":"skip","timestamp":"2026-10-08T07:08:27.105Z","duration_ms":0,"scenario":"headless minimal task (real API)"}
+{"id":"SMOKE-core-07","status":"skip","timestamp":"2026-10-08T07:08:27.106Z","duration_ms":0,"scenario":"TS SDK minimal run (real API)"}
+{"id":"SMOKE-core-09","status":"pass","timestamp":"2026-10-08T07:08:28.913Z","duration_ms":1807,"scenario":"fleet gateway authentication and per-user routing"}
+{"id":"SMOKE-core-10","status":"pass","timestamp":"2026-10-08T07:08:31.071Z","duration_ms":2158,"scenario":"cross-user isolation spot check"}
+{"id":"SMOKE-core-11","status":"pass","timestamp":"2026-10-08T07:08:45.793Z","duration_ms":14722,"scenario":"fleet lifecycle; CPU peak 20.3% <= 80%"}
+{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T07:08:47.542Z","duration_ms":89,"scenario":"two nodes converge on one committed session"}
+{"id":"SMOKE-core-13","status":"pass","timestamp":"2026-10-08T07:08:47.696Z","duration_ms":154,"scenario":"per-user namespaces stay mutually invisible"}

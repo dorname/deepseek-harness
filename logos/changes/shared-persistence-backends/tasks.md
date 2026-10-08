@@ -18,5 +18,5 @@
 - [x] 切片3：共享附件/溢出后端与 smoke 接入——新增 `packages/attachment/attachment-postgres`（最小实现 imageLimits/validateImage/saveImage/readImage，命名空间随属主）与 `packages/spill/spill-postgres`（saveText 落共享表）；实现/更新 smoke runner 支持 SMOKE-core-12（双节点互见）与 SMOKE-core-13（命名空间互不可见），写 `logos/resources/verify/smoke-results.jsonl` reporter 并接入 `scripts/run-smoke.js`，完成后跑 smoke 覆盖预检（CPU 阈值约束下串行执行）；同步 UT/ST + OpenLogos reporter（覆盖 UT-S36-01..05、ST-S36-01..02；SMOKE-core-12/13 于 [deploy] 阶段在 staging 执行）
 
 ## [deploy] 部署任务
-- [ ] 按更新后的部署方案在 staging（本地 staging 验证环境）部署共享持久层：起共享 Postgres（免 root 二进制）→ 两个 dsh Host 实例指向同库 → 双节点打开同一用户历史会话 + SMOKE-core-12/13 走通
-- [ ] 确认配置项、服务启动与回滚预案（停双实例、保留或清理 staging 库）
+- [x] 按更新后的部署方案在 staging（本地 staging 验证环境）部署共享持久层：起共享 Postgres（免 root 二进制）→ 两个 dsh Host 实例指向同库 → 双节点打开同一用户历史会话 + SMOKE-core-12/13 走通
+- [x] 确认配置项、服务启动与回滚预案（停双实例、保留或清理 staging 库）
