@@ -64,6 +64,7 @@ writeFileSync(ledgerPath, '')
 const vitestStatus = run('openlogos vitest suites', 'pnpm', ['exec', 'vitest', 'run',
   'packages/fleet/gateway/tests/gateway.spec.ts', 'packages/fleet/fleet-manager/tests/fleet-manager.spec.ts',
   'packages/storage/storage-domain/tests/namespace.spec.ts', 'packages/storage/storage-postgres/tests/namespace-postgres.spec.ts',
+  'packages/session/session-persistence-postgres/tests/postgres-persistence.spec.ts',
 ], { OPENLOGOS_RESULT_FILE: ledgerPath })
 const acceptanceStatus = run('ST-S33-03 acceptance runner', 'node',
   ['--import', 'tsx/esm', 'scripts/fleet-staging/acceptance-st-s33-03.ts'], { OPENLOGOS_RESULT_FILE: ledgerPath })

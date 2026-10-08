@@ -114,10 +114,13 @@ kind: "package-reference"
 
 零活请求 token。
 
------
+#### KV Cache 影响
+
+无——本后端从不触碰活请求前缀。
+
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
-## 已知限制与延期工作
 
 这些限制定义本后端何时不适配或需要特别运维关注。它们是当前的包约束，不是任务清单。
 
@@ -128,7 +131,8 @@ kind: "package-reference"
 
 -----
 
-## 开发备注
+<a id="dev-note"></a>
+### 开发备注
 
 <details>
 <summary>维护者工作上下文——点击展开</summary>

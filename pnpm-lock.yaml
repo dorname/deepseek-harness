@@ -11295,6 +11295,31 @@ importers:
         specifier: workspace:*
         version: link:../session-persistence
 
+  packages/session/session-persistence-postgres:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      postgres:
+        specifier: ^3.4.7
+        version: 3.4.9
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@deepseek-ai/dsh-session-persistence':
+        specifier: workspace:*
+        version: link:../session-persistence
+      embedded-postgres:
+        specifier: ^18.4.0-beta.17
+        version: 18.4.0-beta.17
+
   packages/session/session-projection:
     dependencies:
       zod:

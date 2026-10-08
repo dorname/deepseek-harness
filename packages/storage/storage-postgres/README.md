@@ -114,10 +114,13 @@ Nothing. This backend contributes no prompt, tool, or schema; it persists non-se
 
 Zero live-request tokens.
 
------
+#### KV Cache effect
+
+None — the backend never touches live request prefixes.
+
+## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-## Known Limitations and Deferred Work
 
 These limits define when this backend is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
 
@@ -128,7 +131,8 @@ These limits define when this backend is a poor fit or needs special operational
 
 -----
 
-## Dev Note
+<a id="dev-note"></a>
+### Dev Note
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

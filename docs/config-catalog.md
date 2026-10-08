@@ -453,6 +453,16 @@ export interface ConnectionConfig {
    * bind. An entry that is not a bare, canonical authority fails plugin load.
    */
   trustedHosts?: string[]
+  /**
+   * Bind the /api fence to the `x-forwarded-host`/`x-forwarded-proto`
+   * authority instead of the (loopback) Host header. For a User Fleet
+   * deployment whose gateway reverse-proxies into this process over
+   * loopback: the browser names the gateway authority, and only the gateway
+   * domain — declared in `trustedHosts` — passes the fence. Only enable this
+   * while the process binds loopback; otherwise any local process could
+   * forge the forwarded headers.
+   */
+  trustForwardedAuthority?: boolean
   /** Absolute browser-session lifetime in days. Default: 30. */
   cookieMaxAgeDays?: number
   /** Maximum buffered JSON body for every `/api` request. Default: 300 MiB. */
@@ -2632,6 +2642,33 @@ export type JsonlCompression = 'zstd' | 'none'
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-session-persistence-jsonl -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-session-persistence-postgres -->
+<a id="deepseek-aidsh-session-persistence-postgres"></a>
+
+## `@deepseek-ai/dsh-session-persistence-postgres`
+
+- `source`: [`packages/session/session-persistence-postgres/src/index.ts:51`](../packages/session/session-persistence-postgres/src/index.ts)
+
+```ts config-catalog
+/** Plugin configuration for the PostgreSQL backend. */
+export interface Config {
+  /**
+   * `postgres://` connection string of the shared database. The database (and
+   * schema) must already exist; the backend creates its tables on connect.
+   * Connect failures surface at the first use of the backend.
+   */
+  connectionString: string
+  /**
+   * Connection pool size for read and append traffic. Every write handle
+   * additionally reserves one dedicated connection for its advisory lock for
+   * the handle's lifetime, so size the pool for the expected concurrent
+   * readers and appending handles.
+   */
+  max?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-session-persistence-postgres -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-session-projection-cache -->
 <a id="deepseek-aidsh-session-projection-cache"></a>
 
@@ -3006,7 +3043,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-storage-domain`
 
 - `inject`: `storage`
-- `source`: [`packages/storage/storage-domain/src/index.ts:52`](../packages/storage/storage-domain/src/index.ts)
+- `source`: [`packages/storage/storage-domain/src/index.ts:54`](../packages/storage/storage-domain/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -3045,6 +3082,33 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-storage-json -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-storage-postgres -->
+<a id="deepseek-aidsh-storage-postgres"></a>
+
+## `@deepseek-ai/dsh-storage-postgres`
+
+- `inject`: `storage`
+- `source`: [`packages/storage/storage-postgres/src/index.ts:26`](../packages/storage/storage-postgres/src/index.ts)
+
+```ts config-catalog
+/** Plugin configuration. */
+export interface Config {
+  /**
+   * `postgres://` connection string of the shared database. The database (and
+   * schema) must already exist; the backend creates its tables on connect.
+   * Connect failures surface at the first use of the backend.
+   */
+  connectionString: string
+  /**
+   * Connection pool size. The KV client is low-traffic and the domain layer
+   * serializes writes per unit, so the default of 1 suffices; raise it only
+   * when one process serves many concurrent domain readers.
+   */
+  max?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-storage-postgres -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-storage-sqlite -->
 <a id="deepseek-aidsh-storage-sqlite"></a>
@@ -4153,6 +4217,13 @@ export interface Config {
   publicUrl?: string
   /** Explicit `--trusted-host` authorities from this invocation. */
   trustedHosts: string[]
+  /**
+   * This process is reverse-proxied by a loopback User Fleet gateway: the
+   * /api fence binds the gateway's forwarded authority instead of the
+   * loopback Host. Only valid while the server binds loopback — the gateway
+   * is otherwise not the only loopback peer able to set forwarded headers.
+   */
+  trustLoopbackGateway: boolean
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-web-app -->
@@ -4500,6 +4571,8 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `@deepseek-ai/dsh-experimental-voice-input-bundle` | — | [`packages/experimental/voice-input-bundle/src/index.ts`](../packages/experimental/voice-input-bundle/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-webworker-packer` | — | [`packages/experimental/webworker-packer/src/index.ts`](../packages/experimental/webworker-packer/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-webworker-runtime` | — | [`packages/experimental/webworker-runtime/src/index.ts`](../packages/experimental/webworker-runtime/src/index.ts) |
+| `@deepseek-ai/dsh-fleet-manager` | — | [`packages/fleet/fleet-manager/src/index.ts`](../packages/fleet/fleet-manager/src/index.ts) |
+| `@deepseek-ai/dsh-gateway` | — | [`packages/fleet/gateway/src/index.ts`](../packages/fleet/gateway/src/index.ts) |
 | `@deepseek-ai/dsh-home-paths` | — | [`packages/util/home-paths/src/index.ts`](../packages/util/home-paths/src/index.ts) |
 | `@deepseek-ai/dsh-hook-protocol` | — | [`packages/hooks/hook-protocol/src/index.ts`](../packages/hooks/hook-protocol/src/index.ts) |
 | `@deepseek-ai/dsh-http-proxy` | — | [`packages/util/http-proxy/src/index.ts`](../packages/util/http-proxy/src/index.ts) |
