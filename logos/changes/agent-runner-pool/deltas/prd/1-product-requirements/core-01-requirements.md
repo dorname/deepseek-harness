@@ -1,57 +1,6 @@
-# DeepSeek Harness 需求文档（dsh · core 模块）
+# delta — core-01-requirements.md（变更 agent-runner-pool）
 
-> 最后更新：2026-10-08
-> 文档性质：存量项目（`bootstrap: adopted`）逆向整理的需求基线，描述 0.2.1-alpha.1（commit `5badb15009`）当前实现所承载的用户需求；场景事实来源为 `logos/resources/prd/3-technical-plan/2-scenario-implementation/core-scenario-candidates.md`（逆向候选，verified:false）中的可验证事实。
-
-## 一、产品背景与目标
-
-### 1.1 产品定位
-
-DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时框架）**：以「一切皆插件」的 Cordis 架构，为 DeepSeek 及各兼容模型提供可安全执行命令、可持久会话、可嵌入可扩展的代理运行环境（`README.md`、`docs/architecture.md`）。
-
-### 1.2 核心目标
-
-- 让代理在**受控权限**下真实操作工作区（沙箱 + 人工审批 + 全程审计日志）。
-- 让产品能力**以插件方式生长**，模型、工具、会话存储、agent loop 均可替换。
-- 让同一会话**跨进程存活**：持久化日志、恢复、分叉、压缩、检索。
-- 让外部程序（TS/Python/编辑器/CI/webhook）以多种协议**驱动同一运行时**。
-
-### 1.3 目标用户画像
-
-- **个人开发者**：在本地或远程机器上让代理完成仓库级任务，要求对敏感操作有控制权。
-- **嵌入方开发者**：把 DSH 作为运行时嵌进自己的产品（编辑器插件、自动化流水线、内部工具），经 SDK/ACP 驱动。
-- **运维/自动化**：用 webhook、定时提醒把外部事件转为代理会话。
-
-## 二、用户痛点分析
-
-### P01: 代理执行命令不可控
-因为现有编码助手多在内核里直接执行模型指令 → 导致越权写文件/跑命令难以拦截与追溯 → 造成安全事件与误操作损失。证据：`SAFETY.md`、`packages/sandbox/`、`packages/interaction/user-approval/`。
-
-### P02: 能力硬编码、生态封闭
-因为传统 harness 把模型/工具/循环写死在核心 → 导致每加一种模型或工具都要改内核 → 能力演进慢、无法按部署裁剪。证据：`docs/architecture.md` §Cordis「no privileged core」。
-
-### P03: 会话即进程，重启即失忆
-因为代理状态只活在内存 → 导致进程崩溃/升级后长任务上下文全丢 → 长任务无人敢用。证据：`packages/session/session-persistence-jsonl/`、`session-checkpoint-policy`。
-
-### P04: 模型与外部工具厂商锁定
-因为代理代码直连某家 provider API → 导致换模型/接新工具要重写集成 → 迁移成本高、工具生态复用难。证据：`packages/llm/`（适配器缝）、`packages/mcp/`（MCP 桥）。
-
-### P05: 复杂任务单代理硬扛
-因为单循环串行处理一切 → 导致上下文膨胀、并行度低、质量下降 → 大任务耗时长且易跑偏。证据：`packages/subagent/`、`packages/workflow/`、`packages/compaction/`。
-
-### P06: 外部事件进不了代理工作流
-因为运行时没有事件入口 → 导致 PR 转 ready、定时触发等只能靠人手动粘贴 → 自动化链路断裂。证据：`packages/webhook/`、`packages/schedule/`。
-
-### P07: 嵌入方重复造运行时轮子
-因为没有进程外 SDK → 导致每个想嵌代理的产品自建子进程管理、协议、会话格式 → 集成成本高。证据：`packages/sdk/`、`python/sdk/`。
-
-### P08: 人对代理行为失去可见性
-因为模型所见与所做不可重建 → 导致无法审计、无法回放、无法分叉修正 → 信任无从建立。证据：`docs/architecture.md`「Model-visible ⟺ logged」。
-
-### P09: 多人共用部署时零隔离
-因为 Web 认证是进程级共享启动令牌、全部用户数据收敛在单一 `$DSH_HOME` → 导致团队/组织共享一台自托管部署时任何持令牌者完全等价、跨用户数据互通 → 无法作为多用户运行时使用。证据：`docs/user/guide/public-deployments.md`、`packages/util/home-paths/README.md`。
-
-## 三、场景总览
+## MODIFIED — 三、场景总览
 
 | 编号 | 场景名称 | 触发条件 | 关联痛点 | 优先级 |
 |------|---------|---------|---------|--------|
@@ -95,7 +44,7 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 | S38 | 队列派发与 inbox 投影接续 | 用户消息/webhook 入队，空闲 runner 取走并接续 | P03/P06 | P0 |
 | S39 | 流中继的跨副本实时 | runner 执行中，浏览器连到非属主 Web/API 副本 | P08 | P1 |
 
-## 四、核心场景详述（P0）
+## MODIFIED — 四、核心场景详述（P0）
 
 ### S01: 启动 Web UI 并运行首个仓库任务
 - **触发条件**：用户已安装 Node.js，运行 `npx @deepseek-ai/dsh web` 或源码 `pnpm dsh web`
@@ -405,19 +354,9 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 - **WHEN** 提供其已冷读到的最大序号
 - **THEN** 中继从该序号之后完整回放，无缺口无重复
 
-## 五、约束与边界
-
-### 5.1 技术约束
-- Node `^22.19 || >=24`，全仓 ESM；`dsh` 源码启动依赖 tsx ESM-only hook（`AGENTS.md`）。
-- 真实模型调用需 `DEEPSEEK_API_KEY`（或配置的第三方 provider 凭证）；无 key 时 e2e 自跳过（`docs/testing.md`）。
-- 公开 API 处于 developer preview，**会有兼容性破坏变更**（`README.md`）。
-- 会话日志格式为已发布数据：代际路径不可改名/删除，只能经相邻迁移递增版本（AGENTS.md）。
-
-### 5.2 资源与时间约束
-- 开源社区驱动；CI 承担全平台矩阵与覆盖率门禁（per-file 100% on `packages/*/*/src`）。
+## MODIFIED — 5.3 "不做"清单
 
 ### 5.3 "不做"清单
-
 - 不做厂商托管多租户 SaaS 后端（多用户能力以**自托管 fleet** 形态交付：认证网关 + 每用户独立进程与数据目录，见 S31–S33；由厂商运营的托管 SaaS 仍不在产品范围）。
 - 不做模型训练/微调；harness 只消费模型 API。
 - 不内置 IDE；编辑器集成走 ACP/SDK/hooks 桥，不重复造 IDE。

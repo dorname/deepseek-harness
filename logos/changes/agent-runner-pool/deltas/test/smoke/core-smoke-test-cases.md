@@ -1,16 +1,8 @@
-# core: 部署后冒烟测试用例
+# delta — core-smoke-test-cases.md（变更 agent-runner-pool）
 
-> 最后更新：2026-10-07
-> 来源：`logos/resources/prd/3-technical-plan/3-deployment/core-01-deployment-plan.md` §八。SMOKE-* 结果写入 `logos/resources/verify/smoke-results.jsonl`（`openlogos smoke` 判定）。
-
-## 一、冒烟测试范围
-
-| 环境 | 覆盖范围 | 说明 |
-|------|----------|------|
-| staging | 健康检查、核心入口、静态资源、配置与密钥、关键链路、日志、fleet 认证与隔离 | launch/发布前必跑；dsh 无集中服务器，staging = 发布验证环境（干净机器或 CI 容器）；fleet 用例按部署配置的小并发上限串行执行 |
+## MODIFIED — 二、冒烟测试用例
 
 ## 二、冒烟测试用例
-
 
 | ID | 描述 | 来源 | 目标环境 | 前置条件 | 操作 | 预期结果 |
 |----|------|------|----------|----------|------|----------|
@@ -30,8 +22,9 @@
 | SMOKE-core-14 | 执行池崩溃接管续跑 | 部署方案 §七.11 / §八·执行池 | staging | 共享 Postgres 运行；runner A/runner B 进程指向同库 | runner A 执行 turn 中被 kill → 等租约过期 → runner B 接管 | B 在租约过期内接管并接续 inbox 未消费输入，事件序列无重复副作用；串行执行，CPU 峰值 ≤ 部署配置阈值 |
 | SMOKE-core-15 | 流中继双副本实时 | 部署方案 §七.12 / §八·执行池 | staging | 同上；runner 与两副本进程 | runner 持续发布帧/事件 → 两副本各自订阅追赶 | 两副本按相同序号收到相同记录；中途订阅从游标完整回放；CPU 峰值 ≤ 阈值 |
 
-## 三、覆盖度校验
+## MODIFIED — 三、覆盖度校验
 
+## 三、覆盖度校验
 
 - [x] 健康检查：SMOKE-core-01/02
 - [x] 核心入口：SMOKE-core-03
