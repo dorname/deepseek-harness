@@ -206,17 +206,19 @@
   "devDependencies": {
     "@deepseek-ai/dsh-agent": "workspace:*",
     "@deepseek-ai/dsh-browser-use": "workspace:*",
-    "@deepseek-ai/dsh-experimental-browser-use-runtime": "workspace:*",
-    "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp": "workspace:*",
-    "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp": "workspace:*",
-    "@deepseek-ai/dsh-experimental-browser-use-stagehand-native": "workspace:*",
     "@deepseek-ai/dsh-computer-use": "workspace:*",
+    "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp": "workspace:*",
+    "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp": "workspace:*",
+    "@deepseek-ai/dsh-experimental-browser-use-runtime": "workspace:*",
+    "@deepseek-ai/dsh-experimental-browser-use-stagehand-native": "workspace:*",
+    "@deepseek-ai/dsh-experimental-claude-code-mods": "workspace:*",
     "@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp": "workspace:*",
     "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native": "workspace:*",
-    "@deepseek-ai/dsh-experimental-claude-code-mods": "workspace:*",
     "@deepseek-ai/dsh-llm-replay": "workspace:*",
     "@deepseek-ai/dsh-mcp-client": "workspace:*",
+    "@deepseek-ai/dsh-skill-office": "workspace:*",
     "@deepseek-ai/dsh-tool-session-query": "workspace:*",
+    "@deepseek-ai/dsh-tool-workspace-dependencies": "workspace:*",
     "@deepseek-ai/dsh-web-fetch-http": "workspace:*",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@testing-library/dom": "^10.4.1",
@@ -259,7 +261,6 @@
     "vite": "8.0.16",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.8",
-    "@deepseek-ai/dsh-skill-office": "workspace:*",
-    "@deepseek-ai/dsh-tool-workspace-dependencies": "workspace:*"
+    "zod": "^4.4.3"
   }
 }

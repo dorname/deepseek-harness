@@ -8,3 +8,17 @@
 {"id":"SMOKE-core-09","status":"pass","timestamp":"2026-10-07T07:38:43.313Z","duration_ms":1717,"scenario":"fleet gateway authentication and per-user routing"}
 {"id":"SMOKE-core-10","status":"pass","timestamp":"2026-10-07T07:38:46.344Z","duration_ms":3031,"scenario":"cross-user isolation spot check"}
 {"id":"SMOKE-core-11","status":"pass","timestamp":"2026-10-07T07:39:08.913Z","duration_ms":22569,"scenario":"fleet lifecycle; CPU peak 18.2% <= 80%"}
+{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:33:01.540Z","duration_ms":82,"scenario":"two nodes converge on one committed session"}
+{"id":"SMOKE-core-13","status":"fail","timestamp":"2026-10-08T04:33:01.594Z","duration_ms":53,"scenario":"per-user namespaces stay mutually invisible","error":"invalid plugin, expect function or object with an \"apply\" method, received undefined"}
+{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:33:44.808Z","duration_ms":82,"scenario":"two nodes converge on one committed session"}
+{"id":"SMOKE-core-13","status":"fail","timestamp":"2026-10-08T04:33:44.839Z","duration_ms":31,"scenario":"per-user namespaces stay mutually invisible","error":"invalid plugin, expect function or object with an \"apply\" method, received undefined"}
+{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:34:31.222Z","duration_ms":85,"scenario":"two nodes converge on one committed session"}
+{"id":"SMOKE-core-13","status":"fail","timestamp":"2026-10-08T04:34:31.258Z","duration_ms":36,"scenario":"per-user namespaces stay mutually invisible","error":"cannot get property \"connectionString\" without inject"}
+{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:35:22.239Z","duration_ms":85,"scenario":"two nodes converge on one committed session"}
+{"id":"SMOKE-core-13","status":"fail","timestamp":"2026-10-08T04:35:22.300Z","duration_ms":60,"scenario":"per-user namespaces stay mutually invisible","error":"kv table name '0' in unit 'smoke_u67abe3db2bd7760d' violates /^[a-z][a-z0-9_]*$/"}
+{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:35:56.189Z","duration_ms":89,"scenario":"two nodes converge on one committed session"}
+{"id":"SMOKE-core-13","status":"fail","timestamp":"2026-10-08T04:35:56.227Z","duration_ms":38,"scenario":"per-user namespaces stay mutually invisible","error":"Cannot find package 'zod' imported from /home/kyle/deepseek-harness/scripts/smoke-shared-persistence.ts"}
+{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:36:58.973Z","duration_ms":84,"scenario":"two nodes converge on one committed session"}
+{"id":"SMOKE-core-13","status":"pass","timestamp":"2026-10-08T04:36:59.104Z","duration_ms":130,"scenario":"per-user namespaces stay mutually invisible"}
+{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-08T04:40:18.571Z","duration_ms":75,"scenario":"two nodes converge on one committed session"}
+{"id":"SMOKE-core-13","status":"pass","timestamp":"2026-10-08T04:40:18.695Z","duration_ms":123,"scenario":"per-user namespaces stay mutually invisible"}

@@ -28,6 +28,7 @@ Three packages play the spill roles; the subsystem reference owns the exhaustive
 |---|---|---|
 | [`spill/`](spill/README.md) | Storage service: saves oversized text and returns a locator plus retrieval guidance | `ctx.spillStore` |
 | [`spill-local/`](spill-local/README.md) | Saves spilled text to private session-scoped files on this machine | registers on `ctx.spillStore` |
+| [`spill-postgres/`](spill-postgres/README.md) | Saves spilled text behind opaque references in one shared PostgreSQL database, namespaced per fleet subject | registers on `ctx.spillStore` |
 | [`spill-policy/`](spill-policy/README.md) | Replaces oversized plain-text tool results with a preview and locator | listens on `ctx.tools` |
 
 -----

@@ -28,6 +28,7 @@ kind: "package-group"
 |---|---|---|
 | [`attachment/`](attachment/README.zh.md) | 可用于提示词与命令、会持久保存并回到历史中的图片附件 | `ctx.attachments` |
 | [`attachment-local/`](attachment-local/README.zh.md) | 把附加图片存储在本机 `DSH_HOME` 下 | 注册到 `ctx.attachments` |
+| [`attachment-postgres/`](attachment-postgres/README.zh.md) | 把附加图片作为内容寻址行存入共享 PostgreSQL 库,按 fleet 主体命名空间隔离 | 注册到 `ctx.attachments` |
 
 -----
 

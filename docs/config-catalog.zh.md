@@ -384,6 +384,38 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-attachment-local -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-attachment-postgres -->
+<a id="deepseek-aidsh-attachment-postgres"></a>
+
+## `@deepseek-ai/dsh-attachment-postgres`
+
+- `source`: [`packages/attachment/attachment-postgres/src/index.ts:92`](../packages/attachment/attachment-postgres/src/index.ts)
+
+```ts config-catalog
+/** Plugin configuration for the PostgreSQL attachment backend. */
+export interface Config {
+  /**
+   * `postgres://` connection string of the shared database. The database (and
+   * schema) must already exist; the backend creates its tables on connect.
+   * Connect failures surface at the first use of the backend.
+   */
+  connectionString: string
+  /** Connection pool size for object writes and reads. */
+  max?: number
+  /** Maximum encoded bytes for one image. */
+  maxImageBytes?: number
+  /** Maximum images admitted in one message. */
+  maxImagesPerMessage?: number
+  /** Maximum aggregate encoded bytes for one message's image batch. */
+  maxMessageImageBytes?: number
+  /** Maximum decoded pixels for one image. */
+  maxImagePixels?: number
+  /** Maximum intrinsic width and height in pixels for one image. */
+  maxImageDimension?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-attachment-postgres -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-bash-local -->
 <a id="deepseek-aidsh-bash-local"></a>
 
@@ -3002,6 +3034,28 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-spill-policy -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-spill-postgres -->
+<a id="deepseek-aidsh-spill-postgres"></a>
+
+## `@deepseek-ai/dsh-spill-postgres`
+
+- `source`: [`packages/spill/spill-postgres/src/index.ts:46`](../packages/spill/spill-postgres/src/index.ts)
+
+```ts config-catalog
+/** Plugin configuration for the PostgreSQL spill backend. */
+export interface Config {
+  /**
+   * `postgres://` connection string of the shared database. The database (and
+   * schema) must already exist; the backend creates its tables on connect.
+   * Connect failures surface at the first use of the backend.
+   */
+  connectionString: string
+  /** Connection pool size for text writes. */
+  max?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-spill-postgres -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-ssh -->
 <a id="deepseek-aidsh-ssh"></a>
