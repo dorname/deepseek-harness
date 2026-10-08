@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/core/session-lease-postgres/README.md
+/:
+  en: 48d56226b91b3b00
+  zh: d7636899447b6afa
+/deepseek-ai-dsh-session-lease-postgres:
+  en: cb9a43e6ee968866
+  zh: a0a603f4a215a667
+/deepseek-ai-dsh-session-lease-postgres/summary:
+  en: db4e0b488e025f40
+  zh: f8a6954b9b765898
+/deepseek-ai-dsh-session-lease-postgres/table-of-contents:
+  en: d7fbbba70852c433
+  zh: 7b82242bafea942b
+/deepseek-ai-dsh-session-lease-postgres/use-this-package:
+  en: 11e1afe6341ce837
+  zh: 55a938f8220cf05f
+/deepseek-ai-dsh-session-lease-postgres/use-this-package/observable-behavior:
+  en: 124ac2116d487e05
+  zh: 5c36c493ce50c516
+/deepseek-ai-dsh-session-lease-postgres/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-session-lease-postgres/model-experience/cross-node-session-execution:
+  en: d55b2deb6a38d643
+  zh: 7100fbe3282d4532
+/deepseek-ai-dsh-session-lease-postgres/model-experience/cross-node-session-execution/what-the-model-sees:
+  en: 6a5129fc139b8e55
+  zh: 36f9525edfda389f
+/deepseek-ai-dsh-session-lease-postgres/model-experience/cross-node-session-execution/token-effect:
+  en: 592ed887c69e5c46
+  zh: dcdc70f2bf4e02cd
+/deepseek-ai-dsh-session-lease-postgres/model-experience/cross-node-session-execution/kv-cache-effect:
+  en: 6a684b64f10e538c
+  zh: e850542904f1a4bc
+/deepseek-ai-dsh-session-lease-postgres/known-limitations-and-deferred-work:
+  en: 93615963329daa39
+  zh: 5c507aac8410ec91
+/deepseek-ai-dsh-session-lease-postgres/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: a66d2e714d5a648c

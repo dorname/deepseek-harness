@@ -322,6 +322,10 @@
       "@deepseek-ai/dsh-experimental-ptc-runtime-python": ["./packages/experimental/ptc-runtime-python/src"],
       "@deepseek-ai/dsh-util-crypto": ["./packages/util/crypto/src"],
       "@deepseek-ai/dsh-util-values": ["./packages/util/values/src"],
+      "@deepseek-ai/dsh-session-lease": ["./packages/core/session-lease/src"],
+      "@deepseek-ai/dsh-session-lease-postgres": ["./packages/core/session-lease-postgres/src"],
+      "@deepseek-ai/dsh-stream-relay": ["./packages/core/stream-relay/src"],
+      "@deepseek-ai/dsh-stream-relay-postgres": ["./packages/core/stream-relay-postgres/src"],
       "@deepseek-ai/dsh-util-code-language": ["./packages/util/code-language/src"],
       // util/ folders are role-named without the util- prefix their npm names carry,
       // so these aliases stay hand-written like dsh-util-crypto above.

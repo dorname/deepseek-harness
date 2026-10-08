@@ -32,6 +32,10 @@ kind: "package-group"
 | [`agent/`](agent/README.zh.md) | 供插件编程使用的 `Agent` 句柄，以及其实时注册表与事件 | `ctx.agents` |
 | [`agent-default-model/`](agent-default-model/README.zh.md) | 入口对全新 agent 应用的部署默认模型选择 | `ctx.agentDefaultModel` |
 | [`agent-loop/`](agent-loop/README.zh.md) | 默认 agent 驱动器：创建 agent 并运行轮次与步骤生命周期 | `ctx.agentLoop` |
+| [`session-lease/`](session-lease/README.zh.md) | Service Definition：单会话跨节点单写者认领 | `ctx.sessionLease` |
+| [`session-lease-postgres/`](session-lease-postgres/README.zh.md) | PostgreSQL 租约提供方：原子获取、心跳续约、过期接管 | 注册到 `ctx.sessionLease` |
+| [`stream-relay/`](stream-relay/README.zh.md) | Service Definition：会话事件与 assistant-stream 帧的跨节点中继 | `ctx.streamRelay` |
+| [`stream-relay-postgres/`](stream-relay-postgres/README.zh.md) | PostgreSQL 中继提供方：每会话单调日志 + LISTEN/NOTIFY 唤醒 | 注册到 `ctx.streamRelay` |
 
 `scope` 提供共享作用域原语；`agent` 负责公开的 `Agent` 约定，而 `agent-loop` 是其默认实现，因此扩展插件依赖 `agent`，驱动器保持可替换。`agent-default-model` 负责入口在会话自身没有选择时应用的部署选择。可运行组合位于 [`packages/bundle`](../bundle/README.zh.md)；本分组只负责可替换的主干组件。
 
