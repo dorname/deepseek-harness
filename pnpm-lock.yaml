@@ -10864,6 +10864,28 @@ importers:
         specifier: workspace:*
         version: link:../../workspace/workspace
 
+  packages/schedule/schedule-dispatch:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      postgres:
+        specifier: ^3.4.7
+        version: 3.4.9
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@deepseek-ai/dsh-session-lease':
+        specifier: workspace:*
+        version: link:../../core/session-lease
+      embedded-postgres:
+        specifier: ^18.4.0-beta.17
+        version: 18.4.0-beta.17
+
   packages/schedule/tool-schedule:
     devDependencies:
       '@deepseek-ai/cordis':

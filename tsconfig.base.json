@@ -322,6 +322,7 @@
       "@deepseek-ai/dsh-experimental-ptc-runtime-python": ["./packages/experimental/ptc-runtime-python/src"],
       "@deepseek-ai/dsh-util-crypto": ["./packages/util/crypto/src"],
       "@deepseek-ai/dsh-util-values": ["./packages/util/values/src"],
+      "@deepseek-ai/dsh-schedule-dispatch": ["./packages/schedule/schedule-dispatch/src"],
       "@deepseek-ai/dsh-session-lease": ["./packages/core/session-lease/src"],
       "@deepseek-ai/dsh-session-lease-postgres": ["./packages/core/session-lease-postgres/src"],
       "@deepseek-ai/dsh-stream-relay": ["./packages/core/stream-relay/src"],

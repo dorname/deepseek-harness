@@ -28,6 +28,7 @@ Choose this package for persistent reminder management.
 |---|---|
 | [`schedule/`](schedule/README.md) | Host-owned reminder persistence, scheduling, inspection, and explicit deletion |
 | [`tool-schedule/`](tool-schedule/README.md) | Preset-scoped `schedule_create`, `schedule_list`, `schedule_update`, and `schedule_delete` tools over the Host `ctx.schedule` service |
+| [`schedule-dispatch/`](schedule-dispatch/README.md) | Cluster form: due rows in one shared database taken exactly once per delivery via FOR UPDATE SKIP LOCKED |
 
 -----
 

@@ -349,6 +349,7 @@
     { "path": "./packages/feedback/command-feedback" },
     { "path": "./packages/schedule/schedule" },
     { "path": "./packages/schedule/tool-schedule" },
+    { "path": "./packages/schedule/schedule-dispatch" },
     { "path": "./packages/context/time-context" },
     { "path": "./packages/context/file-reference" },
     { "path": "./packages/context/file-reference-local" },

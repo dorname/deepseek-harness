@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/schedule/schedule-dispatch/README.md
+/:
+  en: a846e506f51f218c
+  zh: 99653733a9376516
+/deepseek-ai-dsh-schedule-dispatch:
+  en: cbc228ab714ae66c
+  zh: 2a26d15baa1be93c
+/deepseek-ai-dsh-schedule-dispatch/summary:
+  en: 425a82dc790289e3
+  zh: a36e27696ec9afc1
+/deepseek-ai-dsh-schedule-dispatch/table-of-contents:
+  en: d7fbbba70852c433
+  zh: 7b82242bafea942b
+/deepseek-ai-dsh-schedule-dispatch/use-this-package:
+  en: e9e819eba7126bea
+  zh: 769f34e4598b2458
+/deepseek-ai-dsh-schedule-dispatch/use-this-package/observable-behavior:
+  en: a30d12c74f69e248
+  zh: 8b6f2c0e48a286ca
+/deepseek-ai-dsh-schedule-dispatch/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-schedule-dispatch/model-experience/cluster-reminder-delivery:
+  en: 27b4b2a42dd26bd0
+  zh: 74bcc890e545c835
+/deepseek-ai-dsh-schedule-dispatch/model-experience/cluster-reminder-delivery/what-the-model-sees:
+  en: 6bba2662677bb7ad
+  zh: 08c84fdcea01195e
+/deepseek-ai-dsh-schedule-dispatch/model-experience/cluster-reminder-delivery/token-effect:
+  en: 592ed887c69e5c46
+  zh: dcdc70f2bf4e02cd
+/deepseek-ai-dsh-schedule-dispatch/model-experience/cluster-reminder-delivery/kv-cache-effect:
+  en: 6a684b64f10e538c
+  zh: e850542904f1a4bc
+/deepseek-ai-dsh-schedule-dispatch/known-limitations-and-deferred-work:
+  en: 9e2e3e0bea8a4ea5
+  zh: 8124215f634a0c0d
+/deepseek-ai-dsh-schedule-dispatch/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: a66d2e714d5a648c
