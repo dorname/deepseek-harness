@@ -21,7 +21,7 @@ function mount(readonly: string | undefined): Error | undefined {
       else process.env.DSH_CONFIG_READONLY = previous
     })
     // Construct directly: the fail-closed check is in the constructor.
-    new Hmr(ctx, { root: [] })
+    new Hmr(ctx, { root: [], ignored: ['**/node_modules'], debounce: 100 })
     onTestFinished(() => ctx.fiber.dispose())
     return undefined
   } catch (error: unknown) {
