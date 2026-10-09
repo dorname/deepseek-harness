@@ -1,0 +1,8 @@
+merged: 9/9 deltas applied to logos/resources on 2026-10-09
+requirements: overview table 42 rows (S40-S42 appended), detail sections S40-S42 added, 5.3 one new exclusion item
+feature-design: section 7 appended (S40-S42 interaction specs)
+architecture: section 12 inserted before the reverse-baseline section (schedule/webhook components, DDL, drain sequence)
+scenarios: core-S40/S41/S42 files created
+deployment: sections 2/3/7/8 each gained host-services entries
+test-cases: core-S40-S42-test-cases.md created
+smoke: table rows SMOKE-core-16/17/18 appended, coverage updated

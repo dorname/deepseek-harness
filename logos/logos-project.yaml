@@ -4,7 +4,7 @@ project:
   methodology: OpenLogos
 tech_stack: {}
 scenario_counter:
-  next_id: 40
+  next_id: 43
 modules:
   - id: core
     name: 核心功能

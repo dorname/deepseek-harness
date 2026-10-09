@@ -1,20 +1,8 @@
-# core-01-deployment-plan
+# delta — core-01-deployment-plan.md（变更 distributed-host-services）
 
-> 最后更新：2026-10-09
-> 文档性质：存量项目逆向整理的部署基线，描述 0.2.1-alpha.1 已存在的分发/安装/发布路径与部署后检查项。本方案只设计不执行；部署执行与 smoke 属 Phase 3-7/3-8 人类确认点。
-
-## 一、部署目标
-
-dsh 是本地/自托管优先的 Node 应用集合，无托管服务端。「部署」在此等价于**把可运行产物交付到目标机器并验证可用**：
-
-- npm 主包 `@deepseek-ai/dsh`（`apps/cli`，bin `dsh`）→ 终端用户经 `npx @deepseek-ai/dsh web` 运行。
-- Web 前端 `apps/web`（vite dist）随 `dsh web` 伺服，不独立部署。
-- Desktop 安装包（Electron，`apps/desktop`，签名与公证后发布）。
-- Python SDK：`deepseek-harness-sdk` + 平台 runtime wheel（`deepseek-harness-runtime-bin`）→ PyPI。
-- 插件生态：终端用户经 `dsh plugin` 向 profile 安装 npm 包。
+## MODIFIED — 二、部署拓扑
 
 ## 二、部署拓扑
-
 
 
 ```mermaid
@@ -91,8 +79,10 @@ flowchart TB
 - profile 镜像形态：固定层（`dsh-base` 等）在镜像内烘焙，用户层（`cordis.patch.yml`、安装插件）放共享存储只读挂载；进程以 `DSH_CONFIG_READONLY=1` 声明只读配置，HMR 据此 fail-closed 禁用。
 - 滚动升级：部署编排向旧 runner 发排空指令（停取队列、停心跳、等 turn 边界），新版本 runner 接管后旧进程退出；发布前跑 `test:snapshot` 全量（既有 CI 门）。
 
-## 三、环境变量与密钥
 
+## MODIFIED — 三、环境变量与密钥
+
+## 三、环境变量与密钥
 
 
 | 项 | 来源 | 用途 |
@@ -115,35 +105,9 @@ flowchart TB
 | `DSH_CONFIG_READONLY` | 部署编排注入（集群只读配置形态） | 值 `1` 时 HMR fail-closed 禁用；未注入时 HMR 按 profile 既有默认 |
 | runner 排空指令 | 部署编排（进程信号/管理调用） | 滚动升级按会话粒度排空；staging 演练在 SMOKE-core-18 走通 |
 
-## 四、构建与发布命令
-
-| 步骤 | 命令 | 事实来源 |
-|---|---|---|
-| 安装依赖 | `pnpm install`（node ^22.19 \|\| >=24） | `AGENTS.md` |
-| 全量构建 | `pnpm run build`（tsc → lib/types；tsdown → runtime bundle） | `AGENTS.md` |
-| 本地源码启动 | `pnpm dsh web` / `pnpm run dev:web` / `make web\|desktop` | `AGENTS.md`、`README.md` |
-| 单元/覆盖门禁 | `pnpm run test` / `test:coverage`（per-file 100%） | `AGENTS.md`、`docs/testing.md` |
-| 发布序列 | release 提交 + 版本 tag（如 `release(dsh): 0.2.1-alpha.1`） | git log 中的 `release(dsh):` 提交序列 |
-| Desktop 打包 | `apps/desktop` 构建脚本（签名/公证；Windows EV 签名必读 `apps/desktop/README.md`） | `apps/desktop/README.md` |
-| Python wheel | hatchling 构建（`python/sdk`、`python/sdk-runtime`） | `python/*/pyproject.toml` |
-| fleet 组件构建 | `dsh-gateway`、`dsh-fleet-manager` 随全量构建产出（`pnpm run build`） | 变更 `user-fleet-gateway`（[code] 阶段新增组件） |
-| 共享持久层契约测试 | `pnpm run test`（新后端 spec；`@embedded-postgres/linux-x64` 二进制缺失时相关用例显式 skip） | 变更 `shared-persistence-backends`（[code] 阶段新增包与测试） |
-| staging 共享库起停 | 嵌入式 Postgres 二进制初始化数据目录 + 启动/停止（staging 部署任务执行，命令落在部署脚本/记录） | 变更 `shared-persistence-backends`（[deploy] 阶段） |
-
-## 五、数据迁移策略
-
-- **会话日志格式**：`SESSION_FORMAT_VERSION` 代际制。只追加新版本命名的后继代际（`session.vN.jsonl[.zstd]`），不改写/删除已提交代际；打开时选择最高规范代际或经相邻迁移链（v0→v1→…→v4）解码一次。SQLite 存储用单调 `SCHEMA_VERSION`。事实来源：`docs/architecture.md` §Session log、AGENTS.md。
-- **用户数据**：会话/设置在 `$DSH_HOME`；升级不迁移则保持旧代际可读。无外部数据库服务。
-- **共享持久层（本次变更）**：新后端为**并列选项**，指向共享 Postgres 的新部署从空库开始（表结构由后端首次连接按 DDL 创建，unit 版本戳同 `version-mismatch` 语义）；既有 JSONL 世代文件与迁移链原样保留、不受影响。**不做** JSONL/SQLite → Postgres 的自动数据迁移（范围裁剪，见提案）；如需把既有用户迁到共享层，属后续部署变体，届时另行提案。
-
-## 六、回滚策略
-
-- npm/PyPI：发布不可撤回的版本号递增（pre-stable 阶段以 alpha/rc 标签渐进）；回滚 = 用户侧重装上一版本 + upgrade guide 说明破坏面（`.agents/skills/dsh-create-upgrade-guide` 记录每次外部可感知破坏变更）。
-- Desktop：更新器下载新版本并经用户确认安装；回滚为重装旧安装包。
-- 会话数据：格式代际只增不回退，旧版本进程无法读新代际（读打开会拒绝未来版本），因此「回滚」不伴随数据降级承诺。
+## MODIFIED — 七、部署后检查清单
 
 ## 七、部署后检查清单
-
 
 
 1. `dsh --version` 输出预期版本。
@@ -162,8 +126,9 @@ flowchart TB
 14. 排空演练（如部署）：runner 排空后新工作流向其余 runner，in-flight 会话到 turn 边界收尾并被接管续跑；升级后旧会话可打开（SMOKE-core-18）。
 15. profile 只读形态（如部署）：`DSH_CONFIG_READONLY=1` 进程启动时 HMR 未启用；用户层配置经共享只读挂载可读。
 
-## 八、冒烟测试方案
+## MODIFIED — 八、冒烟测试方案
 
+## 八、冒烟测试方案
 
 
 smoke 输入（具体 `SMOKE-*` 用例见 `logos/resources/test/smoke/core-smoke-test-cases.md`）：
@@ -180,8 +145,3 @@ smoke 输入（具体 `SMOKE-*` 用例见 `logos/resources/test/smoke/core-smoke
 目标环境：staging（对应 CI/发布前验证机；`deployment_gates.core.environments: [staging]`）。
 - **执行池**：kill 正在执行 turn 的 runner → 其他节点租约过期内接管接续；双副本连不同节点看同一会话流式实时（SMOKE-core-14/15）。执行约束同上：runner 操作串行触发，嵌入式 Postgres 与多进程同时运行时监控 CPU 不超阈值。
 - **Host 本地服务**：双 runner 到期恰一交付、webhook 恰一建会话、排空后接管续跑与升级后旧会话可打开（SMOKE-core-16/17/18）。执行约束同上：runner 操作串行触发，多进程运行时监控 CPU 不超阈值。
-
-## 九、门禁结论
-
-- `deployment_required: true`、`smoke_required: true`、环境 `staging`（已在 `logos-project.yaml.deployment_gates.core` 登记，无需变更）。
-- 部署执行（Phase 3-7）与 smoke（Phase 3-8）为**人类确认点**：须在 `openlogos verify` 通过且用户明确授权后进行；本仓库作为开源 harness，常规「部署」动作由发布流水线/用户本地完成，无集中式 staging 服务器。

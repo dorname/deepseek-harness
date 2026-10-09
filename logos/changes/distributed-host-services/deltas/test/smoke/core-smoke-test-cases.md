@@ -1,16 +1,8 @@
-# core: 部署后冒烟测试用例
+# delta — core-smoke-test-cases.md（变更 distributed-host-services）
 
-> 最后更新：2026-10-07
-> 来源：`logos/resources/prd/3-technical-plan/3-deployment/core-01-deployment-plan.md` §八。SMOKE-* 结果写入 `logos/resources/verify/smoke-results.jsonl`（`openlogos smoke` 判定）。
-
-## 一、冒烟测试范围
-
-| 环境 | 覆盖范围 | 说明 |
-|------|----------|------|
-| staging | 健康检查、核心入口、静态资源、配置与密钥、关键链路、日志、fleet 认证与隔离 | launch/发布前必跑；dsh 无集中服务器，staging = 发布验证环境（干净机器或 CI 容器）；fleet 用例按部署配置的小并发上限串行执行 |
+## MODIFIED — 二、冒烟测试用例
 
 ## 二、冒烟测试用例
-
 
 
 | ID | 描述 | 来源 | 目标环境 | 前置条件 | 操作 | 预期结果 |
@@ -34,8 +26,9 @@
 | SMOKE-core-17 | webhook 恰一建会话 | 部署方案 §七.13 / §八·Host 本地服务 | staging | 同上；事件经入口入队 | 事件入队 → 消费循环 | 恰一创建 Workspace Session 且会话入执行池队列；CPU 峰值 ≤ 阈值 |
 | SMOKE-core-18 | 排空后接管续跑与旧会话可打开 | 部署方案 §七.14 / §八·Host 本地服务 | staging | 同上；双 runner + 排空指令 | A drive 中排空 → turn 边界收尾 → B 接管 | 新工作流向 B；in-flight 会话日志完整可打开；CPU 峰值 ≤ 阈值 |
 
-## 三、覆盖度校验
+## MODIFIED — 三、覆盖度校验
 
+## 三、覆盖度校验
 
 
 - [x] 健康检查：SMOKE-core-01/02
