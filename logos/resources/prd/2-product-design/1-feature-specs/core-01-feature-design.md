@@ -510,6 +510,7 @@ Host 本地服务分布式化是部署形态能力：在执行池（S37–S39）
 
 ### S42: runner 排空与滚动升级 — 交互规格（运维/开发面）
 
+
 **入口**：部署编排向 runner 发出排空指令（进程信号或管理调用）
 
 **行为规范**：
@@ -530,3 +531,15 @@ Host 本地服务分布式化是部署形态能力：在执行池（S37–S39）
 ##### 正常：升级后旧会话可打开
 - **GIVEN** 排空与接管完成
 - **THEN** 升级前创建的会话在新 runner 上完整可读
+6. **配置化循环生命周期**：runner 形态 = `nodeId` 配置在场即加载自动起派发循环（AbortController 挂 fiber）；fiber dispose（SIGTERM 已由 launcher 接线为整树 unwind）→ `drain()` 等待 in-flight drive 到 turn 边界 → 关池。schedule-dispatch（`loop: true`）与 webhook-ingress（`consumer: true`）同构
+7. **编排器无关**：所有集群语义锚定共享 Postgres；编排器只负责「起进程 / 发 SIGTERM」——K8s、docker compose、systemd、裸机多进程为同等支持的编排矩阵，不做任何编排器专属集成
+
+#### 验收条件（交互级·编排器无关节）
+
+##### 正常：配置化循环加载即启动
+- **GIVEN** runner profile 以 `nodeId`/`loop`/`consumer` 配置加载
+- **THEN** 派发/到期/消费循环自动启动，无需外部调用
+##### 正常：SIGTERM 排空退出
+- **GIVEN** 循环运行中
+- **WHEN** 进程收到 SIGTERM
+- **THEN** 停止接新工作、等待 in-flight 到边界、排空退出（exit 0）

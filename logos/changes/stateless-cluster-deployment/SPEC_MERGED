@@ -1,0 +1,7 @@
+merged: 6/6 deltas applied to logos/resources on 2026-10-09
+requirements: S42 detail gains orchestrator-agnostic exit AC (S42-AC-04), 5.3 gains orchestrator-specific/multi-tenant-namespace exclusion
+feature-design: S42 spec gains lifecycle bullets 6-7 and orchestrator-agnostic ACs (path anchor 7 > S42)
+architecture: section 12 gains 12.6 orchestrator-agnostic deployment (lifecycle effects, support matrix, single-tenant declaration)
+deployment: section 2 gains orchestrator-agnostic principle; section 3 gains loop-config and DSH_CONFIG_READONLY single-tenant rows
+test-cases: S42 table gains UT-S42-06/07, coverage updated, AC table gains S42-AC-04
+smoke: table row SMOKE-core-19 appended, coverage updated

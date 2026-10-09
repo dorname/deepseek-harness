@@ -1,15 +1,6 @@
-# core: 部署后冒烟测试用例
+# delta — core-smoke-test-cases.md（变更 stateless-cluster-deployment）
 
-> 最后更新：2026-10-07
-> 来源：`logos/resources/prd/3-technical-plan/3-deployment/core-01-deployment-plan.md` §八。SMOKE-* 结果写入 `logos/resources/verify/smoke-results.jsonl`（`openlogos smoke` 判定）。
-
-## 一、冒烟测试范围
-
-| 环境 | 覆盖范围 | 说明 |
-|------|----------|------|
-| staging | 健康检查、核心入口、静态资源、配置与密钥、关键链路、日志、fleet 认证与隔离 | launch/发布前必跑；dsh 无集中服务器，staging = 发布验证环境（干净机器或 CI 容器）；fleet 用例按部署配置的小并发上限串行执行 |
-
-## 二、冒烟测试用例
+## MODIFIED — 二、冒烟测试用例
 
 # core: 部署后冒烟测试用例
 
@@ -63,19 +54,3 @@
 - [x] 共享持久层：SMOKE-core-12/13（双节点串行执行，嵌入式 Postgres 与双实例同时运行时监控 CPU 不超部署配置阈值）
 - [x] 执行池：SMOKE-core-14/15（kill-runner 接管续跑与双副本流式实时；runner 操作串行触发，多进程运行时监控 CPU 不超部署配置阈值）
 - [x] Host 本地服务：SMOKE-core-16/17/18 + SMOKE-core-19（SIGTERM 优雅排空；串行执行，CPU 不超部署配置阈值）
-
-## 三、覆盖度校验
-
-
-
-- [x] 健康检查：SMOKE-core-01/02
-- [x] 核心入口：SMOKE-core-03
-- [x] 数据库迁移：不适用（模块 skip_phases 声明无数据库）
-- [x] 静态资源：SMOKE-core-03
-- [x] 配置与密钥：SMOKE-core-04/05
-- [x] 关键链路：SMOKE-core-06/07
-- [x] 日志与监控：SMOKE-core-08 [manual]（人工查日志）
-- [x] fleet 认证与隔离：SMOKE-core-09/10/11（串行执行，CPU 峰值受部署配置阈值约束）
-- [x] 共享持久层：SMOKE-core-12/13（双节点串行执行，嵌入式 Postgres 与双实例同时运行时监控 CPU 不超部署配置阈值）
-- [x] 执行池：SMOKE-core-14/15（kill-runner 接管续跑与双副本流式实时；runner 操作串行触发，多进程运行时监控 CPU 不超部署配置阈值）
-- [x] Host 本地服务：SMOKE-core-16/17/18（到期恰一交付、webhook 恰一建会话、排空接管续跑；串行执行，CPU 不超部署配置阈值）

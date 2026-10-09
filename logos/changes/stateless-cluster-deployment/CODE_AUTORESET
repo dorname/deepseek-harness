@@ -1,0 +1,1 @@
+{"ts":"2026-10-09T09:49:50.008Z","trigger":"merge","old_code":"## [code] 代码实现\n> 删后续自检（评分 → 单片）：全部为既有包的小胶水 + 文档，单一垂直片即可独立过 verify（循环生命周期可观察 + SMOKE-core-19 进程级事实）。\n- [ ] 切片1：循环生命周期胶水——agent-dispatch（nodeId 在场即加载自动起循环；dispose → drain 等待 in-flight → 关池）；schedule-dispatch（`loop: true` 同理）；webhook-ingress（`consumer: true` 同理）；同步 UT/ST + OpenLogos reporter（覆盖 UT-S42-06..07 及生命周期断言）"}
