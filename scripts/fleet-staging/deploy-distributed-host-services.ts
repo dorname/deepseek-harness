@@ -22,8 +22,7 @@ import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
-import type { SessionLease } from '../../packages/core/session-lease/src/index.ts'
-import type { LeaseFacts } from '@deepseek-ai/dsh-session-lease'
+import type { SessionLease, LeaseFacts } from '@deepseek-ai/dsh-session-lease'
 import { startEmbeddedCluster } from '../../packages/storage/storage-postgres/tests/helpers/embedded.ts'
 import { startCpuMonitor } from './cpu-monitor.ts'
 import { loadStagingConfig } from './config.ts'
@@ -35,10 +34,10 @@ function fail(message: string): never {
   throw new Error(message)
 }
 
-/** An in-memory SessionLease test double: real acquire/release semantics, no medium. */
 class FakeLease {
   private held = new Map<string, LeaseFacts>()
   async acquire(id: string, owner: string, ttlMs: number) {
+    await Promise.resolve()
     const now = Date.now()
     const current = this.held.get(id)
     if (current !== undefined && current.owner !== owner && current.expiresAt >= now) {
@@ -48,18 +47,21 @@ class FakeLease {
     return { status: 'acquired' as const }
   }
   async renew(id: string, owner: string, ttlMs: number) {
+    await Promise.resolve()
     const current = this.held.get(id)
     if (current?.owner !== owner) return false
     this.held.set(id, { owner, expiresAt: Date.now() + ttlMs })
     return true
   }
   async release(id: string, owner: string) {
+    await Promise.resolve()
     const current = this.held.get(id)
     if (current?.owner !== owner) return false
     this.held.delete(id)
     return true
   }
   async ownerOf(id: string) {
+    await Promise.resolve()
     return this.held.get(id)
   }
   async waitLost(id: string, owner: string, pollMs = 20) {
@@ -108,7 +110,7 @@ async function main(): Promise<void> {
       ctx.sessionLease = lease
       return new PostgresScheduleDispatch(ctx, {
         connectionString: cluster.url('staging_schedule'), nodeId, pollMs: 40,
-        deliver: async (task) => { deliveries.push(`${task.taskId}@${nodeId}`) },
+        deliver: async (task) => { deliveries.push(`${task.taskId}@${nodeId}`); await Promise.resolve() },
       })
     }
     const a = mk('runner-a')
@@ -135,7 +137,7 @@ async function main(): Promise<void> {
     const stop = new AbortController()
     const consumer = new WebhookIngress(new Context(), {
       connectionString: cluster.url('staging_webhook'), pollMs: 40,
-      consume: async (key) => { created.push(key) },
+      consume: async (key) => { created.push(key); await Promise.resolve() },
     })
     try {
       await consumer.enqueue('staging-delivery-1', { workspacePath: '/work', prompt: 'run it' })
@@ -166,11 +168,10 @@ async function main(): Promise<void> {
       return d
     }
     const a = mk('runner-a', async (session) => {
-      // Hold through drain, then release at the turn boundary.
       await new Promise(resolve => setTimeout(resolve, 150))
       await (a as unknown as { ctx: { sessionLease: { release(s: string, o: string): Promise<boolean> } } }).ctx.sessionLease.release(session, 'runner-a')
     })
-    const b = mk('runner-b', async (session) => { executed.push(`${session}@b`) })
+    const b = mk('runner-b', async (session) => { executed.push(`@b ${session}`); await Promise.resolve() })
     try {
       await a.publish('staging-drain-session' as never)
       const loopA = a.runLoop(stopA.signal)
@@ -205,7 +206,7 @@ async function main(): Promise<void> {
     '- webhook 库 `staging_webhook`：同去重键重复投递折叠为一行，消费恰一建会话（SMOKE-core-17）。',
     '- 派发库 `staging_dispatch`：runner A 排空（停取队列、等 turn 边界、释放租约）后 runner B 取走重投会话（SMOKE-core-18）。',
     '- profile 镜像形态：`DSH_CONFIG_READONLY=1` 下 HMR fail-closed 禁用（UT-S42-04 钉住）；固定层只读 + 用户层共享挂载为部署打包要求。',
-    '- 回滚：runner/副本进程退出；' + '`cluster.stop()` 停止共享库并删除数据目录，staging 库不保留。',
+    '- 回滚：runner/副本进程退出；`cluster.stop()` 停止共享库并删除数据目录，staging 库不保留。',
     `- CPU 峰值：${peak.toFixed(1)}%（阈值 ${String(config.cpuThresholdPercent)}%），耗时 ${String(durationMs)}ms。`,
     '',
   ].join('\n'))
