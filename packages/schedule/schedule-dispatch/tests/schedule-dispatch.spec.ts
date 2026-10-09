@@ -341,7 +341,7 @@ describe.skipIf(unavailable)('postgres schedule dispatch', () => {
     // runner B to redeliver.
     const a = await instance(url, async () => {
       await new Promise<void>((_, reject) => {
-        stopA.signal.addEventListener('abort', () => reject(new Error('runner died')), { once: true })
+        stopA.signal.addEventListener('abort', () => { reject(new Error('runner died')) }, { once: true })
       })
     })
     const b = await instance(url, async (t) => { deliveries.push(t.taskId) })

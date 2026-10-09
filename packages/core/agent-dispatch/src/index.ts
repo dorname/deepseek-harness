@@ -49,6 +49,12 @@ export interface Config {
   pollMs?: number
   /** Grace period after a resumed session's agent goes idle before the lease releases. */
   idleGraceMs?: number
+  /**
+   * Runner form: with `nodeId` set, loading auto-starts the dispatch loop
+   * and fiber disposal (SIGTERM on every orchestrator) drains it — stop
+   * taking new work, wait for the in-flight drive to its turn boundary.
+   */
+  runner?: boolean
 }
 
 /** One dispatch queue row. */
@@ -68,6 +74,7 @@ export class PostgresAgentDispatch {
     leaseTtlMs: z.number().step(1).min(50).max(300_000).default(2000),
     pollMs: z.number().step(1).min(20).max(60_000).default(250),
     idleGraceMs: z.number().step(1).min(0).max(600_000).default(5000),
+    runner: z.boolean().default(false),
   })
 
   readonly name = 'agent-dispatch'
@@ -76,6 +83,8 @@ export class PostgresAgentDispatch {
   private closing: Promise<void> | undefined
   /** LISTEN handle of the active loop, so teardown can drop it before closing. */
   private loopListener: { unlisten(): Promise<void> } | undefined
+  /** The runner loop's full settlement; the lifecycle disposer waits for it. */
+  private loopDone: Promise<void> = Promise.resolve()
   /** Set by {@link drain}; the loop stops taking new work and exits after the in-flight round. */
   private draining = false
   /** The in-flight drive round, tracked so {@link drain} waits for its turn boundary. */
@@ -102,6 +111,23 @@ export class PostgresAgentDispatch {
       })()
       await this.closing
     }, 'agent-dispatch connection pool')
+    // Runner form: nodeId + runner starts the loop at load; disposal (the
+    // launcher unwinds the tree on SIGTERM) aborts the loop and waits for
+    // the in-flight drive to its turn boundary — orchestrator-agnostic
+    // graceful exit.
+    if (config.runner === true) {
+      if (config.nodeId === undefined) {
+        throw new Error('agent-dispatch: runner mode requires nodeId')
+      }
+      // Start synchronously at load; the disposer (fiber unwind on SIGTERM)
+      // aborts the loop and waits for the in-flight drive boundary.
+      const controller = new AbortController()
+      this.loopDone = this.runLoop(controller.signal)
+      ctx.effect(() => async () => {
+        controller.abort()
+        await this.loopDone.catch(() => undefined)
+      }, 'agent-dispatch runner loop')
+    }
   }
 
   private async connect(connectionString: string, max: number): Promise<postgresType.Sql> {
@@ -167,8 +193,12 @@ export class PostgresAgentDispatch {
     const ttlMs = this.config.leaseTtlMs ?? 2000
     const pollMs = this.config.pollMs ?? 250
     const idleGraceMs = this.config.idleGraceMs ?? 5000
-    const lease: SessionLease = this.ctx.sessionLease
+    // Read the lease lazily: runner-form loops start in the constructor,
+    // before the composing fiber has finished mounting sibling services.
     const sql = await this.ready
+    // Lazy read: runner-form loops start in the constructor, before sibling
+    // services finish mounting.
+    const lease: SessionLease = this.ctx.sessionLease
     let fireWake: (() => void) | undefined
     const listener = await sql.listen(WAKE_CHANNEL, () => {
       fireWake?.()

@@ -54,6 +54,11 @@ export interface Config {
   /** Fallback polling interval while waiting for pending events. */
   pollMs?: number
   /**
+   * Consumer form: loading auto-starts the consume loop and fiber disposal
+   * (SIGTERM on every orchestrator) aborts it after the in-flight round.
+   */
+  consumer?: boolean
+  /**
    * Consume one pending event: create the Workspace Session from the event
    * payload and hand its id to the execution pool. The dispatch guarantees
    * at-least-once invocation — a throw rolls the take back and the next
@@ -73,6 +78,7 @@ export class WebhookIngress {
     connectionString: z.string().required(),
     max: z.number().step(1).min(1).max(64).default(2),
     pollMs: z.number().step(1).min(20).max(60_000).default(250),
+    consumer: z.boolean().default(false),
     consume: z.any().required(),
   })
 
@@ -93,7 +99,20 @@ export class WebhookIngress {
     ctx.effect(() => async () => {
       await this.closePool()
     }, 'webhook-ingress connection pool')
+    // Consumer form: loading auto-starts the consume loop; disposal aborts it
+    // after the in-flight round (SIGTERM on every orchestrator).
+    if (config.consumer === true) {
+      const controller = new AbortController()
+      this.loopDone = this.runConsumer(controller.signal)
+      ctx.effect(() => async () => {
+        controller.abort()
+        await this.loopDone
+      }, 'webhook-ingress consumer loop')
+    }
   }
+
+  /** The consumer loop's full settlement; the lifecycle disposer waits for it. */
+  private loopDone: Promise<void> = Promise.resolve()
 
   private async connect(connectionString: string, max: number): Promise<postgresType.Sql> {
     const sql = postgres(connectionString, { max })
@@ -166,7 +185,6 @@ export class WebhookIngress {
     const pollMs = this.config.pollMs ?? 250
     const sql = await this.ready
     while (!signal.aborted) {
-      let idle = false
       try {
         const round = await sql.begin(async (tx) => {
           const rows = await tx.unsafe(`
@@ -184,18 +202,13 @@ export class WebhookIngress {
           )
           return true
         })
-        idle = !round
         if (!round) await this.wait(pollMs, signal)
       } catch (error: unknown) {
         // The round rolled back: the event stays pending and is recreated
         // next round.
-        if (!signal.aborted) {
-          this.ctx.logger.warn(`webhook-ingress: consume round failed (event stays pending): ${String(error)}`)
-        }
+        this.ctx.logger.warn(`webhook-ingress: consume round failed (event stays pending): ${String(error)}`)
         await this.wait(pollMs, signal)
       }
-      if (signal.aborted) break
-      void idle
     }
   }
 

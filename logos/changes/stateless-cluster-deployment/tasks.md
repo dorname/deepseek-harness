@@ -15,4 +15,4 @@
 - [ ] 实现代码变更
 
 ## [deploy] 部署任务
-- [ ] SMOKE-core-19：本地起双 runner 进程（配置化循环），向 A 发 SIGTERM——A 在 in-flight drive 到 turn 边界后排空退出（exit 0），B 继续取队列；SMOKE 账本记录
+- [x] SMOKE-core-19：本地起双 runner 进程（配置化循环），向 A 发 SIGTERM——A 在 in-flight drive 到 turn 边界后排空退出（exit 0），B 继续取队列；SMOKE 账本记录

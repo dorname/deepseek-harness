@@ -490,6 +490,85 @@ describe.skipIf(unavailable)('postgres agent dispatch', () => {
     }
   })
 
+  it('UT-S42-06: runner lifecycle — loop auto-starts on load, dispose drains to the boundary', async () => {
+    const started = Date.now()
+    const url = await freshDatabase()
+    const lease = new FakeLease() as unknown as SessionLease
+    const executed: string[] = []
+    const ctx = new Context()
+    const dispatch = new PostgresAgentDispatch(ctx, {
+      connectionString: url, nodeId: 'runner-a', pollMs: 40, runner: true,
+    })
+    try {
+      ctx.sessionLease = lease
+      Object.defineProperty(dispatch, 'drive', {
+        value: async (session: SessionId): Promise<void> => {
+          executed.push(String(session))
+          await new Promise(resolve => setTimeout(resolve, 300))
+        },
+      })
+      await dispatch.publish(SESSION)
+      const pgc = (await import('postgres')).default(url, { max: 1 })
+      const qrows = await pgc.unsafe('SELECT * FROM agent_dispatch_queue') as unknown[]
+      console.log('[DBG] queue after publish:', JSON.stringify(qrows), 'lease-owner:', JSON.stringify(await (lease as unknown as { ownerOf(id: SessionId): Promise<unknown> }).ownerOf(SESSION)))
+      await pgc.end()
+      // Loading started the loop: the session executes without external calls.
+      expect(await until(() => executed.length > 0)).toBe(true)
+      // Disposal drains: waits for the in-flight drive boundary, then unwinds.
+      await ctx.fiber.dispose()
+      expect(Date.now() - started).toBeGreaterThanOrEqual(300)
+      expect(executed).toHaveLength(1)
+      reportResult('UT-S42-06', 'pass', undefined, Date.now() - started)
+    } catch (error: unknown) {
+      reportResult('UT-S42-06', 'fail', String(error))
+      throw error
+    }
+  })
+
+  it('UT-S42-07: SIGTERM drains the runner and exits 0 at the turn boundary', async () => {
+    const started = Date.now()
+    const url = await freshDatabase()
+    const { spawn } = await import('node:child_process')
+    const path = await import('node:path')
+    const { existsSync } = await import('node:fs')
+    const { fileURLToPath } = await import('node:url')
+    // cwd 相对（vitest worker = 仓库根）优先；否则按模块 URL 兜底。
+    const byCwd = path.join(process.cwd(), 'packages', 'core', 'agent-dispatch', 'tests', 'helpers', 'sigterm-child.mts')
+    const byUrl = fileURLToPath(new URL('./helpers/sigterm-child.mts', import.meta.url))
+    const childPath = existsSync(byCwd) ? byCwd : byUrl
+    const child = spawn(process.execPath,
+      ['--import', 'tsx/esm', childPath],
+      { env: { ...process.env, CHILD_URL: url }, stdio: ['ignore', 'pipe', 'inherit'] })
+    let stdout = ''
+    let sawDriving = false
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf8')
+      if (stdout.lastIndexOf('driving') >= 0) sawDriving = true
+    })
+    try {
+      // Wait until the child is mid-drive.
+      const deadline = Date.now() + 15_000
+      while (!sawDriving && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 30))
+      }
+      expect(sawDriving).toBe(true)
+      const t0 = Date.now()
+      child.kill('SIGTERM')
+      const code = await new Promise<number | null>((resolve) => {
+        child.on('exit', (c) => { resolve(c) })
+        setTimeout(() => { resolve(-1) }, 10_000)
+      })
+      const elapsed = Date.now() - t0
+      // Graceful: exit 0 after the in-flight drive reached its boundary.
+      expect(code).toBe(0)
+      expect(elapsed).toBeGreaterThanOrEqual(300)
+      reportResult('UT-S42-07', 'pass', undefined, Date.now() - started)
+    } catch (error: unknown) {
+      reportResult('UT-S42-07', 'fail', String(error))
+      throw error
+    }
+  })
+
   it('stamps the shared layout version once and rejects a foreign stamp', async () => {
     const url = await freshDatabase()
     const first = await instance(url)

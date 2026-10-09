@@ -57,6 +57,11 @@ export interface Config {
   /** Fallback polling interval while waiting for due work. */
   pollMs?: number
   /**
+   * Loop form: loading auto-starts the dispatch loop and fiber disposal
+   * (SIGTERM on every orchestrator) aborts it after the in-flight round.
+   */
+  loop?: boolean
+  /**
    * Deliver one due task: resume the session and append the reminder. The
    * dispatch guarantees at-least-once invocation per occurrence — a throw
    * rolls the take back and the next round redelivers.
@@ -85,6 +90,7 @@ export class PostgresScheduleDispatch {
     max: z.number().step(1).min(1).max(64).default(2),
     leaseTtlMs: z.number().step(1).min(50).max(300_000).default(2000),
     pollMs: z.number().step(1).min(20).max(60_000).default(250),
+    loop: z.boolean().default(false),
     deliver: z.any().required(),
   })
 
@@ -105,7 +111,20 @@ export class PostgresScheduleDispatch {
     ctx.effect(() => async () => {
       await this.closePool()
     }, 'schedule-dispatch connection pool')
+    // Loop form: loading auto-starts the dispatch loop; disposal aborts it
+    // after the in-flight round (SIGTERM on every orchestrator).
+    if (config.loop === true) {
+      const controller = new AbortController()
+      this.loopDone = this.runLoop(controller.signal)
+      ctx.effect(() => async () => {
+        controller.abort()
+        await this.loopDone
+      }, 'schedule-dispatch loop')
+    }
   }
+
+  /** The loop's full settlement; the lifecycle disposer waits for it. */
+  private loopDone: Promise<void> = Promise.resolve()
 
   private async connect(connectionString: string, max: number): Promise<postgresType.Sql> {
     const sql = postgres(connectionString, { max })
@@ -190,7 +209,6 @@ export class PostgresScheduleDispatch {
     const lease: SessionLease = this.ctx.sessionLease
     const sql = await this.ready
     while (!signal.aborted) {
-      let idle = false
       try {
         const round = await sql.begin(async (tx) => {
           const rows = await tx.unsafe(`
@@ -220,20 +238,15 @@ export class PostgresScheduleDispatch {
           await this.advanceTx(tx, task)
           return { taken: true, delivered: true }
         })
-        idle = !round.taken
         // A held lease or an idle table waits one poll interval; a delivered
         // row loops immediately in case more work is due.
         if (!round.delivered) await this.wait(pollMs, signal)
       } catch (error: unknown) {
         // The round rolled back: the row stays due and is redelivered next
         // round (at-least-once per occurrence).
-        if (!signal.aborted) {
-          this.ctx.logger.warn(`schedule-dispatch: delivery round failed (rows stay due): ${String(error)}`)
-        }
+        this.ctx.logger.warn(`schedule-dispatch: delivery round failed (rows stay due): ${String(error)}`)
         await this.wait(pollMs, signal)
       }
-      if (signal.aborted) break
-      void idle
     }
   }
 
