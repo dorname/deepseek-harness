@@ -1,17 +1,18 @@
-{"id":"SMOKE-core-14","status":"pass","timestamp":"2026-10-09T02:32:01.693Z","duration_ms":678,"scenario":"killed runner is taken over inside the lease window"}
-{"id":"SMOKE-core-15","status":"pass","timestamp":"2026-10-09T02:32:01.750Z","duration_ms":57,"scenario":"two replicas converge on one publisher's stream"}
-{"id":"SMOKE-core-01","status":"pass","timestamp":"2026-10-09T02:32:02.071Z","duration_ms":101,"scenario":"cli version health check"}
-{"id":"SMOKE-core-02","status":"pass","timestamp":"2026-10-09T02:32:02.193Z","duration_ms":121,"scenario":"web profile dump-config"}
-{"id":"SMOKE-core-03","status":"pass","timestamp":"2026-10-09T02:32:04.199Z","duration_ms":2006,"scenario":"web core entry and static assets"}
-{"id":"SMOKE-core-04","status":"pass","timestamp":"2026-10-09T02:32:08.237Z","duration_ms":4038,"scenario":"no-credential boot guides instead of crashing"}
-{"id":"SMOKE-core-05","status":"pass","timestamp":"2026-10-09T02:32:10.111Z","duration_ms":1874,"scenario":"proxy trust fence accepts trusted Host and rejects foreign Host"}
-{"id":"SMOKE-core-06","status":"skip","timestamp":"2026-10-09T02:32:10.111Z","duration_ms":0,"scenario":"headless minimal task (real API)"}
-{"id":"SMOKE-core-07","status":"skip","timestamp":"2026-10-09T02:32:10.111Z","duration_ms":0,"scenario":"TS SDK minimal run (real API)"}
-{"id":"SMOKE-core-09","status":"pass","timestamp":"2026-10-09T02:32:11.887Z","duration_ms":1776,"scenario":"fleet gateway authentication and per-user routing"}
-{"id":"SMOKE-core-10","status":"pass","timestamp":"2026-10-09T02:32:14.014Z","duration_ms":2127,"scenario":"cross-user isolation spot check"}
-{"id":"SMOKE-core-11","status":"pass","timestamp":"2026-10-09T02:32:35.701Z","duration_ms":21686,"scenario":"fleet lifecycle; CPU peak 16.2% <= 80%"}
-{"id":"SMOKE-core-16","status":"pass","timestamp":"2026-10-09T02:32:37.580Z","duration_ms":370,"scenario":"two dispatch loops take one due row exactly once"}
-{"id":"SMOKE-core-17","status":"pass","timestamp":"2026-10-09T02:32:37.938Z","duration_ms":358,"scenario":"one webhook event creates exactly one session"}
-{"id":"SMOKE-core-18","status":"pass","timestamp":"2026-10-09T02:32:38.162Z","duration_ms":224,"scenario":"drain hands the session to the remaining runner"}
-{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-09T02:32:39.760Z","duration_ms":75,"scenario":"two nodes converge on one committed session"}
-{"id":"SMOKE-core-13","status":"pass","timestamp":"2026-10-09T02:32:39.923Z","duration_ms":163,"scenario":"per-user namespaces stay mutually invisible"}
+{"id":"SMOKE-core-14","status":"pass","timestamp":"2026-10-09T14:23:59.061Z","duration_ms":652,"scenario":"killed runner is taken over inside the lease window"}
+{"id":"SMOKE-core-15","status":"pass","timestamp":"2026-10-09T14:23:59.113Z","duration_ms":51,"scenario":"two replicas converge on one publisher's stream"}
+{"id":"SMOKE-core-01","status":"pass","timestamp":"2026-10-09T14:23:59.444Z","duration_ms":84,"scenario":"cli version health check"}
+{"id":"SMOKE-core-02","status":"pass","timestamp":"2026-10-09T14:23:59.567Z","duration_ms":122,"scenario":"web profile dump-config"}
+{"id":"SMOKE-core-03","status":"pass","timestamp":"2026-10-09T14:24:01.507Z","duration_ms":1940,"scenario":"web core entry and static assets"}
+{"id":"SMOKE-core-04","status":"pass","timestamp":"2026-10-09T14:24:05.373Z","duration_ms":3866,"scenario":"no-credential boot guides instead of crashing"}
+{"id":"SMOKE-core-05","status":"pass","timestamp":"2026-10-09T14:24:07.344Z","duration_ms":1971,"scenario":"proxy trust fence accepts trusted Host and rejects foreign Host"}
+{"id":"SMOKE-core-06","status":"skip","timestamp":"2026-10-09T14:24:07.344Z","duration_ms":0,"scenario":"headless minimal task (real API)"}
+{"id":"SMOKE-core-07","status":"skip","timestamp":"2026-10-09T14:24:07.344Z","duration_ms":0,"scenario":"TS SDK minimal run (real API)"}
+{"id":"SMOKE-core-09","status":"pass","timestamp":"2026-10-09T14:24:09.089Z","duration_ms":1745,"scenario":"fleet gateway authentication and per-user routing"}
+{"id":"SMOKE-core-10","status":"pass","timestamp":"2026-10-09T14:24:11.050Z","duration_ms":1961,"scenario":"cross-user isolation spot check"}
+{"id":"SMOKE-core-11","status":"pass","timestamp":"2026-10-09T14:24:25.405Z","duration_ms":14355,"scenario":"fleet lifecycle; CPU peak 21.8% <= 80%"}
+{"id":"SMOKE-core-16","status":"pass","timestamp":"2026-10-09T14:24:27.340Z","duration_ms":371,"scenario":"two dispatch loops take one due row exactly once"}
+{"id":"SMOKE-core-17","status":"pass","timestamp":"2026-10-09T14:24:27.698Z","duration_ms":358,"scenario":"one webhook event creates exactly one session"}
+{"id":"SMOKE-core-18","status":"pass","timestamp":"2026-10-09T14:24:27.917Z","duration_ms":219,"scenario":"drain hands the session to the remaining runner"}
+{"id":"SMOKE-core-12","status":"pass","timestamp":"2026-10-09T14:24:29.511Z","duration_ms":73,"scenario":"two nodes converge on one committed session"}
+{"id":"SMOKE-core-13","status":"pass","timestamp":"2026-10-09T14:24:29.668Z","duration_ms":157,"scenario":"per-user namespaces stay mutually invisible"}
+{"id":"SMOKE-core-19","status":"pass","timestamp":"2026-10-09T14:24:31.975Z","duration_ms":1186,"scenario":"SIGTERM drain: exit 0 at turn boundary (777ms after signal); CPU peak 17.2%"}

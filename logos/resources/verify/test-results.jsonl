@@ -1,157 +1,159 @@
-{"id":"UT-S33-01","status":"pass","timestamp":"2026-10-09T02:29:27.112Z","duration_ms":2}
-{"id":"UT-S33-02","status":"pass","timestamp":"2026-10-09T02:29:27.115Z","duration_ms":2}
-{"id":"UT-S33-03","status":"pass","timestamp":"2026-10-09T02:29:27.117Z","duration_ms":1}
-{"id":"UT-S31-01","status":"pass","timestamp":"2026-10-09T02:29:27.252Z","duration_ms":33}
-{"id":"UT-S31-02","status":"pass","timestamp":"2026-10-09T02:29:27.297Z","duration_ms":41}
-{"id":"UT-S31-03","status":"pass","timestamp":"2026-10-09T02:29:27.337Z","duration_ms":39}
-{"id":"UT-S32-01","status":"pass","timestamp":"2026-10-09T02:29:27.397Z","duration_ms":20}
-{"id":"UT-S32-02","status":"pass","timestamp":"2026-10-09T02:29:27.419Z","duration_ms":21}
-{"id":"ST-S33-01","status":"pass","timestamp":"2026-10-09T02:29:27.789Z","duration_ms":649}
-{"id":"ST-S31-01","status":"pass","timestamp":"2026-10-09T02:29:27.806Z","duration_ms":213}
-{"id":"ST-S31-02","status":"pass","timestamp":"2026-10-09T02:29:27.897Z","duration_ms":81}
-{"id":"ST-S33-02","status":"pass","timestamp":"2026-10-09T02:29:28.095Z","duration_ms":305}
-{"id":"UT-S35-04","status":"pass","timestamp":"2026-10-09T02:29:28.108Z","duration_ms":2}
-{"id":"UT-S35-01","status":"pass","timestamp":"2026-10-09T02:29:28.118Z","duration_ms":9}
-{"id":"UT-S35-05","status":"pass","timestamp":"2026-10-09T02:29:28.121Z","duration_ms":3}
-{"id":"UT-S35-03","status":"pass","timestamp":"2026-10-09T02:29:28.125Z","duration_ms":4}
-{"id":"UT-S35-02","status":"pass","timestamp":"2026-10-09T02:29:28.128Z","duration_ms":2}
-{"id":"ST-S32-01","status":"pass","timestamp":"2026-10-09T02:29:28.160Z","duration_ms":262}
-{"id":"ST-S32-02","status":"pass","timestamp":"2026-10-09T02:29:28.436Z","duration_ms":259}
-{"id":"UT-S42-04","status":"pass","timestamp":"2026-10-09T02:29:28.852Z"}
-{"id":"UT-S42-05","status":"pass","timestamp":"2026-10-09T02:29:28.857Z"}
-{"id":"UT-S41-01","status":"pass","timestamp":"2026-10-09T02:29:29.801Z","duration_ms":417}
-{"id":"UT-S41-02","status":"pass","timestamp":"2026-10-09T02:29:30.047Z","duration_ms":240}
-{"id":"UT-S41-03","status":"pass","timestamp":"2026-10-09T02:29:30.253Z","duration_ms":201}
-{"id":"UT-S41-04","status":"pass","timestamp":"2026-10-09T02:29:30.261Z","duration_ms":0}
-{"id":"UT-S36-01","status":"pass","timestamp":"2026-10-09T02:29:30.336Z","duration_ms":234}
-{"id":"ST-S35-01","status":"pass","timestamp":"2026-10-09T02:29:30.464Z","duration_ms":279}
-{"id":"UT-S36-02","status":"pass","timestamp":"2026-10-09T02:29:30.505Z","duration_ms":160}
-{"id":"UT-S36-03","status":"pass","timestamp":"2026-10-09T02:29:30.727Z","duration_ms":216}
-{"id":"ST-S41-01","status":"pass","timestamp":"2026-10-09T02:29:30.877Z","duration_ms":430}
-{"id":"UT-S36-05","status":"pass","timestamp":"2026-10-09T02:29:30.988Z","duration_ms":255}
-{"id":"ST-S36-01","status":"pass","timestamp":"2026-10-09T02:29:31.223Z","duration_ms":225}
-{"id":"ST-S41-02","status":"pass","timestamp":"2026-10-09T02:29:31.313Z","duration_ms":430}
-{"id":"UT-S38-01","status":"pass","timestamp":"2026-10-09T02:29:31.972Z","duration_ms":386}
-{"id":"UT-S39-01","status":"pass","timestamp":"2026-10-09T02:29:32.033Z","duration_ms":300}
-{"id":"UT-S37-01","status":"pass","timestamp":"2026-10-09T02:29:32.141Z","duration_ms":156}
-{"id":"UT-S36-04","status":"pass","timestamp":"2026-10-09T02:29:32.175Z","duration_ms":147}
-{"id":"UT-S39-02","status":"pass","timestamp":"2026-10-09T02:29:32.284Z","duration_ms":237}
-{"id":"UT-S37-02","status":"pass","timestamp":"2026-10-09T02:29:32.300Z","duration_ms":151}
-{"id":"ST-S36-02","status":"pass","timestamp":"2026-10-09T02:29:32.344Z","duration_ms":163}
-{"id":"UT-S39-03","status":"pass","timestamp":"2026-10-09T02:29:32.427Z","duration_ms":139}
-{"id":"UT-S38-02","status":"pass","timestamp":"2026-10-09T02:29:32.469Z","duration_ms":491}
-{"id":"UT-S40-01","status":"pass","timestamp":"2026-10-09T02:29:32.470Z","duration_ms":474}
-{"id":"UT-S37-03","status":"pass","timestamp":"2026-10-09T02:29:32.493Z","duration_ms":186}
-{"id":"ST-S39-01","status":"pass","timestamp":"2026-10-09T02:29:32.578Z","duration_ms":144}
-{"id":"ST-S38-01","status":"pass","timestamp":"2026-10-09T02:29:32.642Z","duration_ms":167}
-{"id":"UT-S40-02","status":"pass","timestamp":"2026-10-09T02:29:32.704Z","duration_ms":225}
-{"id":"UT-S37-04","status":"pass","timestamp":"2026-10-09T02:29:32.745Z","duration_ms":245}
-{"id":"ST-S39-02","status":"pass","timestamp":"2026-10-09T02:29:32.831Z","duration_ms":239}
-{"id":"ST-S37-01","status":"pass","timestamp":"2026-10-09T02:29:32.936Z","duration_ms":182}
-{"id":"ST-S38-02","status":"pass","timestamp":"2026-10-09T02:29:32.956Z","duration_ms":310}
-{"id":"ST-S37-02","status":"pass","timestamp":"2026-10-09T02:29:33.049Z","duration_ms":106}
-{"id":"UT-S40-03","status":"pass","timestamp":"2026-10-09T02:29:33.193Z","duration_ms":486}
-{"id":"ST-S37-03","status":"pass","timestamp":"2026-10-09T02:29:33.263Z","duration_ms":206}
-{"id":"UT-S40-04","status":"pass","timestamp":"2026-10-09T02:29:33.421Z","duration_ms":223}
-{"id":"ST-S38-03","status":"pass","timestamp":"2026-10-09T02:29:33.426Z","duration_ms":466}
-{"id":"UT-S42-01","status":"pass","timestamp":"2026-10-09T02:29:33.592Z","duration_ms":158}
-{"id":"UT-S42-02","status":"pass","timestamp":"2026-10-09T02:29:34.112Z","duration_ms":513}
-{"id":"UT-S42-03","status":"pass","timestamp":"2026-10-09T02:29:34.347Z","duration_ms":233}
-{"id":"UT-S40-05","status":"pass","timestamp":"2026-10-09T02:29:34.412Z","duration_ms":985}
-{"id":"ST-S42-01","status":"pass","timestamp":"2026-10-09T02:29:34.528Z","duration_ms":177}
-{"id":"ST-S42-02","status":"pass","timestamp":"2026-10-09T02:29:34.804Z","duration_ms":271}
-{"id":"ST-S40-01","status":"pass","timestamp":"2026-10-09T02:29:34.904Z","duration_ms":325}
-{"id":"ST-S40-02","status":"pass","timestamp":"2026-10-09T02:29:35.231Z","duration_ms":321}
-{"id":"UT-S34-01","status":"pass","timestamp":"2026-10-09T02:29:37.310Z","duration_ms":117}
-{"id":"UT-S34-02","status":"pass","timestamp":"2026-10-09T02:29:37.490Z","duration_ms":173}
-{"id":"UT-S34-03","status":"pass","timestamp":"2026-10-09T02:29:37.610Z","duration_ms":115}
-{"id":"UT-S34-04","status":"pass","timestamp":"2026-10-09T02:29:37.756Z","duration_ms":141}
-{"id":"UT-S34-05","status":"pass","timestamp":"2026-10-09T02:29:37.891Z","duration_ms":130}
-{"id":"UT-S34-06","status":"pass","timestamp":"2026-10-09T02:29:38.002Z","duration_ms":108}
-{"id":"UT-S34-07","status":"pass","timestamp":"2026-10-09T02:29:38.119Z","duration_ms":111}
-{"id":"ST-S34-01","status":"pass","timestamp":"2026-10-09T02:29:38.266Z","duration_ms":143}
-{"id":"ST-S34-02","status":"pass","timestamp":"2026-10-09T02:29:38.431Z","duration_ms":160}
-{"id":"ST-S34-03","status":"pass","timestamp":"2026-10-09T02:29:38.548Z","duration_ms":114}
-{"id":"UT-S34-08","status":"skip","timestamp":"2026-10-09T02:29:56.103Z","error":"embedded-postgres binaries are available; the missing-binary skip path is not exercisable here"}
-{"id":"ST-S33-03","status":"pass","timestamp":"2026-10-09T02:30:22.353Z","duration_ms":25950}
-{"id":"UT-S01-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S01-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S01-03","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S01-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S01-03","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S02-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S02-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S02-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S02-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S03-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S03-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S04-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S04-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S05-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S05-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S06-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S06-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S07-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S07-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S08-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S09-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S09-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S10-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S10-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S11-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S11-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S11-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S11-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S12-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S12-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S13-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S13-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S13-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S13-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S13-03","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S14-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S14-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S15-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S15-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S15-03","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S16-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S16-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S17-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S17-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S18-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S18-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S19-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S19-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S20-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S20-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S20-03","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S21-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S21-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S21-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S21-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S22-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S22-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S23-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S23-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S24-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S24-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S25-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S25-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S26-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S26-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S26-03","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S27-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S27-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S28-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S28-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S29-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S29-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S30-01","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"ST-S30-02","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S37-05","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S38-03","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S38-04","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S38-05","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S39-04","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S40-06","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
-{"id":"UT-S41-05","status":"skip","timestamp":"2026-10-09T02:30:23.358Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S33-01","status":"pass","timestamp":"2026-10-09T14:19:04.750Z","duration_ms":3}
+{"id":"UT-S33-02","status":"pass","timestamp":"2026-10-09T14:19:04.754Z","duration_ms":2}
+{"id":"UT-S33-03","status":"pass","timestamp":"2026-10-09T14:19:04.758Z","duration_ms":3}
+{"id":"UT-S31-01","status":"pass","timestamp":"2026-10-09T14:19:04.903Z","duration_ms":38}
+{"id":"UT-S31-02","status":"pass","timestamp":"2026-10-09T14:19:04.951Z","duration_ms":45}
+{"id":"UT-S31-03","status":"pass","timestamp":"2026-10-09T14:19:04.983Z","duration_ms":30}
+{"id":"UT-S32-01","status":"pass","timestamp":"2026-10-09T14:19:05.064Z","duration_ms":28}
+{"id":"UT-S32-02","status":"pass","timestamp":"2026-10-09T14:19:05.087Z","duration_ms":22}
+{"id":"ST-S33-01","status":"pass","timestamp":"2026-10-09T14:19:05.445Z","duration_ms":657}
+{"id":"ST-S31-01","status":"pass","timestamp":"2026-10-09T14:19:05.493Z","duration_ms":217}
+{"id":"ST-S31-02","status":"pass","timestamp":"2026-10-09T14:19:05.608Z","duration_ms":105}
+{"id":"UT-S35-04","status":"pass","timestamp":"2026-10-09T14:19:05.789Z","duration_ms":2}
+{"id":"ST-S33-02","status":"pass","timestamp":"2026-10-09T14:19:05.793Z","duration_ms":346}
+{"id":"UT-S35-01","status":"pass","timestamp":"2026-10-09T14:19:05.799Z","duration_ms":8}
+{"id":"UT-S35-05","status":"pass","timestamp":"2026-10-09T14:19:05.803Z","duration_ms":4}
+{"id":"UT-S35-03","status":"pass","timestamp":"2026-10-09T14:19:05.806Z","duration_ms":3}
+{"id":"UT-S35-02","status":"pass","timestamp":"2026-10-09T14:19:05.808Z","duration_ms":2}
+{"id":"ST-S32-01","status":"pass","timestamp":"2026-10-09T14:19:05.899Z","duration_ms":290}
+{"id":"ST-S32-02","status":"pass","timestamp":"2026-10-09T14:19:06.113Z","duration_ms":199}
+{"id":"UT-S42-04","status":"pass","timestamp":"2026-10-09T14:19:06.388Z"}
+{"id":"UT-S42-05","status":"pass","timestamp":"2026-10-09T14:19:06.395Z"}
+{"id":"UT-S41-01","status":"pass","timestamp":"2026-10-09T14:19:07.518Z","duration_ms":419}
+{"id":"UT-S36-01","status":"pass","timestamp":"2026-10-09T14:19:07.666Z","duration_ms":121}
+{"id":"UT-S41-02","status":"pass","timestamp":"2026-10-09T14:19:07.720Z","duration_ms":198}
+{"id":"ST-S35-01","status":"pass","timestamp":"2026-10-09T14:19:07.775Z","duration_ms":181}
+{"id":"UT-S36-02","status":"pass","timestamp":"2026-10-09T14:19:07.814Z","duration_ms":144}
+{"id":"UT-S41-03","status":"pass","timestamp":"2026-10-09T14:19:07.887Z","duration_ms":164}
+{"id":"UT-S41-04","status":"pass","timestamp":"2026-10-09T14:19:07.894Z","duration_ms":1}
+{"id":"UT-S36-03","status":"pass","timestamp":"2026-10-09T14:19:07.982Z","duration_ms":163}
+{"id":"UT-S36-05","status":"pass","timestamp":"2026-10-09T14:19:08.204Z","duration_ms":219}
+{"id":"ST-S36-01","status":"pass","timestamp":"2026-10-09T14:19:08.520Z","duration_ms":308}
+{"id":"UT-S37-01","status":"pass","timestamp":"2026-10-09T14:19:08.702Z","duration_ms":187}
+{"id":"ST-S41-01","status":"pass","timestamp":"2026-10-09T14:19:08.711Z","duration_ms":628}
+{"id":"UT-S36-04","status":"pass","timestamp":"2026-10-09T14:19:08.783Z","duration_ms":264}
+{"id":"UT-S39-01","status":"pass","timestamp":"2026-10-09T14:19:08.807Z","duration_ms":277}
+{"id":"UT-S38-01","status":"pass","timestamp":"2026-10-09T14:19:08.828Z","duration_ms":312}
+{"id":"UT-S40-01","status":"pass","timestamp":"2026-10-09T14:19:08.978Z","duration_ms":497}
+{"id":"UT-S37-02","status":"pass","timestamp":"2026-10-09T14:19:09.086Z","duration_ms":371}
+{"id":"ST-S41-02","status":"pass","timestamp":"2026-10-09T14:19:09.158Z","duration_ms":442}
+{"id":"ST-S36-02","status":"pass","timestamp":"2026-10-09T14:19:09.183Z","duration_ms":395}
+{"id":"UT-S39-02","status":"pass","timestamp":"2026-10-09T14:19:09.341Z","duration_ms":523}
+{"id":"UT-S37-03","status":"pass","timestamp":"2026-10-09T14:19:09.398Z","duration_ms":297}
+{"id":"UT-S40-02","status":"pass","timestamp":"2026-10-09T14:19:09.495Z","duration_ms":506}
+{"id":"UT-S38-02","status":"pass","timestamp":"2026-10-09T14:19:09.553Z","duration_ms":722}
+{"id":"UT-S39-03","status":"pass","timestamp":"2026-10-09T14:19:09.628Z","duration_ms":281}
+{"id":"UT-S37-04","status":"pass","timestamp":"2026-10-09T14:19:09.737Z","duration_ms":331}
+{"id":"ST-S38-01","status":"pass","timestamp":"2026-10-09T14:19:09.812Z","duration_ms":251}
+{"id":"ST-S39-01","status":"pass","timestamp":"2026-10-09T14:19:09.881Z","duration_ms":243}
+{"id":"ST-S37-01","status":"pass","timestamp":"2026-10-09T14:19:10.021Z","duration_ms":277}
+{"id":"UT-S40-03","status":"pass","timestamp":"2026-10-09T14:19:10.098Z","duration_ms":598}
+{"id":"ST-S38-02","status":"pass","timestamp":"2026-10-09T14:19:10.166Z","duration_ms":350}
+{"id":"ST-S37-02","status":"pass","timestamp":"2026-10-09T14:19:10.259Z","duration_ms":231}
+{"id":"ST-S39-02","status":"pass","timestamp":"2026-10-09T14:19:10.292Z","duration_ms":397}
+{"id":"UT-S40-04","status":"pass","timestamp":"2026-10-09T14:19:10.374Z","duration_ms":272}
+{"id":"ST-S37-03","status":"pass","timestamp":"2026-10-09T14:19:10.574Z","duration_ms":304}
+{"id":"ST-S38-03","status":"pass","timestamp":"2026-10-09T14:19:10.834Z","duration_ms":664}
+{"id":"UT-S42-01","status":"pass","timestamp":"2026-10-09T14:19:11.012Z","duration_ms":171}
+{"id":"UT-S42-02","status":"pass","timestamp":"2026-10-09T14:19:11.509Z","duration_ms":492}
+{"id":"UT-S40-05","status":"pass","timestamp":"2026-10-09T14:19:11.583Z","duration_ms":1205}
+{"id":"UT-S42-03","status":"pass","timestamp":"2026-10-09T14:19:11.791Z","duration_ms":279}
+{"id":"ST-S42-01","status":"pass","timestamp":"2026-10-09T14:19:11.941Z","duration_ms":147}
+{"id":"ST-S40-01","status":"pass","timestamp":"2026-10-09T14:19:12.042Z","duration_ms":322}
+{"id":"ST-S42-02","status":"pass","timestamp":"2026-10-09T14:19:12.213Z","duration_ms":268}
+{"id":"ST-S40-02","status":"pass","timestamp":"2026-10-09T14:19:12.372Z","duration_ms":325}
+{"id":"UT-S42-06","status":"pass","timestamp":"2026-10-09T14:19:12.681Z","duration_ms":462}
+{"id":"UT-S42-07","status":"pass","timestamp":"2026-10-09T14:19:14.505Z","duration_ms":1823}
+{"id":"UT-S34-01","status":"pass","timestamp":"2026-10-09T14:19:15.129Z","duration_ms":116}
+{"id":"UT-S34-02","status":"pass","timestamp":"2026-10-09T14:19:15.291Z","duration_ms":157}
+{"id":"UT-S34-03","status":"pass","timestamp":"2026-10-09T14:19:15.426Z","duration_ms":130}
+{"id":"UT-S34-04","status":"pass","timestamp":"2026-10-09T14:19:15.572Z","duration_ms":141}
+{"id":"UT-S34-05","status":"pass","timestamp":"2026-10-09T14:19:15.697Z","duration_ms":120}
+{"id":"UT-S34-06","status":"pass","timestamp":"2026-10-09T14:19:15.819Z","duration_ms":119}
+{"id":"UT-S34-07","status":"pass","timestamp":"2026-10-09T14:19:15.925Z","duration_ms":101}
+{"id":"ST-S34-01","status":"pass","timestamp":"2026-10-09T14:19:16.074Z","duration_ms":146}
+{"id":"ST-S34-02","status":"pass","timestamp":"2026-10-09T14:19:16.250Z","duration_ms":172}
+{"id":"ST-S34-03","status":"pass","timestamp":"2026-10-09T14:19:16.366Z","duration_ms":113}
+{"id":"UT-S34-08","status":"skip","timestamp":"2026-10-09T14:19:33.550Z","error":"embedded-postgres binaries are available; the missing-binary skip path is not exercisable here"}
+{"id":"ST-S33-03","status":"pass","timestamp":"2026-10-09T14:20:00.514Z","duration_ms":26662}
+{"id":"UT-S01-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S01-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S01-03","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S01-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S01-03","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S02-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S02-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S02-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S02-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S03-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S03-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S04-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S04-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S05-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S05-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S06-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S06-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S07-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S07-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S08-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S09-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S09-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S10-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S10-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S11-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S11-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S11-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S11-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S12-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S12-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S13-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S13-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S13-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S13-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S13-03","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S14-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S14-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S15-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S15-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S15-03","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S16-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S16-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S17-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S17-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S18-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S18-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S19-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S19-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S20-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S20-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S20-03","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S21-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S21-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S21-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S21-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S22-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S22-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S23-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S23-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S24-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S24-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S25-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S25-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S26-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S26-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S26-03","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S27-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S27-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S28-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S28-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S29-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S29-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S30-01","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"ST-S30-02","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S37-05","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S38-03","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S38-04","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S38-05","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S39-04","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S40-06","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}
+{"id":"UT-S41-05","status":"skip","timestamp":"2026-10-09T14:20:01.471Z","scenario":"baseline","detail":"reverse-engineered baseline domain (core S01-S30); owned by the repository package test suites, outside this change delta"}

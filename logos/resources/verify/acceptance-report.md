@@ -6,10 +6,10 @@
 
 | Metric | Value |
 |--------|-------|
-| Defined cases | 157 |
+| Defined cases | 159 |
 | Manual cases (excluded) | 2 |
-| Executed cases | 157 |
-| Passed | 75 |
+| Executed cases | 159 |
+| Passed | 77 |
 | Failed | 0 |
 | Skipped | 82 |
 | Uncovered | 0 |
@@ -118,6 +118,6 @@
 | ✅ | fleet 认证与隔离：SMOKE-core-09/10/11（串行执行，CPU 峰值受部署配置阈值约束） | smoke/core-smoke-test-cases.md |
 | ✅ | 共享持久层：SMOKE-core-12/13（双节点串行执行，嵌入式 Postgres 与双实例同时运行时监控 CPU 不超部署配置阈值） | smoke/core-smoke-test-cases.md |
 | ✅ | 执行池：SMOKE-core-14/15（kill-runner 接管续跑与双副本流式实时；runner 操作串行触发，多进程运行时监控 CPU 不超部署配置阈值） | smoke/core-smoke-test-cases.md |
-| ✅ | Host 本地服务：SMOKE-core-16/17/18（到期恰一交付、webhook 恰一建会话、排空接管续跑；串行执行，CPU 不超部署配置阈值） | smoke/core-smoke-test-cases.md |
+| ✅ | Host 本地服务：SMOKE-core-16/17/18 + SMOKE-core-19（SIGTERM 优雅排空；串行执行，CPU 不超部署配置阈值） | smoke/core-smoke-test-cases.md |
 
 **11/11** assertions confirmed.
