@@ -15,7 +15,7 @@
 ## [code] 代码实现
 > 删后续自检（六维评分 → 大任务，垂直拆 3 片）：切片1（schedule-dispatch，契约自成闭环，删后续独立过 verify；端到端可观察——双 runner 并发取用到期行恰一交付）；切片2（webhook-ingress + agent-dispatch.drain + HMR 只读禁用，与切片1 并列、非前向依赖，删切片3 后 verify 绿——恰一建会话与排空接管可观察）；切片3（staging 部署 + smoke 接入 + 滚动升级演练，端到端可观察——SMOKE-core-16/17/18 走通）。无横向片，无前向依赖。
 - [x] 切片1：共享 schedule 派发——新增 `packages/schedule/schedule-dispatch`（`schedule_due` 表：每任务一行 + `next_due_at` 单调推进；`FOR UPDATE SKIP LOCKED` 恰一取到期行；取会话租约后投递，投递后推进 next-due 仅补最近一次错过）；嵌入式 Postgres 测试 helper 随包建立（复用 M2/M3 模式，二进制缺失显式 skip）；同步 UT/ST + OpenLogos reporter（覆盖 UT-S40-01..06、ST-S40-01..02）
-- [ ] 切片2：webhook 无状态入口与排空——新增 `packages/webhook/webhook-ingress`（`webhook_events` 表 + 签名校验入队 + `NOTIFY`；消费循环恰一取事件、建 Workspace Session、入 agent-dispatch 队列）；`agent-dispatch` 增 `drain()`（停取队列、停心跳、等 in-flight drive 到 turn 边界）；`boot/hmr` 在 `DSH_CONFIG_READONLY=1` 下 fail-closed 禁用；同步 UT/ST + OpenLogos reporter（覆盖 UT-S41-01..05、UT-S42-01..05、ST-S41-01..02、ST-S42-01..02）
+- [x] 切片2：webhook 无状态入口与排空——新增 `packages/webhook/webhook-ingress`（`webhook_events` 表 + 签名校验入队 + `NOTIFY`；消费循环恰一取事件、建 Workspace Session、入 agent-dispatch 队列）；`agent-dispatch` 增 `drain()`（停取队列、停心跳、等 in-flight drive 到 turn 边界）；`boot/hmr` 在 `DSH_CONFIG_READONLY=1` 下 fail-closed 禁用；同步 UT/ST + OpenLogos reporter（覆盖 UT-S41-01..05、UT-S42-01..05、ST-S41-01..02、ST-S42-01..02）
 - [ ] 切片3：staging 部署与 smoke 接入——staging driver（共享 PG + 双 runner/双副本 + 一次滚动排空演练，串行操作 + CPU 监控）；实现 smoke runner 支持 SMOKE-core-16（双 runner 到期恰一交付）、SMOKE-core-17（webhook 恰一建会话）、SMOKE-core-18（排空后接管续跑），接入 `scripts/run-smoke.js`；完成后跑 smoke 覆盖预检（CPU 阈值约束下串行执行）
 
 ## [deploy] 部署任务

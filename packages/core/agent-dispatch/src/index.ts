@@ -76,6 +76,10 @@ export class PostgresAgentDispatch {
   private closing: Promise<void> | undefined
   /** LISTEN handle of the active loop, so teardown can drop it before closing. */
   private loopListener: { unlisten(): Promise<void> } | undefined
+  /** Set by {@link drain}; the loop stops taking new work and exits after the in-flight round. */
+  private draining = false
+  /** The in-flight drive round, tracked so {@link drain} waits for its turn boundary. */
+  private inFlight: Promise<void> | undefined
 
   constructor(
     private readonly ctx: Context,
@@ -171,7 +175,7 @@ export class PostgresAgentDispatch {
     })
     this.loopListener = listener
     try {
-      while (!signal.aborted) {
+      while (!signal.aborted && !this.draining) {
         const taken = await this.take(sql)
         if (taken === undefined) {
           await this.wait(pollMs, signal, (fire) => {
@@ -187,12 +191,32 @@ export class PostgresAgentDispatch {
           await this.publish(SessionId(session))
           continue
         }
-        await this.drive(SessionId(session), nodeId, ttlMs, idleGraceMs, signal)
+        // Track the round so drain() waits for this drive to its turn
+        // boundary before returning.
+        const round = this.drive(SessionId(session), nodeId, ttlMs, idleGraceMs, signal)
+        this.inFlight = round
+        await round
+        this.inFlight = undefined
       }
     } finally {
       this.loopListener = undefined
       await listener.unlisten()
     }
+  }
+
+  /**
+   * Drain this runner for a rolling upgrade: stop taking new work (queued
+   * sessions flow to the remaining runners), stop renewing held leases (they
+   * expire and are taken over), and wait for the in-flight drive to reach its
+   * turn boundary before returning. The caller then exits the process; the
+   * upgraded runner resumes the session from shared persistence.
+   * @returns resolution once the loop has stopped and the in-flight drive
+   *   reached its turn boundary.
+   */
+  async drain(): Promise<void> {
+    this.draining = true
+    await this.inFlight?.catch(() => undefined)
+    this.inFlight = undefined
   }
 
   /**

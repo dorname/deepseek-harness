@@ -26,6 +26,7 @@ The Webhook family receives authenticated provider events and runs trusted progr
 |---|---|---|
 | [`webhook/`](webhook/README.md) | Rule registry, callback lifecycle, and Workspace-backed Session creation | `ctx.webhookRuntime` |
 | [`webhook-github/`](webhook-github/README.md) | Signed GitHub HTTP adapter | consumes `ctx.webhookRuntime` and `ctx.webServer` |
+| [`webhook-ingress/`](webhook-ingress/README.md) | Stateless cluster entry: signature-checked events queued in one shared database, consumed exactly once |
 
 <a id="related-documentation"></a>
 ## Related documentation

@@ -300,6 +300,13 @@ class Hmr extends Service {
 
   constructor(ctx: Context, public config: HmrConfig) {
     super(ctx, 'hmr')
+    // Cluster read-only configuration form: a shared read-only mount owns the
+    // configuration, so watching and reloading would either fail on every
+    // write or serve stale in-process edits. Fail closed at load, matching the
+    // headless/SDK profiles' disabled default.
+    if (process.env.DSH_CONFIG_READONLY === '1') {
+      throw new Error('HMR is unavailable: DSH_CONFIG_READONLY=1 declares a read-only cluster configuration (shared read-only mount); unload dsh-hmr or clear the variable')
+    }
     this.ownerContext = ctx
     if (!this.ctx.loader.internal) {
       throw new Error('--expose-internals is required for HMR service')

@@ -69,6 +69,7 @@ const vitestStatus = run('openlogos vitest suites', 'pnpm', ['exec', 'vitest', '
   'packages/core/session-lease-postgres/tests/postgres-lease.spec.ts', 'packages/core/stream-relay-postgres/tests/postgres-relay.spec.ts',
   'packages/core/agent-dispatch/tests/agent-dispatch.spec.ts',
   'packages/schedule/schedule-dispatch/tests/schedule-dispatch.spec.ts',
+  'packages/webhook/webhook-ingress/tests/webhook-ingress.spec.ts', 'packages/boot/hmr/tests/readonly-form.spec.ts',
 ], { OPENLOGOS_RESULT_FILE: ledgerPath })
 const acceptanceStatus = run('ST-S33-03 acceptance runner', 'node',
   ['--import', 'tsx/esm', 'scripts/fleet-staging/acceptance-st-s33-03.ts'], { OPENLOGOS_RESULT_FILE: ledgerPath })

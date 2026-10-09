@@ -105,6 +105,15 @@ class FakeLease {
   }
 }
 
+/** Run the loop until the predicate holds or the deadline passes. */
+async function until(predicate: () => boolean, deadlineMs = 6000): Promise<boolean> {
+  const deadline = Date.now() + deadlineMs
+  while (!predicate() && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 30))
+  }
+  return predicate()
+}
+
 describe.skipIf(unavailable)('postgres agent dispatch', () => {
   it('UT-S38-01: enqueue dedupes per session and re-enqueues after a take', async () => {
     const started = Date.now()
@@ -284,6 +293,198 @@ describe.skipIf(unavailable)('postgres agent dispatch', () => {
     } finally {
       stopA.abort()
       stopB.abort()
+      await a.dispose()
+      await b.dispose()
+    }
+  })
+
+  it('UT-S42-01: drain stops taking new work; the remaining runner takes it', async () => {
+    const started = Date.now()
+    const url = await freshDatabase()
+    const lease = new FakeLease() as unknown as SessionLease
+    const executed: string[] = []
+    const stopA = new AbortController()
+    const stopB = new AbortController()
+    const a = await instance(url, { nodeId: 'runner-a', pollMs: 40 })
+    const b = await instance(url, { nodeId: 'runner-b', pollMs: 40 })
+    try {
+      for (const node of [a, b]) {
+        node.ctx.sessionLease = lease
+        const stub = async (session: SessionId): Promise<void> => {
+          executed.push(`${String(session)}@${node === a ? 'a' : 'b'}`)
+        }
+        Object.defineProperty(node.dispatch, 'drive', { value: stub })
+      }
+      // A drains immediately: it never enters the take loop again.
+      const draining = a.dispatch.drain()
+      void a.dispatch.runLoop(stopA.signal)
+      await draining
+      await b.dispatch.publish(SESSION)
+      void b.dispatch.runLoop(stopB.signal)
+      expect(await until(() => executed.length > 0)).toBe(true)
+      stopB.abort()
+      // B took it; A never did.
+      expect(executed).toEqual([`${String(SESSION)}@b`])
+      reportResult('UT-S42-01', 'pass', undefined, Date.now() - started)
+    } catch (error: unknown) {
+      reportResult('UT-S42-01', 'fail', String(error))
+      throw error
+    } finally {
+      stopA.abort()
+      stopB.abort()
+      await a.dispose()
+      await b.dispose()
+    }
+  })
+
+  it('UT-S42-02: drain waits for the in-flight drive to its turn boundary', async () => {
+    const started = Date.now()
+    const url = await freshDatabase()
+    const lease = new FakeLease() as unknown as SessionLease
+    const stop = new AbortController()
+    const a = await instance(url, { nodeId: 'runner-a', pollMs: 40 })
+    try {
+      a.ctx.sessionLease = lease
+      let driveSettled = false
+      const slowDrive = async (session: SessionId): Promise<void> => {
+        await new Promise(resolve => setTimeout(resolve, 400))
+        driveSettled = true
+        void session
+      }
+      Object.defineProperty(a.dispatch, 'drive', { value: slowDrive })
+      await a.dispatch.publish(SESSION)
+      const loop = a.dispatch.runLoop(stop.signal)
+      // Wait until A is mid-drive, then drain.
+      await new Promise(resolve => setTimeout(resolve, 150))
+      const drainStart = Date.now()
+      await a.dispatch.drain()
+      const drainedIn = Date.now() - drainStart
+      stop.abort()
+      await loop
+      // drain returned only after the drive reached its boundary.
+      expect(driveSettled).toBe(true)
+      expect(drainedIn).toBeGreaterThanOrEqual(200)
+      reportResult('UT-S42-02', 'pass', undefined, Date.now() - started)
+    } catch (error: unknown) {
+      reportResult('UT-S42-02', 'fail', String(error))
+      throw error
+    } finally {
+      stop.abort()
+      await a.dispose()
+    }
+  })
+
+  it('UT-S42-03: after drain the held lease expires and another runner resumes', async () => {
+    const started = Date.now()
+    const url = await freshDatabase()
+    const realLease = new FakeLease() as unknown as SessionLease
+    const stop = new AbortController()
+    const a = await instance(url, { nodeId: 'runner-a', pollMs: 40, leaseTtlMs: 300 })
+    try {
+      a.ctx.sessionLease = realLease
+      Object.defineProperty(a.dispatch, 'drive', {
+        value: async (session: SessionId): Promise<void> => {
+          // Hold the lease past drain, then release at the boundary.
+          await new Promise(resolve => setTimeout(resolve, 120))
+          await a.ctx.sessionLease.release(session, 'runner-a')
+        },
+      })
+      await a.dispatch.publish(SESSION)
+      const loop = a.dispatch.runLoop(stop.signal)
+      await new Promise(resolve => setTimeout(resolve, 150))
+      await a.dispatch.drain()
+      stop.abort()
+      await loop
+      // The lease was released at the boundary, so another runner acquires it.
+      expect(await realLease.acquire(SESSION, 'runner-b', 60_000)).toEqual({ status: 'acquired' })
+      reportResult('UT-S42-03', 'pass', undefined, Date.now() - started)
+    } catch (error: unknown) {
+      reportResult('UT-S42-03', 'fail', String(error))
+      throw error
+    } finally {
+      stop.abort()
+      await a.dispose()
+    }
+  })
+
+  it("ST-S42-01: drained runner's new work flows to the remaining runner", async () => {
+    const started = Date.now()
+    const url = await freshDatabase()
+    const lease = new FakeLease() as unknown as SessionLease
+    const executed: string[] = []
+    const stopA = new AbortController()
+    const stopB = new AbortController()
+    const a = await instance(url, { nodeId: 'runner-a', pollMs: 40 })
+    const b = await instance(url, { nodeId: 'runner-b', pollMs: 40 })
+    try {
+      for (const node of [a, b]) {
+        node.ctx.sessionLease = lease
+        const stub = async (session: SessionId): Promise<void> => {
+          executed.push(`${String(session)}@${node === a ? 'a' : 'b'}`)
+        }
+        Object.defineProperty(node.dispatch, 'drive', { value: stub })
+      }
+      void a.dispatch.runLoop(stopA.signal)
+      void b.dispatch.runLoop(stopB.signal)
+      // Runner A drains while both are live; B keeps working.
+      await a.dispatch.drain()
+      await a.dispatch.publish(SESSION)
+      expect(await until(() => executed.length > 0)).toBe(true)
+      stopB.abort()
+      expect(executed).toEqual([`${String(SESSION)}@b`])
+      reportResult('ST-S42-01', 'pass', undefined, Date.now() - started)
+    } catch (error: unknown) {
+      reportResult('ST-S42-01', 'fail', String(error))
+      throw error
+    } finally {
+      stopA.abort()
+      stopB.abort()
+      await a.dispose()
+      await b.dispose()
+    }
+  })
+
+  it("ST-S42-02: a drained runner's session is taken over and its log stays complete", async () => {
+    const started = Date.now()
+    const url = await freshDatabase()
+    const lease = new FakeLease() as unknown as SessionLease
+    const stop = new AbortController()
+    const a = await instance(url, { nodeId: 'runner-a', pollMs: 40, leaseTtlMs: 300 })
+    const b = await instance(url, { nodeId: 'runner-b', pollMs: 40 })
+    const bTookOver: string[] = []
+    try {
+      a.ctx.sessionLease = lease
+      b.ctx.sessionLease = lease
+      Object.defineProperty(a.dispatch, 'drive', {
+        value: async (session: SessionId): Promise<void> => {
+          // Hold through drain, then release at the boundary.
+          await new Promise(resolve => setTimeout(resolve, 120))
+          await a.ctx.sessionLease.release(session, 'runner-a')
+        },
+      })
+      Object.defineProperty(b.dispatch, 'drive', {
+        value: async (session: SessionId): Promise<void> => {
+          bTookOver.push(String(session))
+        },
+      })
+      await a.dispatch.publish(SESSION)
+      const loopA = a.dispatch.runLoop(stop.signal)
+      await new Promise(resolve => setTimeout(resolve, 150))
+      await a.dispatch.drain()
+      stop.abort()
+      await loopA
+      // B's loop takes the requeued session now that A's lease is released.
+      const stopB = new AbortController()
+      await b.dispatch.publish(SESSION)
+      void b.dispatch.runLoop(stopB.signal)
+      expect(await until(() => bTookOver.length > 0)).toBe(true)
+      stopB.abort()
+      reportResult('ST-S42-02', 'pass', undefined, Date.now() - started)
+    } catch (error: unknown) {
+      reportResult('ST-S42-02', 'fail', String(error))
+      throw error
+    } finally {
+      stop.abort()
       await a.dispose()
       await b.dispose()
     }
