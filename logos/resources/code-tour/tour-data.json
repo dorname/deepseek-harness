@@ -2,10 +2,11 @@
   "meta": {
     "project": "DeepSeek Harness",
     "branch": "openlogos/align-core-specs",
-    "commit": "e6e0635c8fa1084cf227f84b582ceae395a4d596",
-    "sources": ["manifest", "docs/architecture.md", "README", "source"],
+    "commit": "f30b1377da3214572b571a7f7b988c25257ac5ce",
+    "analysisSession": "bebd829f8c173c0a",
+    "sources": ["grasp packages/core", "manifest", "docs/architecture.md", "README", "source"],
     "depMainChain": ["app-boot", "web-app", "cordis", "agent-loop", "session", "session-persistence", "session-persistence-jsonl", "llm", "llm-deepseek", "tools", "system-prompt"],
-    "note": "验证策略：模块依赖逐条抄自各包 package.json 的 dependencies/peerDependencies（manifest 证据）；执行流步骤的文件/符号/行号由四路并行源码取证逐一核实（标注 verified），仅无法落到具体行号的步骤标 partial。overviewEdges 的边语义统一为「调用方 → 被调方」。"
+    "note": "验证策略：模块依赖逐条抄自各包 package.json 的 dependencies/peerDependencies（manifest 证据）；执行流步骤的文件/符号/行号由源码取证核实（标注 verified），仅无法落到具体行号的步骤标 partial。overviewEdges 的边语义统一为「调用方 → 被调方」。2026-10-09 对照 HEAD f30b1377da 复核关键行号与符号。"
   },
   "overviewNodes": [
     {
@@ -246,7 +247,7 @@
       "usedBy": ["session"],
       "readingPriority": 7,
       "verification": "verified",
-      "evidence": "session-persistence index.ts:135-204 抽象契约；jsonl index.ts:245 实现；filename.ts:14-32 世代命名"
+      "evidence": "packages/session/session-persistence/src/index.ts:135-204 抽象契约；packages/session/session-persistence-jsonl/src/index.ts:245 JsonlSessionPersistence；session-format filename.ts:14-32 世代命名"
     }
   ],
   "overviewEdges": [
@@ -350,7 +351,7 @@
       "deps": ["session-persistence", "session", "llm", "cordis"],
       "dependents": [],
       "keyFiles": ["packages/session/session-persistence-jsonl/src/index.ts", "packages/session/session-persistence-jsonl/src/storage.ts", "packages/session/session-persistence-jsonl/src/format.ts", "packages/session/session-format/src/filename.ts"],
-      "keySymbols": ["JsonlSessionPersistence", "JsonlSessionHandle", "generationLogFilename"],
+      "keySymbols": ["JsonlSessionPersistence", "JsonlSessionHandle", "sessionFormatLogFilename"],
       "entryPoints": ["packages/session/session-persistence-jsonl/src/index.ts"],
       "evidence": "manifest dependencies：dsh-session-format、dsh-session-format-catalog、dsh-session-format-v3-to-v4；index.ts:245/314/342/437/475"
     },
@@ -471,7 +472,7 @@
       "priority": "P0",
       "summary": "一次 turn 的完整执行链：唤醒入队 → turn/start → 认领输入与 pre-step → 组装提示词 → 请求准备与冻结 → 流式调用 → 工具管线 → 落账收尾。工具欠一次请求时回到认领步骤开下一个 step（黄色回边）。",
       "nodes": [
-        { "id": "ft-01", "label": "消息入队与唤醒驱动器", "crate": "agent-loop", "file": "packages/core/agent-loop/src/inbox.ts", "symbol": "ReactLoopInbox.send / ReactLoopAgent.wakeDriver", "responsibility": "send 持久化入队（agent/inbox/spliced），wakeup 启动 driver 调 kick。", "verification": "verified", "evidence": "inbox.ts:154-174,198-243（235 append）；agent.ts:154-161,214-235" },
+        { "id": "ft-01", "label": "消息入队与唤醒驱动器", "crate": "agent-loop", "file": "packages/core/agent-loop/src/agent.ts", "symbol": "ReactLoopAgent.send / ReactLoopAgent.wakeDriver", "responsibility": "send 经 inbox.append 持久化入队（agent/inbox/spliced），wakeup 经 wakeDriver 启动 driver 调 kick。", "verification": "verified", "evidence": "agent.ts:154-161 send、214-235 wakeDriver（234 kick）；inbox.ts:121-122 append、167+ splice、235 session.append('agent/inbox/spliced')" },
         { "id": "ft-02", "label": "kick：while(await turn()) 驱动", "crate": "agent-loop", "file": "packages/core/agent-loop/src/agent.ts", "symbol": "ReactLoopAgent.kick", "responsibility": "连续驱动 turn，直到没有欠账输入。", "verification": "verified", "evidence": "agent.ts:252-265" },
         { "id": "ft-03", "label": "append turn/start", "crate": "agent-loop", "file": "packages/core/agent-loop/src/agent.ts", "symbol": "ReactLoopAgent.turn", "responsibility": "turn 打开持久边界，写 { turn }。", "verification": "verified", "evidence": "agent.ts:296-396（append 'turn/start' at 305）" },
         { "id": "ft-04", "label": "claim 输入 + agent/pre-step 瀑布", "crate": "agent-loop", "file": "packages/core/agent-loop/src/agent.ts", "symbol": "ReactLoopAgent.preStep", "responsibility": "inbox.claim 认领 next-step 批次；监听器可改写或拒绝（拒绝/空首认领 → 直接关闭 turn）。", "verification": "verified", "evidence": "agent.ts:267-286（waterfall 276-282）；inbox.ts:109-114 claim" },
@@ -556,7 +557,7 @@
       "nodes": [
         { "id": "sp-01", "label": "Session.append 唯一入口", "crate": "session", "file": "packages/core/session/src/index.ts", "symbol": "Session.append", "responsibility": "快照 data、deepFreeze 事件、经 session/event 发布。", "verification": "verified", "evidence": "index.ts:718-769" },
         { "id": "sp-02", "label": "句柄落盘", "crate": "session-persistence-jsonl", "file": "packages/session/session-persistence-jsonl/src/storage.ts", "symbol": "JsonlSessionHandle.append", "responsibility": "agent-loop 经 handle.append 写 JSONL 帧。", "verification": "verified", "evidence": "storage.ts:85；agent-loop index.ts:702 使用" },
-        { "id": "sp-03", "label": "世代文件命名", "crate": "session-persistence-jsonl", "file": "packages/session/session-format/src/filename.ts", "symbol": "sessionFormatLogFilename / generationLogFilename", "responsibility": "v0 为 session.jsonl，v1+ 为 session.vN.jsonl[.zstd]；已发布世代不改名不覆盖。", "verification": "verified", "evidence": "filename.ts:14-32；jsonl format.ts:42-59" },
+        { "id": "sp-03", "label": "世代文件命名", "crate": "session-persistence-jsonl", "file": "packages/session/session-format/src/filename.ts", "symbol": "sessionFormatLogFilename", "responsibility": "v0 为 session.jsonl，v1+ 为 session.vN.jsonl[.zstd]；已发布世代不改名不覆盖。", "verification": "verified", "evidence": "filename.ts:14-32（sessionFormatLogFilename / parseSessionFormatLogFilename）；jsonl format.ts:42-59" },
         { "id": "sp-04", "label": "open：世代选择与迁移", "crate": "session-persistence-jsonl", "file": "packages/session/session-persistence-jsonl/src/index.ts", "symbol": "JsonlSessionPersistence.open", "responsibility": "选最高规范世代，拒绝未来版本，静态相邻迁移链组合到当前逻辑格式；写式 open 独占发布后继世代。", "verification": "verified", "evidence": "index.ts:342；manifest 依赖 dsh-session-format-v3-to-v4" },
         { "id": "sp-05", "label": "stat / list 头扫描", "crate": "session-persistence-jsonl", "file": "packages/session/session-persistence-jsonl/src/index.ts", "symbol": "JsonlSessionPersistence.stat / list", "responsibility": "仅重扫目录头并翻译历史头，不加载事件。", "verification": "verified", "evidence": "index.ts:437,475" },
         { "id": "sp-06", "label": "deriveMessages 投影模型历史", "crate": "session", "file": "packages/core/session/src/index.ts", "symbol": "Session.deriveMessages", "responsibility": "沿 surface.nodes 增量派生冻结 Message[]——模型可见即已落账。", "verification": "verified", "evidence": "index.ts:856-877" },

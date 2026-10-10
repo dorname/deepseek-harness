@@ -77,6 +77,7 @@ async function runCase(id: string, scenario: string, body: () => Promise<void>):
 class FakeLease {
   private held = new Map<string, LeaseFacts>()
   async acquire(id: string, owner: string, ttlMs: number) {
+    await Promise.resolve()
     const now = Date.now()
     const current = this.held.get(id)
     if (current !== undefined && current.owner !== owner && current.expiresAt >= now) {
@@ -86,18 +87,21 @@ class FakeLease {
     return { status: 'acquired' as const }
   }
   async renew(id: string, owner: string, ttlMs: number) {
+    await Promise.resolve()
     const current = this.held.get(id)
     if (current?.owner !== owner) return false
     this.held.set(id, { owner, expiresAt: Date.now() + ttlMs })
     return true
   }
   async release(id: string, owner: string) {
+    await Promise.resolve()
     const current = this.held.get(id)
     if (current?.owner !== owner) return false
     this.held.delete(id)
     return true
   }
   async ownerOf(id: string) {
+    await Promise.resolve()
     return this.held.get(id)
   }
   async waitLost(id: string, owner: string, pollMs = 20) {
@@ -152,7 +156,7 @@ async function main(): Promise<void> {
         ctx.sessionLease = lease
         return new PostgresScheduleDispatch(ctx, {
           connectionString: cluster.url('smoke_schedule'), nodeId, pollMs: 40,
-          deliver: async (task) => { deliveries.push(`${task.taskId}@${nodeId}`) },
+          deliver: async (task) => { deliveries.push(`${task.taskId}@${nodeId}`); await Promise.resolve() },
         })
       }
       const a = mk('runner-a')
@@ -183,7 +187,7 @@ async function main(): Promise<void> {
         const stop = new AbortController()
         const consumer = new WebhookIngress(new Context(), {
           connectionString: cluster.url('smoke_webhook'), pollMs: 40,
-          consume: async (key) => { created.push(key) },
+          consume: async (key) => { created.push(key); await Promise.resolve() },
         })
         try {
           await consumer.enqueue('smoke-delivery-1', { workspacePath: '/work', prompt: 'run it' })
@@ -222,7 +226,7 @@ async function main(): Promise<void> {
           await new Promise(resolve => setTimeout(resolve, 150))
           await (a as unknown as { ctx: { sessionLease: { release(s: string, o: string): Promise<boolean> } } }).ctx.sessionLease.release(session, 'runner-a')
         })
-        const b = mk('runner-b', async (session) => { executed.push(`${session}@b`) })
+        const b = mk('runner-b', async (session) => { executed.push(`${session}@b`); await Promise.resolve() })
         try {
           await a.publish('smoke-drain-session' as never)
           const loopA = a.runLoop(stopA.signal)

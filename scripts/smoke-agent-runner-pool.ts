@@ -129,6 +129,7 @@ async function main(): Promise<void> {
         Object.defineProperty(b.dispatch, 'drive', {
           value: async (session: SessionId): Promise<void> => {
             bDrives.push(session)
+            await Promise.resolve()
           },
         })
         await b.dispatch.publish(SESSION)
@@ -167,7 +168,7 @@ async function main(): Promise<void> {
             }, 40).then((unlisten) => {
               stop = unlisten
             })
-            setTimeout(() => resolve(got), 6000)
+            setTimeout(() => { resolve(got) }, 6000)
           })
         }
         const collector1 = collect(replica1.ctx.streamRelay, 4)
@@ -191,7 +192,7 @@ async function main(): Promise<void> {
           }, 40).then((unlisten) => {
             stop = unlisten
           })
-          setTimeout(() => resolve(got), 4000)
+          setTimeout(() => { resolve(got) }, 4000)
         })
         assert(replay.map(record => record.seq).join(',') === '3,4', `cursor replay saw ${replay.map(record => record.seq).join(',')}, expected 3,4`)
       })
