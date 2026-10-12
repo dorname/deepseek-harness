@@ -29,6 +29,8 @@ COPY tsconfig.base.json tsconfig.base.client.json tsconfig.json tsconfig.host.js
 # Root tsdown workspace config — without it host tsdown falls back to package.json and fails with "No input files".
 COPY tsdown.config.ts ./
 COPY vitest.config.ts ./
+# Host typecheck reaches apps/cli tests that import deploy/cluster-web/upstream.mts.
+COPY deploy ./deploy
 
 ARG DSH_CLIENT_COMMIT_HASH=0000000
 ENV DSH_CLIENT_COMMIT_HASH=${DSH_CLIENT_COMMIT_HASH}
@@ -36,9 +38,6 @@ ENV DSH_CLIENT_COMMIT_HASH=${DSH_CLIENT_COMMIT_HASH}
 RUN pnpm install --frozen-lockfile \
   && pnpm run build \
   && pnpm store prune
-
-# Deploy tree is runtime-only (tsx); copy last so supervise/edge edits do not rebuild the monorepo.
-COPY deploy ./deploy
 
 ENV DSH_CONFIG_READONLY=1
 EXPOSE 8080
