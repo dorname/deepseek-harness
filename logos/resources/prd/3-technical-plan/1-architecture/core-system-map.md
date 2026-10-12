@@ -352,6 +352,22 @@ sequenceDiagram
 - **单租户声明**：不注入 `DSH_FLEET_USER_ID` 即全集群默认命名空间；多租户（subject 从请求身份派生命名空间）需求出现时另行立项。
 - **前端独立部署**：web client 为静态 dist，独立托管走同域反代（`/`→ 前端、API 前缀 → 后端副本）或 `--public-url`/`--trusted-host` 既有路径；前端与后端副本数解耦。
 
+
+### 12.7 cluster-web Compose 一键拓扑（cluster-web-compose · P0）
+
+- **交付物**：`deploy/cluster-web/`（supervise + edge + compose）。
+- **绑定规则**：仅 edge 绑非 loopback；api/runner 绑 `127.0.0.1`。
+- **验收**：SMOKE-core-20；默认 1 api / 0 runner；硬上限 2；串行；CPU 阈值门禁。
+- **后继**：P1 `dsh up`、P2 Helm 投影同一角色集合。
+
+### 12.8 同域前后端分离（cluster-web-fe-split）
+
+- **落地 §12.6「前端独立部署」**：同域反代将 `/`（及静态、`/plugins`）与 `/api` 拆到不同上游，前端副本数与 API 副本数解耦。
+- **角色**：edge（唯一非 loopback）+ shell（`serveFrontend: true`）+ API-only ×N（`serveFrontend: false`）+ 可选 runner。
+- **鉴权**：launch token 仅在 shell `GET /` 兑换；API 只认 cookie；多 API 共享 `$DSH_HOME` 的 `browser-session` 密钥。
+- **外仓**：可替换 shell；须遵守同域与 boot/token/`/plugins` 契约；禁止跨域部署作为一等路径。
+- **验收**：SMOKE-core-23；默认 1 shell / 1 api / 0 runner；硬上限同 S43。
+
 ## 逆向基线来源
 ```yaml
 candidates:

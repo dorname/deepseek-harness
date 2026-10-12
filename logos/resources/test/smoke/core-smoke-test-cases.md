@@ -47,6 +47,10 @@
 | SMOKE-core-17 | webhook 恰一建会话 | 部署方案 §七.13 / §八·Host 本地服务 | staging | 同上；事件经入口入队 | 事件入队 → 消费循环 | 恰一创建 Workspace Session 且会话入执行池队列；CPU 峰值 ≤ 阈值 |
 | SMOKE-core-18 | 排空后接管续跑与旧会话可打开 | 部署方案 §七.14 / §八·Host 本地服务 | staging | 同上；双 runner + 排空指令 | A drive 中排空 → turn 边界收尾 → B 接管 | 新工作流向 B；in-flight 会话日志完整可打开；CPU 峰值 ≤ 阈值 |
 | SMOKE-core-19 | SIGTERM 优雅排空退出 | 部署方案 §编排器无关原则 / §八·Host 本地服务 | staging | runner 进程以配置化循环运行 | 向进程发 SIGTERM | 停止接新工作；in-flight 到 turn 边界；exit 0；串行执行，CPU 峰值 ≤ 部署配置阈值 |
+| SMOKE-core-20 | cluster-web 同域一键 | 部署方案 · cluster-web Compose / S43 | staging | deploy/cluster-web 存在；API_REPLICAS=1、RUNNER_REPLICAS=0 | supervise（或 compose）→ GET PUBLIC_URL → SIGTERM | 非 5xx；子树退出；串行；CPU 峰值 ≤ 部署配置阈值 |
+| SMOKE-core-21 | `dsh up` 同域一键 | 部署方案 · cluster-web dsh up / S44 | staging | 已 build 或源码可启动；API=1、RUNNER=0 | `dsh up --skip-overlays --skip-runners` → GET → SIGTERM | 非 5xx；子树退出；串行；CPU 峰值 ≤ 部署配置阈值 |
+| SMOKE-core-22 | cluster-web Helm 清单验收 | 部署方案 · cluster-web k8s / S45 | staging | chart 存在 | 校验 values 默认副本与 Ingress/sidecar；可选 `helm template` | 默认 api=1/runner=0；含 edge sidecar 与同域 `/`；串行；CPU ≤ 阈值；不强制 live apply |
+| SMOKE-core-23 | cluster-web 同域前后端分离 | 部署方案 · cluster-web fe-split / S46 | staging | deploy/cluster-web 存在；shell=1、API_REPLICAS=1、RUNNER_REPLICAS=0 | supervise（或 compose）→ `/?token=` → cookie GET `/` 与 `/api` → SIGTERM | 303+cookie；HTML 含 boot；无 cookie `/api`→401；子树退出；串行；CPU 峰值 ≤ 部署配置阈值 |
 
 ## 三、覆盖度校验
 
@@ -63,6 +67,8 @@
 - [x] 共享持久层：SMOKE-core-12/13（双节点串行执行，嵌入式 Postgres 与双实例同时运行时监控 CPU 不超部署配置阈值）
 - [x] 执行池：SMOKE-core-14/15（kill-runner 接管续跑与双副本流式实时；runner 操作串行触发，多进程运行时监控 CPU 不超部署配置阈值）
 - [x] Host 本地服务：SMOKE-core-16/17/18 + SMOKE-core-19（SIGTERM 优雅排空；串行执行，CPU 不超部署配置阈值）
+- [x] cluster-web 同域一键：SMOKE-core-20（默认 1 api / 0 runner；串行；CPU 不超部署配置阈值）
+- [x] cluster-web 同域前后端分离：SMOKE-core-23（1 shell / 1 api / 0 runner；token/cookie/API；串行；CPU 不超部署配置阈值）
 
 ## 三、覆盖度校验
 

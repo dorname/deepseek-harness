@@ -97,6 +97,10 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 | S40 | 共享 schedule 到期恰一交付 | 部署双 runner 共享库，任务到期 | P03/P06 | P0 |
 | S41 | webhook 入口无状态化恰一建会话 | 外部事件到达入口副本 | P06/P09 | P0 |
 | S42 | runner 排空与滚动升级 | 升级发布，runner 收到排空指令 | P03 | P1 |
+| S43 | 同域 cluster-web Compose 一键启动 | 运维执行 compose up / supervise | P03/P08 | P0 |
+| S44 | 同域 cluster-web `dsh up` 一键启动 | 运维执行 `dsh up` | P03/P08 | P0 |
+| S45 | 同域 cluster-web Helm/K8s 一键投影 | 运维执行 `helm upgrade --install` | P03/P08 | P1 |
+| S46 | 同域前后端分离（API-only + shell） | 运维启用 cluster-web 三分流 / 外仓替换 shell | P03/P08 | P0 |
 
 ## 四、核心场景详述（P0）
 
@@ -477,6 +481,56 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 - **GIVEN** runner 以配置化循环运行（进程加载即起循环）
 - **WHEN** 任意编排器发送 SIGTERM（K8s/docker stop/systemd stop 同信号）
 - **THEN** 进程停止接新工作、等待 in-flight drive 到 turn 边界、排空退出（exit 0）；剩余 runner 接续该会话
+
+### S43: 同域 cluster-web Compose 一键启动
+
+- **触发条件**：运维在仓库根执行 `docker compose -f deploy/cluster-web/docker-compose.yml up`，或无 Docker 时运行 `deploy/cluster-web/supervise.mts`
+- **用户价值**：浏览器只开一个 origin 即可使用 GUI；API 副本留在 loopback，edge 做同域反代（← P03/P08）
+- **优先级**：P0
+- **主路径**：supervise 按低副本默认拉起 api（及可选 runner）→ edge 对外监听 → 打印 PUBLIC_URL → SIGTERM 排空子树退出。
+
+#### 验收条件
+##### 正常：同域入口可达
+- **GIVEN** API_REPLICAS=1、RUNNER_REPLICAS=0（smoke 默认）
+- **WHEN** 经 edge 的 PUBLIC_URL 发起 HTTP 请求
+- **THEN** 非 5xx；浏览器 Host 经 edge 原样转发
+##### 正常：副本上限保护 CPU
+- **GIVEN** 验收配置
+- **WHEN** 设置 API_REPLICAS>2 或 RUNNER_REPLICAS>2
+- **THEN** supervise 拒绝启动；冒烟串行且主机 CPU 峰值 ≤ 部署配置阈值
+##### 正常：SIGTERM 排空
+- **GIVEN** 进程树就绪
+- **WHEN** 向 supervise 发 SIGTERM
+- **THEN** 子进程退出；supervise 在宽限内结束
+
+### S46: 同域前后端分离（API-only + shell）
+
+- **触发条件**：运维使用 `deploy/cluster-web`（compose / supervise / `dsh up` / Helm）且启用前后端分流；或外仓前端按同域契约替换 shell
+- **用户价值**：浏览器仍只开一个 origin；前端托管与后端 API 副本解耦，便于前端独立成仓部署（← P03/P08；编排器无关「前端独立部署」原则落地）
+- **优先级**：P0
+- **主路径**：supervise 拉起 shell（`serveFrontend: true`）+ N×API-only（`serveFrontend: false`）→ edge 将 `/`（及静态、`/plugins`）指向 shell、`/api` 轮询 API → 用户打开 `PUBLIC_URL?token=` → shell 换 cookie → 浏览器相对路径调用 `/api` → SIGTERM 排空子树。
+
+#### 验收条件
+##### 正常：同域分流可达
+- **GIVEN** shell=1、API_REPLICAS=1、RUNNER_REPLICAS=0（smoke 默认）
+- **WHEN** 经 edge 的 `PUBLIC_URL?token=` 完成换票后请求 `/` 与 `/api`
+- **THEN** `/` 返回注入 boot 的 HTML；带 cookie 的 `/api` 非 401；浏览器 Host 经 edge 原样转发
+##### 正常：API-only 不提供 SPA
+- **GIVEN** API 副本 `serveFrontend: false`
+- **WHEN** 直接请求该副本的 `/`（绕过 edge 的静态上游）
+- **THEN** 无 frontend-static fallback（404 或等价非 SPA）；`/api` 仍可服务
+##### 正常：无跨域
+- **GIVEN** 产品信任栅栏与 `SameSite=Strict` host-only cookie
+- **WHEN** 试图将前端与 API 部署在不同浏览器 origin
+- **THEN** 不在本场景支持范围；须同域反代统一 origin
+##### 正常：副本上限与 CPU
+- **GIVEN** 验收配置
+- **WHEN** API_REPLICAS>2 或 RUNNER_REPLICAS>2
+- **THEN** supervise 拒绝启动；冒烟串行且主机 CPU 峰值 ≤ 部署配置阈值
+##### 正常：SIGTERM 排空
+- **GIVEN** shell + API + edge 进程树就绪
+- **WHEN** 向 supervise 发 SIGTERM
+- **THEN** 子进程退出；supervise 在宽限内结束
 
 ## 五、约束与边界
 

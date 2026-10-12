@@ -543,3 +543,30 @@ Host 本地服务分布式化是部署形态能力：在执行池（S37–S39）
 - **GIVEN** 循环运行中
 - **WHEN** 进程收到 SIGTERM
 - **THEN** 停止接新工作、等待 in-flight 到边界、排空退出（exit 0）
+
+### S43: 同域 cluster-web Compose 一键启动 — 交互规格（运维面）
+
+**入口**：`deploy/cluster-web`（compose 或 supervise）
+
+**信息架构**：无产品 UI 变更（`ui_impact: false`）。运维面交付物：
+
+1. **同域 edge**：唯一公网监听；`/` 与静态走 upstream[0]；`/api` 在 API 副本间轮询；保留浏览器 `Host` 与 WebSocket Upgrade。
+2. **loopback API**：`dsh --profile web --host 127.0.0.1`；遵守产品「拒绝 0.0.0.0」规则。
+3. **低副本默认**：`.env.example` 中 `API_REPLICAS=1`、`RUNNER_REPLICAS=0`；supervise 硬上限 2。
+4. **可选共享库**：`DATABASE_URL` 在场时渲染 api/runner overlay；缺省则跳过 overlay，纯同域单体等价树。
+
+**验收**：SMOKE-core-20；串行；CPU ≤ `cpuThresholdPercent`。
+
+### S46: 同域前后端分离（API-only + shell）— 交互规格（运维面）
+
+**入口**：`deploy/cluster-web`（compose / supervise / `dsh up` / Helm）
+
+**信息架构**：无产品 UI 变更（`ui_impact: false`）。运维面交付物：
+
+1. **三分流 edge**：唯一公网监听；`STATIC_UPSTREAM` → shell；`API_UPSTREAMS` → API 池；`/api`（及 `/api/*`）轮询 API；`/`、静态资源与 **`/plugins`** 走 shell；保留浏览器 `Host` 与 WebSocket Upgrade。
+2. **shell**：`dsh --profile web` + `serveFrontend: true`；负责 `window.__DSH_BOOT__` 注入、`GET /?token=` 换 cookie、插件客户端脚本；可与 API 共用 `$DSH_HOME` 凭证目录。
+3. **API-only 副本**：`serveFrontend: false`；`--host 127.0.0.1`；共享 Postgres overlay（若配置）；共享 `$DSH_HOME` 使 `browser-session` cookie 跨副本互认。
+4. **外仓替换契约**：外仓前端替换 shell 时必须 (a) 与 API 同浏览器 origin（同域反代）；(b) 提供等价 boot 注入与 `GET /?token=` 换票（或后续立项的 bootstrap 路径）；(c) `/plugins` 同源可达。不做跨域 CORS。
+5. **低副本默认**：smoke 默认 shell=1、API=1、RUNNER=0；supervise 硬上限 API/RUNNER ≤ 2。
+
+**验收**：SMOKE-core-23；串行；CPU ≤ `cpuThresholdPercent`。
