@@ -51,6 +51,7 @@
 | SMOKE-core-21 | `dsh up` 同域一键 | 部署方案 · cluster-web dsh up / S44 | staging | 已 build 或源码可启动；API=1、RUNNER=0 | `dsh up --skip-overlays --skip-runners` → GET → SIGTERM | 非 5xx；子树退出；串行；CPU 峰值 ≤ 部署配置阈值 |
 | SMOKE-core-22 | cluster-web Helm 清单验收 | 部署方案 · cluster-web k8s / S45 | staging | chart 存在 | 校验 values 默认副本与 Ingress/sidecar；可选 `helm template` | 默认 api=1/runner=0；含 edge sidecar 与同域 `/`；串行；CPU ≤ 阈值；不强制 live apply |
 | SMOKE-core-23 | cluster-web 同域前后端分离 | 部署方案 · cluster-web fe-split / S46 | staging | deploy/cluster-web 存在；shell=1、API_REPLICAS=1、RUNNER_REPLICAS=0 | supervise（或 compose）→ `/?token=` → cookie GET `/` 与 `/api` → SIGTERM | 303+cookie；HTML 含 boot；无 cookie `/api`→401；子树退出；串行；CPU 峰值 ≤ 部署配置阈值 |
+| SMOKE-core-24 | cluster-web 前后端双容器 | 部署方案 · cluster-web fe-be-containers / S47 | staging | deploy/cluster-web 存在；frontend=1；api 副本=1（诊断可 2） | compose up → 断言 frontend/api 分离（scale=2 时 ≥2 api 容器）→ `/?token=` → cookie GET `/` 与 `/api` → compose down | 服务分离可见；303+cookie；HTML 含 boot；无 cookie `/api`→401；串行；CPU 峰值 ≤ 部署配置阈值 |
 
 ## 三、覆盖度校验
 
@@ -69,6 +70,7 @@
 - [x] Host 本地服务：SMOKE-core-16/17/18 + SMOKE-core-19（SIGTERM 优雅排空；串行执行，CPU 不超部署配置阈值）
 - [x] cluster-web 同域一键：SMOKE-core-20（默认 1 api / 0 runner；串行；CPU 不超部署配置阈值）
 - [x] cluster-web 同域前后端分离：SMOKE-core-23（1 shell / 1 api / 0 runner；token/cookie/API；串行；CPU 不超部署配置阈值）
+- [x] cluster-web 前后端双容器：SMOKE-core-24（frontend/api 分离；可选 api×2；token/cookie/API；串行；CPU 不超部署配置阈值）
 
 ## 三、覆盖度校验
 

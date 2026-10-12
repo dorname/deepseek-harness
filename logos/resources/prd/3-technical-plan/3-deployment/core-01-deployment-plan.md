@@ -125,6 +125,26 @@ flowchart LR
 - **外仓前端**：替换 shell 进程/镜像；浏览器 origin 仍为 edge 的 `PUBLIC_URL`；相对路径 `/api`；不做跨域。
 - **Helm**：chart 对齐 shell 容器（或 Deployment）与 edge 双上游；默认低副本。
 - **验收**：SMOKE-core-23（扩展 20/21 语义）；串行；CPU ≤ `cpuThresholdPercent`。
+- **与 S47**：S46 描述同域逻辑分流；**Compose 物理双容器与 API 容器级副本见 S47**。裸机/`dsh up` 进程树仍可用于无 Docker 验收路径。
+
+**cluster-web 前后端双容器（cluster-web-fe-be-containers · S47）**：
+
+```mermaid
+flowchart LR
+  browser["浏览器"] --> feEdge["frontend<br/>edge 0.0.0.0:EDGE_PORT"]
+  feEdge -->|"/ /plugins"| shell["shell<br/>127.0.0.1:SHELL_PORT"]
+  feEdge -->|"/api DNS RR"| fwd["api forwarder<br/>0.0.0.0:API_FORWARD_PORT"]
+  fwd --> dshApi["dsh API-only<br/>127.0.0.1"]
+  dshApi --> pg[("Postgres 可选")]
+  feHome["shared DSH_HOME volume"] --- shell
+  feHome --- dshApi
+```
+
+- **Compose 服务**：`frontend`（edge+shell）、`api`（scale N≤2，每实例 forwarder+API-only）、可选 `postgres`。
+- **不再**以单一 `cluster` 服务承载 shell+API+edge 作为 Compose 一等路径（回滚可恢复该形态）。
+- **环境变量**：`PUBLIC_URL` / `TRUSTED_HOST` / `EDGE_PORT` / `SHELL_PORT` / `API_FORWARD_PORT` / `API_REPLICAS`（或 compose scale）；`DATABASE_URL` 在 api 容器内指向 `postgres` 服务名。
+- **Helm**：`frontend` Deployment（1）+ `api` Deployment（replicas）+ 共享 PVC/`emptyDir` 文档化；Ingress → frontend。
+- **验收**：SMOKE-core-24；串行；CPU ≤ `cpuThresholdPercent`；断言 `docker compose ps` 可见 frontend 与 api 分离（scale=2 时 ≥2 个 api 容器）。
 
 
 ## 三、环境变量与密钥

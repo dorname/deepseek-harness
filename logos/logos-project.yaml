@@ -4,7 +4,7 @@ project:
   methodology: OpenLogos
 tech_stack: {}
 scenario_counter:
-  next_id: 47
+  next_id: 48
 modules:
   - id: core
     name: 核心功能
@@ -55,6 +55,10 @@ resource_index:
     desc: 部署后冒烟用例 SMOKE-core-01..11。涉及 openlogos smoke 判定时必读。
   - path: logos/resources/test/core-S43-test-cases.md
     desc: S43 cluster-web Compose 一键启动测试用例（低副本/串行/CPU 阈值）。涉及同域一键验收时必读。
+  - path: logos/resources/test/core-S46-test-cases.md
+    desc: S46 同域前后端分离测试用例（serveFrontend/edge/UT-ST）。涉及 fe-split 验收时必读。
+  - path: logos/resources/test/core-S47-test-cases.md
+    desc: S47 前后端双容器与 API 容器级副本测试用例。涉及 compose frontend/api scale 验收时必读。
   - path: logos/resources/implementation/core-01-implementation.md
     desc: core 实现清单（场景→主责包映射、验证命令、reporter 接入差距）。涉及实现定位时必读。
   - path: logos/resources/reference/note/2026-10-06-multi-user-and-cluster-plan.md
