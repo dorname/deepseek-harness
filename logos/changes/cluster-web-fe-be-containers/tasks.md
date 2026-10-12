@@ -11,7 +11,9 @@
 
 ## [code] 代码实现
 
-（本段在 plan 段留空：本提案需要代码实现，但 `[code]` 切片由 merge 后的 `slice-planner` 基于已合并规格和真实 UT/ST ID 统一规划。此处仅保留 `## [code]` 标题，勿提前填写切片项。）
+> 删后续自检：评分≈10（跨 compose/forwarder/Helm/smoke），但 frontend↔api↔共享 volume↔edge DNS 互相咬死，垂直拆片过不了全量 verify，故单片。
+
+- [x] 单切片：Compose 拆为 `frontend`（edge+shell）与可 scale 的 `api`（loopback API-only + 内网 forwarder）+ 共享 `DSH_HOME` volume；更新 supervise/entrypoint/Helm/README；实现 UT-S47-01..03、ST-S47-01..04 reporter 与 `scripts/smoke-cluster-web-fe-be-containers.ts`（SMOKE-core-24），接入 smoke runner
 
 ## [deploy] 部署任务
 

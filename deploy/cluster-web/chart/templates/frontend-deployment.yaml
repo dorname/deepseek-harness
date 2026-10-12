@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-frontend
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-frontend
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-frontend
+    spec:
+      containers:
+        - name: shell
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - node
+            - --import
+            - tsx/esm
+            - apps/cli/src/bin.ts
+            - --profile
+            - web
+            - --no-open
+            - --host
+            - 127.0.0.1
+            - --port
+            - {{ .Values.shell.containerPort | quote }}
+            - --public-url
+            - $(PUBLIC_URL)
+            - --trusted-host
+            - $(TRUSTED_HOST)
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-cluster-web
+          volumeMounts:
+            - name: dsh-home
+              mountPath: /dsh-home
+          env:
+            - name: DSH_HOME
+              value: /dsh-home
+          resources:
+            {{- toYaml .Values.resources.shell | nindent 12 }}
+        - name: edge
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - node
+            - --import
+            - tsx/esm
+            - deploy/cluster-web/edge.mts
+          env:
+            - name: EDGE_PORT
+              value: {{ .Values.edge.port | quote }}
+            - name: STATIC_UPSTREAM
+              value: "127.0.0.1:{{ .Values.shell.containerPort }}"
+            - name: API_UPSTREAMS
+              value: "{{ .Release.Name }}-api:{{ .Values.api.forwardPort }}"
+          ports:
+            - containerPort: {{ .Values.edge.port }}
+              name: http
+          resources:
+            {{- toYaml .Values.resources.edge | nindent 12 }}
+      volumes:
+        - name: dsh-home
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-dsh-home
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-frontend
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: {{ .Release.Name }}-frontend
+  ports:
+    - port: 80
+      targetPort: http
+      name: http

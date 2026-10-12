@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-dsh-home
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.dshHome.storage | default "1Gi" }}
+  {{- if .Values.dshHome.storageClassName }}
+  storageClassName: {{ .Values.dshHome.storageClassName | quote }}
+  {{- end }}

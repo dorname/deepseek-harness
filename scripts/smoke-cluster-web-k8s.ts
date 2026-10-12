@@ -54,16 +54,22 @@ function assertChartArtifacts(): void {
   if (!/^runnerReplicas:\s*0\s*$/m.test(values)) throw new Error('values.yaml must default runnerReplicas: 0')
   const api = readFileSync(join(CHART, 'templates', 'api-deployment.yaml'), 'utf8')
   if (!api.includes('127.0.0.1')) throw new Error('api-deployment must bind dsh to 127.0.0.1')
-  if (!api.includes('name: edge')) throw new Error('api-deployment must include edge sidecar')
-  if (!api.includes('name: shell')) throw new Error('api-deployment must include shell sidecar (S46)')
+  if (!api.includes('name: forward')) throw new Error('api-deployment must include forward sidecar (S47)')
   if (!api.includes('--api-only')) throw new Error('api-deployment dsh must pass --api-only')
-  if (!api.includes('STATIC_UPSTREAM')) throw new Error('edge must set STATIC_UPSTREAM')
-  if (!api.includes('API_UPSTREAMS')) throw new Error('edge must set API_UPSTREAMS')
+  if (!existsSync(join(CHART, 'templates', 'frontend-deployment.yaml'))) {
+    throw new Error('missing frontend-deployment.yaml (S47)')
+  }
+  const frontend = readFileSync(join(CHART, 'templates', 'frontend-deployment.yaml'), 'utf8')
+  if (!frontend.includes('name: shell')) throw new Error('frontend-deployment must include shell')
+  if (!frontend.includes('name: edge')) throw new Error('frontend-deployment must include edge')
+  if (!frontend.includes('STATIC_UPSTREAM')) throw new Error('edge must set STATIC_UPSTREAM')
+  if (!frontend.includes('API_UPSTREAMS')) throw new Error('edge must set API_UPSTREAMS')
   if (!/shell:\s*\n\s*containerPort:\s*3079/.test(values)) {
     throw new Error('values.yaml must declare shell.containerPort')
   }
   const ingress = readFileSync(join(CHART, 'templates', 'ingress.yaml'), 'utf8')
   if (!ingress.includes('path: /')) throw new Error('ingress must expose path / for same-origin')
+  if (!ingress.includes('-frontend')) throw new Error('ingress must target frontend Service (S47)')
   void readdirSync(join(CHART, 'templates'))
 }
 

@@ -15,8 +15,14 @@ shell:
   # SPA + token exchange; edge STATIC_UPSTREAM (S46).
 
 api:
+  # In-network forwarder (Service target); dsh stays on loopbackPort.
+  forwardPort: 3080
+  loopbackPort: 13080
   containerPort: 3080
-  # API-only (`--api-only`); dsh binds loopback; edge publishes the Service port.
+
+dshHome:
+  storage: 1Gi
+  storageClassName: ""
 
 publicUrl: http://127.0.0.1/
 trustedHost: 127.0.0.1

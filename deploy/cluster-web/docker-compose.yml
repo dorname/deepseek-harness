@@ -1,7 +1,7 @@
-# cluster-web Compose topology (P0).
-# One-click: `docker compose --env-file .env.example up --build`
-# Only the edge publishes a host port; dsh API/runner stay on container loopback.
-# Acceptance: keep API_REPLICAS≤2 and RUNNER_REPLICAS≤2; smoke uses 1 / 0.
+# cluster-web Compose topology (S47): frontend + api (+ postgres).
+# One-click: `docker compose --env-file .env up --build`
+# Scale API containers: `docker compose up --scale api=2` (hard cap 2 for acceptance).
+# Only frontend publishes a host port; api forwarder stays on the compose network.
 
 name: dsh-cluster-web
 
@@ -25,32 +25,78 @@ services:
           cpus: '1.0'
           memory: 512M
 
-  cluster:
+  frontend:
     build:
       context: ../..
       dockerfile: deploy/cluster-web/Dockerfile
       args:
-        # Image context has no .git; inject a hex commit (default placeholder).
-        # Prefer: DSH_CLIENT_COMMIT_HASH=$(git rev-parse HEAD) docker compose ... build
         DSH_CLIENT_COMMIT_HASH: ${DSH_CLIENT_COMMIT_HASH:-0000000}
     depends_on:
       postgres:
         condition: service_healthy
+      api:
+        condition: service_started
+    command:
+      - node
+      - --import
+      - tsx/esm
+      - deploy/cluster-web/frontend.mts
     env_file:
       - .env.example
     environment:
-      DATABASE_URL: postgres://dsh:dsh@postgres:5432/dsh
-      # Compose network DNS name is not loopback for Postgres; API still binds 127.0.0.1.
       PUBLIC_URL: ${PUBLIC_URL:-http://127.0.0.1:8080/}
       TRUSTED_HOST: ${TRUSTED_HOST:-127.0.0.1:8080}
       EDGE_PORT: ${EDGE_PORT:-8080}
-      API_REPLICAS: ${API_REPLICAS:-1}
-      RUNNER_REPLICAS: ${RUNNER_REPLICAS:-0}
+      SHELL_PORT: ${SHELL_PORT:-3079}
+      API_UPSTREAMS: ${API_UPSTREAMS:-api:3080}
+      DSH_HOME: /dsh-home
       DSH_CONFIG_READONLY: '1'
+      # Frontend does not need Postgres; keep overlays off unless explicitly set.
+      CLUSTER_WEB_SKIP_OVERLAYS: '1'
+    volumes:
+      - dsh-home:/dsh-home
     ports:
       - '${EDGE_PORT:-8080}:8080'
     deploy:
       resources:
         limits:
-          cpus: '2.0'
+          cpus: '1.5'
           memory: 2G
+
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/cluster-web/Dockerfile
+      args:
+        DSH_CLIENT_COMMIT_HASH: ${DSH_CLIENT_COMMIT_HASH:-0000000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - node
+      - --import
+      - tsx/esm
+      - deploy/cluster-web/api.mts
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgres://dsh:dsh@postgres:5432/dsh
+      PUBLIC_URL: ${PUBLIC_URL:-http://127.0.0.1:8080/}
+      TRUSTED_HOST: ${TRUSTED_HOST:-127.0.0.1:8080}
+      EDGE_PORT: ${EDGE_PORT:-8080}
+      FORWARD_PORT: ${API_FORWARD_PORT:-3080}
+      API_LOOPBACK_PORT: ${API_LOOPBACK_PORT:-13080}
+      DSH_HOME: /dsh-home
+      DSH_CONFIG_READONLY: '1'
+    volumes:
+      - dsh-home:/dsh-home
+    # No host ports: only reachable as compose DNS `api:FORWARD_PORT`.
+    # Scale: `docker compose up --scale api=N` (acceptance hard cap N≤2).
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+volumes:
+  dsh-home:
