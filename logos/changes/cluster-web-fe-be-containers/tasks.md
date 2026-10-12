@@ -17,5 +17,5 @@
 
 ## [deploy] 部署任务
 
-- [ ] 按部署方案在本地 staging 拉起双容器 compose（含可选 API scale=2）
-- [ ] 确认共享 DSH_HOME volume、公网仅 frontend、回滚到单 cluster 进程树的预案
+- [x] 按部署方案在本地 staging 拉起双容器 compose（含可选 API scale=2）
+- [x] 确认共享 DSH_HOME volume、公网仅 frontend、回滚到单 cluster 进程树的预案
