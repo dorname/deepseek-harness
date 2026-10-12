@@ -1,0 +1,20 @@
+# API / Web replica overlay for cluster-web (API-only + optional shared Postgres).
+# Supervise substitutes __DATABASE_URL__ before applying via `dsh --patch`.
+# Disables the local JSONL persistence row and mounts the shared Postgres backend.
+# serveFrontend: false — SPA stays on the shell upstream (S46).
+- id: web-runtime
+  config:
+    serveFrontend: false
+- id: session-persistence-jsonl
+  disabled: true
+- insert:
+    - id: session-persistence-postgres
+      name: '@deepseek-ai/dsh-session-persistence-postgres'
+      config:
+        connectionString: __DATABASE_URL__
+        max: 2
+    - id: stream-relay-postgres
+      name: '@deepseek-ai/dsh-stream-relay-postgres'
+      config:
+        connectionString: __DATABASE_URL__
+        max: 2

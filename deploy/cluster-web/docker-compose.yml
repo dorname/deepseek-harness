@@ -1,0 +1,56 @@
+# cluster-web Compose topology (P0).
+# One-click: `docker compose --env-file .env.example up --build`
+# Only the edge publishes a host port; dsh API/runner stay on container loopback.
+# Acceptance: keep API_REPLICAS≤2 and RUNNER_REPLICAS≤2; smoke uses 1 / 0.
+
+name: dsh-cluster-web
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dsh
+      POSTGRES_PASSWORD: dsh
+      POSTGRES_DB: dsh
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dsh -d dsh']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  cluster:
+    build:
+      context: ../..
+      dockerfile: deploy/cluster-web/Dockerfile
+      args:
+        # Image context has no .git; inject a hex commit (default placeholder).
+        # Prefer: DSH_CLIENT_COMMIT_HASH=$(git rev-parse HEAD) docker compose ... build
+        DSH_CLIENT_COMMIT_HASH: ${DSH_CLIENT_COMMIT_HASH:-0000000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgres://dsh:dsh@postgres:5432/dsh
+      # Compose network DNS name is not loopback for Postgres; API still binds 127.0.0.1.
+      PUBLIC_URL: ${PUBLIC_URL:-http://127.0.0.1:8080/}
+      TRUSTED_HOST: ${TRUSTED_HOST:-127.0.0.1:8080}
+      EDGE_PORT: ${EDGE_PORT:-8080}
+      API_REPLICAS: ${API_REPLICAS:-1}
+      RUNNER_REPLICAS: ${RUNNER_REPLICAS:-0}
+      DSH_CONFIG_READONLY: '1'
+    ports:
+      - '${EDGE_PORT:-8080}:8080'
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G

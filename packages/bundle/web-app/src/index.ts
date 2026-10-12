@@ -72,6 +72,12 @@ export interface Config {
    * is otherwise not the only loopback peer able to set forwarded headers.
    */
   trustLoopbackGateway: boolean
+  /**
+   * Mount `frontend-static` over the built SPA dist. Cluster API-only replicas
+   * set this to `false` so `/` is not served here; the same-origin shell (or an
+   * external front) owns index injection and `/?token=` exchange.
+   */
+  serveFrontend: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -81,6 +87,7 @@ export const Config: z<Config> = z.object({
   publicUrl: z.transform(z.string(), value => parsePublicUrl(value).href),
   trustedHosts: z.array(String).default([]),
   trustLoopbackGateway: z.boolean().default(false),
+  serveFrontend: z.boolean().default(true),
 })
 
 /** Bind-derived trust snapshot the /api fence and the URL display share. */
@@ -265,7 +272,9 @@ export function apply(ctx: Context, config: Config): void {
   const handoffBrowser = config.openBrowser && !launchedThroughSsh(launchEnvironmentOf(ctx))
   // Release dependent rows only after bind-dependent trust has been sampled once.
   ctx.provide(WEB_RUNTIME_SERVICE, runtime)
-  ctx.plugin(FrontendStatic, { distIndex: internals.resolveDistIndex() })
+  if (config.serveFrontend) {
+    ctx.plugin(FrontendStatic, { distIndex: internals.resolveDistIndex() })
+  }
   if (config.surfaceContext) {
     ctx.inject(['systemPrompt'], (promptCtx) => {
       addHarnessSourceSection(promptCtx, SOURCE_ROOT)

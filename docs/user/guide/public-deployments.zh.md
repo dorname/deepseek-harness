@@ -31,3 +31,7 @@ dsh --profile web --public-url https://app.example/ui/ --trusted-host app.exampl
 在代理处终止 TLS。`http://` 公告根会以明文发送启动 token 与会话 cookie，而 `https://` 根只加密浏览器到代理这一段。打印的 URL 携带进程凭据，只应与预期用户分享。
 
 [Web 应用参考](../../../packages/bundle/web-app/README.zh.md#public-deployments)负责 `--public-url` 与 `--trusted-host` 的命令行约定，以及 `publicUrl` 与 `trustedHosts` 字段。
+
+## 同域前后端分离（cluster-web）
+
+[`deploy/cluster-web`](../../../deploy/cluster-web/README.zh.md) 可在同一 edge 后跑 **shell**（SPA）与 **API-only** 副本：`/` 与 `/plugins` 打到 shell；`/api` 在 API 副本间轮询。API 进程使用 `--api-only`（或 `serveFrontend: false`）。浏览器 RPC 仍用文档相对路径——不要把 SPA 指到另一 origin。外仓前端只有在保持同域、并提供等价 boot 注入与启动 token 换 cookie 时，才可替换 shell。

@@ -1,0 +1,13 @@
+dsh-cluster-web {{ .Chart.Version }}
+
+Same-origin topology:
+  Ingress / → Service {{ .Release.Name }}-api → edge sidecar → dsh on 127.0.0.1:{{ .Values.api.containerPort }}
+
+Acceptance defaults (do not raise for routine smoke):
+  apiReplicas={{ .Values.apiReplicas }}  (hard cap 2)
+  runnerReplicas={{ .Values.runnerReplicas }}  (hard cap 2)
+
+One-click:
+  helm upgrade --install {{ .Release.Name }} deploy/cluster-web/chart -n dsh-cluster-web --create-namespace
+
+No Operator/CRD — SIGTERM drains runners via existing agent-dispatch lifecycle.

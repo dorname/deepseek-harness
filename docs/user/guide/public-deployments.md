@@ -31,3 +31,7 @@ Neither the advertised URL nor the fence protects the listening port itself, so 
 Terminate TLS at the proxy. An `http://` advertised root sends the launch token and the session cookie unencrypted, and an `https://` root encrypts only the browser-to-proxy leg. The printed URL carries a process credential, so share it only with intended users.
 
 The [Web app reference](../../../packages/bundle/web-app/README.md#public-deployments) owns the `--public-url` and `--trusted-host` command-line contract and the `publicUrl` and `trustedHosts` fields.
+
+## Same-origin frontend split (cluster-web)
+
+[`deploy/cluster-web`](../../../deploy/cluster-web/README.md) can run a **shell** (SPA) and **API-only** replicas behind one edge: `/` and `/plugins` go to the shell; `/api` round-robins API replicas. Use `--api-only` (or `serveFrontend: false`) on API processes. Browser RPC stays document-relative — do not point the SPA at a different origin. An external front may replace the shell only if it keeps the same origin and provides equivalent boot injection plus launch-token cookie exchange.

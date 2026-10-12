@@ -1,0 +1,43 @@
+{{- if gt (int .Values.runnerReplicas) 0 }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-runner
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.runnerReplicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-runner
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-runner
+    spec:
+      containers:
+        - name: runner
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Private loopback keep-alive (not Service-published). Mount a dispatch
+          # overlay via --patch when DATABASE_URL is configured (see chart README).
+          command:
+            - node
+            - --import
+            - tsx/esm
+            - apps/cli/src/bin.ts
+            - --profile
+            - web
+            - --no-open
+            - --host
+            - 127.0.0.1
+            - --port
+            - "3180"
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-cluster-web
+          env:
+            - name: DSH_CONFIG_READONLY
+              value: {{ .Values.configReadonly | quote }}
+          resources:
+            {{- toYaml .Values.resources.runner | nindent 12 }}
+{{- end }}

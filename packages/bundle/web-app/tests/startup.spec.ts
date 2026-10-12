@@ -66,6 +66,7 @@ export const apply = ctx => globalThis.__webStartupApply(ctx)
     '    publicUrl: !!js ctx.webStartup.publicUrl',
     '    trustedHosts: !!js ctx.webStartup.trustedHosts',
     '    trustLoopbackGateway: !!js ctx.webStartup.trustLoopbackGateway',
+    '    serveFrontend: !!js ctx.webStartup.serveFrontend',
     '- id: provider',
     `  name: ${pathToFileURL(join(dir, 'provider.mjs')).href}`,
     '',
@@ -108,6 +109,7 @@ describe('web command-line provider', () => {
       port: 8080,
       trustedHosts: ['lab.internal', 'lab-2.internal', '10.0.0.9'],
       trustLoopbackGateway: false,
+      serveFrontend: true,
     })
     expect(observed.readerConfig).toEqual(values)
     expect(observed.exits).toEqual([])
@@ -115,26 +117,47 @@ describe('web command-line provider', () => {
 
   it('publishes --trust-loopback-gateway for the connection fence', async () => {
     const { values, observed } = await bootProvider(['--trust-loopback-gateway'])
-    expect(values).toEqual({ openBrowser: true, trustedHosts: [], trustLoopbackGateway: true })
+    expect(values).toEqual({ openBrowser: true, trustedHosts: [], trustLoopbackGateway: true, serveFrontend: true })
     expect(observed.readerConfig).toEqual({
       host: '127.0.0.1',
       openBrowser: true,
       port: 3080,
       trustedHosts: [],
       trustLoopbackGateway: true,
+      serveFrontend: true,
+    })
+    expect(observed.exits).toEqual([])
+  })
+
+  it('publishes --api-only as serveFrontend false', async () => {
+    const { values, observed } = await bootProvider(['--api-only', '--no-open'])
+    expect(values).toEqual({
+      openBrowser: false,
+      trustedHosts: [],
+      trustLoopbackGateway: false,
+      serveFrontend: false,
+    })
+    expect(observed.readerConfig).toEqual({
+      host: '127.0.0.1',
+      openBrowser: false,
+      port: 3080,
+      trustedHosts: [],
+      trustLoopbackGateway: false,
+      serveFrontend: false,
     })
     expect(observed.exits).toEqual([])
   })
 
   it('leaves deployment values to each consumer when flags omit them', async () => {
     const { values, observed } = await bootProvider([])
-    expect(values).toEqual({ openBrowser: true, trustedHosts: [], trustLoopbackGateway: false })
+    expect(values).toEqual({ openBrowser: true, trustedHosts: [], trustLoopbackGateway: false, serveFrontend: true })
     expect(observed.readerConfig).toEqual({
       host: '127.0.0.1',
       openBrowser: true,
       port: 3080,
       trustedHosts: [],
       trustLoopbackGateway: false,
+      serveFrontend: true,
     })
   })
 
@@ -175,6 +198,7 @@ describe('web command-line provider', () => {
       publicUrl: 'https://web.example/ui',
       trustedHosts: ['lab.internal'],
       trustLoopbackGateway: false,
+      serveFrontend: true,
     })
     expect(observed.readerConfig).toEqual({
       host: '127.0.0.1',
@@ -183,6 +207,7 @@ describe('web command-line provider', () => {
       publicUrl: 'https://web.example/ui',
       trustedHosts: ['lab.internal'],
       trustLoopbackGateway: false,
+      serveFrontend: true,
     })
     expect(observed.exits).toEqual([])
   })

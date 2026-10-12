@@ -122,6 +122,16 @@ describe('parseDshArgs', () => {
       .toEqual({ mode: 'plugin', profile: 'tui', args: ['add', '--save-dev', 'x'] })
   })
 
+  it('reserves leading up for cluster-web and forwards later command names', () => {
+    expect(parse(['up', '--edge-port', '8080']))
+      .toEqual({ mode: 'up', args: ['--edge-port', '8080'] })
+    expect(parse(['up']))
+      .toEqual({ mode: 'up', args: [] })
+    expect(parse(['--profile', 'up'])).toMatchObject({ mode: 'profile', profile: 'up' })
+    expect(parse(['--profile', 'web', 'up']))
+      .toMatchObject({ mode: 'profile', profile: 'web', args: ['up'] })
+  })
+
   it.each(['desktop', 'Desktop', 'DESKTOP'])('permits installed Desktop plugin commands for %s', (profile) => {
     expect(parse(['plugin', '--profile', profile, 'add', 'example-plugin'], true))
       .toEqual({ mode: 'plugin', profile: 'desktop', args: ['add', 'example-plugin'] })

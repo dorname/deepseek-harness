@@ -1,0 +1,22 @@
+# Runner overlay for cluster-web.
+# Supervise substitutes __DATABASE_URL__ and __NODE_ID__ before `--patch`.
+- id: session-persistence-jsonl
+  disabled: true
+- insert:
+    - id: session-persistence-postgres
+      name: '@deepseek-ai/dsh-session-persistence-postgres'
+      config:
+        connectionString: __DATABASE_URL__
+        max: 2
+    - id: session-lease-postgres
+      name: '@deepseek-ai/dsh-session-lease-postgres'
+      config:
+        connectionString: __DATABASE_URL__
+        max: 2
+    - id: agent-dispatch
+      name: '@deepseek-ai/dsh-agent-dispatch'
+      config:
+        connectionString: __DATABASE_URL__
+        nodeId: __NODE_ID__
+        max: 2
+        pollMs: 250

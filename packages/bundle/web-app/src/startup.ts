@@ -38,6 +38,11 @@ export interface WebStartupValues {
   trustedHosts: string[]
   /** `--trust-loopback-gateway`: bind the /api fence to the forwarded authority. */
   trustLoopbackGateway: boolean
+  /**
+   * Mount the SPA fallback. `false` when `--api-only` (cluster API replica);
+   * default `true`.
+   */
+  serveFrontend: boolean
 }
 
 /** The web flag family, as commander parsed it. */
@@ -48,6 +53,7 @@ interface WebOptions {
   publicUrl?: string
   trustedHost?: string[]
   trustLoopbackGateway?: boolean
+  apiOnly?: boolean
 }
 
 /**
@@ -65,11 +71,13 @@ function webCommand(): Command {
     .option('--public-url <url>', 'advertise this HTTP(S) root in the printed, opened, web-surface, and DSH_WEB_URL forms; grants no trust')
     .option('--trusted-host <authority...>', 'extra authority the /api browser-trust fence accepts (host or host:port; repeatable)')
     .option('--trust-loopback-gateway', 'this process is reverse-proxied by a loopback User Fleet gateway; the /api fence binds the forwarded authority instead of the loopback Host (declare the gateway authority via --trusted-host)')
+    .option('--api-only', 'do not mount the SPA (frontend-static); API and connection only — use with a same-origin shell or external front')
     .addHelpText('after', `
 Examples:
   dsh --profile web                          serve on the composed host and port
   dsh --profile web --no-open                serve without opening a browser
   dsh --profile web --port 8080              serve on another port
+  dsh --profile web --api-only               API replica without SPA (cluster-web)
   dsh --profile web --public-url https://app.example/ui/ --trusted-host app.example
                                              advertise a prefix-stripping HTTPS proxy entry and admit its authority
 `)
@@ -106,6 +114,7 @@ export function apply(ctx: Context): void {
       ...options.publicUrl !== undefined && { publicUrl: options.publicUrl },
       trustedHosts: options.trustedHost ?? [],
       trustLoopbackGateway: options.trustLoopbackGateway === true,
+      serveFrontend: options.apiOnly !== true,
     } satisfies WebStartupValues)
   })
   parseCmdline(ctx, program)

@@ -1,0 +1,6 @@
+# Shell (SPA) overlay for cluster-web fe-split.
+# Keeps serveFrontend on; does not mount shared Postgres (shell is not a session writer).
+# Supervise may apply this when CLUSTER_WEB_SKIP_OVERLAYS is unset so the row is explicit.
+- id: web-runtime
+  config:
+    serveFrontend: true

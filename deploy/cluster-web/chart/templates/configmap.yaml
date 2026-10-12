@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-cluster-web
+  namespace: {{ .Release.Namespace }}
+data:
+  PUBLIC_URL: {{ .Values.publicUrl | quote }}
+  TRUSTED_HOST: {{ .Values.trustedHost | quote }}
+  EDGE_PORT: {{ .Values.edge.port | quote }}
+  API_BASE_PORT: {{ .Values.api.containerPort | quote }}
+  DSH_CONFIG_READONLY: {{ .Values.configReadonly | quote }}
+  CLUSTER_WEB_SKIP_OVERLAYS: {{ if .Values.postgres.enabled }}"0"{{ else }}"1"{{ end }}
+  CLUSTER_WEB_SKIP_RUNNERS: "1"
+{{- if .Values.postgres.enabled }}
+  DATABASE_URL: "postgres://{{ .Values.postgres.user }}:{{ .Values.postgres.password }}@{{ .Release.Name }}-postgres:5432/{{ .Values.postgres.database }}"
+{{- end }}

@@ -1,0 +1,56 @@
+# Acceptance defaults — keep low for smoke; hard cap is 2 (enforced by notes + SMOKE-core-22).
+apiReplicas: 1
+runnerReplicas: 0
+
+image:
+  repository: dsh-cluster-web
+  tag: local
+  pullPolicy: IfNotPresent
+
+edge:
+  port: 8080
+
+shell:
+  containerPort: 3079
+  # SPA + token exchange; edge STATIC_UPSTREAM (S46).
+
+api:
+  containerPort: 3080
+  # API-only (`--api-only`); dsh binds loopback; edge publishes the Service port.
+
+publicUrl: http://127.0.0.1/
+trustedHost: 127.0.0.1
+
+postgres:
+  enabled: true
+  image: postgres:16-alpine
+  user: dsh
+  password: dsh
+  database: dsh
+
+ingress:
+  enabled: true
+  className: ""
+  host: ""
+  # Same-origin: / → api Service (edge); /api → same Service (edge round-robins upstream).
+
+resources:
+  shell:
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  api:
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  edge:
+    limits:
+      cpu: "200m"
+      memory: 128Mi
+  runner:
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+# Cluster config is read-only (disables HMR).
+configReadonly: "1"

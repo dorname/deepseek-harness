@@ -206,6 +206,7 @@
         surfaceContext: true
         trustedHosts: !!js ctx.webStartup.trustedHosts
         trustLoopbackGateway: !!js ctx.webStartup.trustLoopbackGateway
+        serveFrontend: !!js ctx.webStartup.serveFrontend
 
     # The client-plugin reload chain, always mounted: it is idle until a
     # rebuild watcher (pnpm run dev:web) actually rewrites client bundles. It

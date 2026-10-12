@@ -1,0 +1,13 @@
+# Applied when build context is the repository root (compose `context: ../..`).
+# Keep sources needed by `pnpm run build`; drop local artifacts that bloat the context.
+**/node_modules
+**/.git
+**/.dsh-build
+**/lib
+**/dist
+**/.turbo
+**/.vitepress/cache
+**/coverage
+logos/changes
+skill-output
+*.log

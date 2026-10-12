@@ -9,9 +9,9 @@
 
 import { EventEmitter } from 'node:events'
 import { spawn, type ChildProcess } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -21,6 +21,17 @@ import { createLaunchEnvironmentSnapshot, DSH_LAUNCH_ENVIRONMENT_KEY } from '@de
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import { apply, Config, internals } from '../src/index.ts'
+
+/** OpenLogos ledger helper (no-op without OPENLOGOS_RESULT_FILE). */
+function reportWebApp(id: string, status: 'pass' | 'fail', error?: string, durationMs?: number): void {
+  const file = process.env.OPENLOGOS_RESULT_FILE
+  if (file === undefined) return
+  mkdirSync(dirname(file), { recursive: true })
+  const record: Record<string, unknown> = { id, status, timestamp: new Date().toISOString() }
+  if (durationMs !== undefined) record.duration_ms = durationMs
+  if (error !== undefined) record.error = error
+  appendFileSync(file, `${JSON.stringify(record)}\n`)
+}
 
 vi.mock('node:child_process', async importOriginal => ({
   ...await importOriginal<typeof import('node:child_process')>(),
@@ -115,6 +126,59 @@ interface BashContribution {
 }
 
 describe('web-app runtime glue', () => {
+  it('skips frontend-static when serveFrontend is false (UT-S46-01)', async () => {
+    const started = Date.now()
+    try {
+      const ctx = new Context()
+      onTestFinished(() => ctx.fiber.dispose())
+      const { server, seat } = fakeHttpServer()
+      ctx.provide('webServer', server)
+      provideConnection(ctx)
+      provideLoader(ctx)
+      apply(ctx, new Config({
+        openBrowser: false,
+        printUrl: false,
+        surfaceContext: false,
+        trustLoopbackGateway: false,
+        trustedHosts: [],
+        serveFrontend: false,
+      }))
+      await new Promise(resolve => setTimeout(resolve, 0))
+      expect(seat()).toBeUndefined()
+      reportWebApp('UT-S46-01', 'pass', undefined, Date.now() - started)
+    } catch (error) {
+      reportWebApp('UT-S46-01', 'fail', error instanceof Error ? error.message : String(error), Date.now() - started)
+      throw error
+    }
+  })
+
+  it('mounts frontend-static when serveFrontend is true (UT-S46-02)', async () => {
+    const started = Date.now()
+    try {
+      stageDist()
+      const ctx = new Context()
+      onTestFinished(() => ctx.fiber.dispose())
+      const { server, seat } = fakeHttpServer()
+      ctx.provide('webServer', server)
+      provideConnection(ctx)
+      provideLoader(ctx)
+      apply(ctx, new Config({
+        openBrowser: false,
+        printUrl: false,
+        surfaceContext: false,
+        trustLoopbackGateway: false,
+        trustedHosts: [],
+        serveFrontend: true,
+      }))
+      await new Promise(resolve => setTimeout(resolve, 0))
+      expect(seat()).toBeDefined()
+      reportWebApp('UT-S46-02', 'pass', undefined, Date.now() - started)
+    } catch (error) {
+      reportWebApp('UT-S46-02', 'fail', error instanceof Error ? error.message : String(error), Date.now() - started)
+      throw error
+    }
+  })
+
   it('mounts dist serving, prompt section, bash variables, and publishes the URL with the LAN snapshot', async () => {
     stageDist()
     const ctx = new Context()
