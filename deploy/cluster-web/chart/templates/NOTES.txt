@@ -1,7 +1,8 @@
 dsh-cluster-web {{ .Chart.Version }}
 
 Same-origin topology:
-  Ingress / → Service {{ .Release.Name }}-api → edge sidecar → dsh on 127.0.0.1:{{ .Values.api.containerPort }}
+  Ingress / → Service {{ .Release.Name }}-frontend → frontend.mts edge
+  /api → Service {{ .Release.Name }}-api → api.mts forwarder → loopback dsh
 
 Acceptance defaults (do not raise for routine smoke):
   apiReplicas={{ .Values.apiReplicas }}  (hard cap 2)

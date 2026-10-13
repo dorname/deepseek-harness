@@ -1,25 +1,40 @@
-# dsh-cluster-web Helm chart (P2)
+---
+description: "Kubernetes topology for cluster-web: one frontend Deployment and scalable api Deployments sharing one DSH_HOME PVC."
+kind: "reference"
+---
 
-Projects the same topology as Compose / `dsh up`: Ingress same-origin → API Service → edge → shell + API-only on loopback (S46).
+# dsh-cluster-web Helm chart
 
-## One-click
+English | [中文](README.zh.md)
+
+## Summary
+
+The chart projects the S47 topology into Kubernetes: Ingress sends all traffic to the frontend Service, while the api Service load-balances the API Deployment. API replicas are stateless pod processes; browser-session keys and durable session state live in the shared `DSH_HOME` PVC and optional Postgres.
+
+## Install
+
+Build the image from the repository root, then install the chart:
 
 ```sh
+docker build \
+  --build-arg DSH_CLIENT_COMMIT_HASH=$(git rev-parse HEAD) \
+  -f deploy/cluster-web/Dockerfile -t dsh-cluster-web:local .
 helm upgrade --install dsh deploy/cluster-web/chart -n dsh-cluster-web --create-namespace
 ```
 
-Defaults: `apiReplicas=1`, `runnerReplicas=0`. Do not raise above 2 for acceptance smokes.
+For a remote cluster, push the image to its registry and set `image.repository` and `image.tag` with `--set`.
+
+Scale the backend to two replicas:
+
+```sh
+helm upgrade --install dsh deploy/cluster-web/chart -n dsh-cluster-web --reuse-values --set apiReplicas=2
+```
 
 ## Pod layout
 
-Each API pod runs three containers sharing the pod network:
+| Deployment | Replicas | Containers | Network |
+|------------|----------|------------|---------|
+| `frontend` | 1 | `shell` on loopback, public `edge` | Ingress and frontend Service reach only `edge` |
+| `api` | `apiReplicas` | API-only `dsh` on loopback, `forward` in-network | frontend reaches the api Service, which selects forwarder containers |
 
-1. **shell** — SPA + `/?token=` (`serveFrontend: true`) on `127.0.0.1:3079`
-2. **dsh** — `--api-only` on `127.0.0.1:3080` (product bind rule)
-3. **edge** — `0.0.0.0:EDGE_PORT`; `STATIC_UPSTREAM`→shell, `API_UPSTREAMS`→dsh
-
-## See also
-
-- [cluster-web README](../README.md)
-- SMOKE-core-22 — values/template acceptance without requiring a live cluster
-- SMOKE-core-23 — live supervise fe-split auth smoke
+Both Deployments mount the same ReadWriteMany PVC. The API entry applies `overlays/api.overlay.yml` when Postgres is enabled, so session persistence and stream relay state are stored in Postgres rather than an API pod. The PVC owns the cross-replica browser-session key. `apiReplicas` defaults to 1; acceptance smoke keeps it at 2 or fewer.

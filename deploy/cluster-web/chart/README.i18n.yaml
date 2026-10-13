@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write deploy/cluster-web/chart/README.md
+/:
+  en: 5df6bd067c867db6
+  zh: 7331889579b61d85
+/dsh-cluster-web-helm-chart:
+  en: 7caa94501aec7614
+  zh: 890f113dc70c179f
+/dsh-cluster-web-helm-chart/summary:
+  en: ce97c35a2f675acb
+  zh: 5aaef8879500f3e2
+/dsh-cluster-web-helm-chart/install:
+  en: 8e7a699cbdd7683b
+  zh: bfd8b55dd3c5f8b3
+/dsh-cluster-web-helm-chart/pod-layout:
+  en: d3f5ab61adb384ad
+  zh: ac63772dd301fb00

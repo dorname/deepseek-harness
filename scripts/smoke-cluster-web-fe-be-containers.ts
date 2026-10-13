@@ -154,7 +154,7 @@ async function main(): Promise<void> {
     upChild.stdout?.on('data', (c: Buffer) => { upLog += c.toString('utf8'); process.stdout.write(c) })
     upChild.stderr?.on('data', (c: Buffer) => { upLog += c.toString('utf8'); process.stderr.write(c) })
     const upCode = await new Promise<number | null>((resolve) => {
-      upChild?.on('exit', code => resolve(code))
+      upChild?.on('exit', (code) => { resolve(code) })
     })
     if (upCode !== 0) throw new Error(`compose up failed code=${String(upCode)}; log:\n${upLog.slice(-3000)}`)
 
@@ -182,7 +182,7 @@ async function main(): Promise<void> {
     if (tokenRes.status !== 303) {
       throw new Error(`expected 303 from token exchange, got ${String(tokenRes.status)}`)
     }
-    const setCookie = tokenRes.headers.getSetCookie?.() ?? []
+    const setCookie = tokenRes.headers.getSetCookie()
     for (const c of setCookie) {
       const part = c.split(';')[0]
       if (part !== undefined && part.length > 0) jar.push(part)

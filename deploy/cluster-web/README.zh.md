@@ -69,4 +69,4 @@ pnpm dsh up --edge-port 8080 --api-replicas 1 --runner-replicas 0 --skip-overlay
 helm upgrade --install dsh deploy/cluster-web/chart -n dsh-cluster-web --create-namespace
 ```
 
-见 [chart/README.md](chart/README.md)。`apiReplicas` 对应 api Deployment 副本数。
+见 [chart/README.zh.md](chart/README.zh.md)。`apiReplicas` 对应 api Deployment 副本数。

@@ -53,16 +53,14 @@ function assertChartArtifacts(): void {
   if (!/^apiReplicas:\s*1\s*$/m.test(values)) throw new Error('values.yaml must default apiReplicas: 1')
   if (!/^runnerReplicas:\s*0\s*$/m.test(values)) throw new Error('values.yaml must default runnerReplicas: 0')
   const api = readFileSync(join(CHART, 'templates', 'api-deployment.yaml'), 'utf8')
-  if (!api.includes('127.0.0.1')) throw new Error('api-deployment must bind dsh to 127.0.0.1')
-  if (!api.includes('name: forward')) throw new Error('api-deployment must include forward sidecar (S47)')
-  if (!api.includes('--api-only')) throw new Error('api-deployment dsh must pass --api-only')
+  if (!api.includes('deploy/cluster-web/api.mts')) throw new Error('api-deployment must use the Compose api entry')
+  if (!api.includes('name: FORWARD_PORT')) throw new Error('api-deployment must configure the in-network forwarder')
+  if (!api.includes('name: API_LOOPBACK_PORT')) throw new Error('api-deployment must keep dsh on loopback')
   if (!existsSync(join(CHART, 'templates', 'frontend-deployment.yaml'))) {
     throw new Error('missing frontend-deployment.yaml (S47)')
   }
   const frontend = readFileSync(join(CHART, 'templates', 'frontend-deployment.yaml'), 'utf8')
-  if (!frontend.includes('name: shell')) throw new Error('frontend-deployment must include shell')
-  if (!frontend.includes('name: edge')) throw new Error('frontend-deployment must include edge')
-  if (!frontend.includes('STATIC_UPSTREAM')) throw new Error('edge must set STATIC_UPSTREAM')
+  if (!frontend.includes('deploy/cluster-web/frontend.mts')) throw new Error('frontend-deployment must use the Compose frontend entry')
   if (!frontend.includes('API_UPSTREAMS')) throw new Error('edge must set API_UPSTREAMS')
   if (!/shell:\s*\n\s*containerPort:\s*3079/.test(values)) {
     throw new Error('values.yaml must declare shell.containerPort')
@@ -70,6 +68,10 @@ function assertChartArtifacts(): void {
   const ingress = readFileSync(join(CHART, 'templates', 'ingress.yaml'), 'utf8')
   if (!ingress.includes('path: /')) throw new Error('ingress must expose path / for same-origin')
   if (!ingress.includes('-frontend')) throw new Error('ingress must target frontend Service (S47)')
+  const apiEntry = readFileSync(join(CHART, '..', 'api.mts'), 'utf8')
+  if (!apiEntry.includes('renderOverlay(API_OVERLAY_TEMPLATE')) {
+    throw new Error('api entry must render the shared-Postgres overlay')
+  }
   void readdirSync(join(CHART, 'templates'))
 }
 
@@ -87,11 +89,19 @@ function maybeHelmTemplate(): void {
   if (rendered.status !== 0) {
     throw new Error(`helm template failed: ${rendered.stderr || rendered.stdout}`)
   }
+  const scaled = spawnSync(
+    'helm',
+    ['template', 'dsh', CHART, '--namespace', 'dsh-cluster-web', '--set', 'apiReplicas=2'],
+    { encoding: 'utf8', cwd: REPO_ROOT },
+  )
+  if (scaled.status !== 0) throw new Error(`helm template apiReplicas=2 failed: ${scaled.stderr || scaled.stdout}`)
   if (!rendered.stdout.includes('kind: Ingress')) throw new Error('helm template missing Ingress')
   if (!rendered.stdout.includes('kind: Deployment')) throw new Error('helm template missing Deployment')
+  if (!scaled.stdout.includes('kind: Deployment')) throw new Error('scaled helm template missing Deployment')
+  if (!scaled.stdout.includes('replicas: 2')) throw new Error('scaled helm template missing apiReplicas=2')
 }
 
-async function main(): Promise<void> {
+function main(): void {
   const config = loadStagingConfig()
   const started = Date.now()
   const monitor = startCpuMonitor(500)
@@ -130,4 +140,4 @@ async function main(): Promise<void> {
   }
 }
 
-await main()
+main()

@@ -143,7 +143,7 @@ flowchart LR
 - **Compose 服务**：`frontend`（edge+shell）、`api`（scale N≤2，每实例 forwarder+API-only）、可选 `postgres`。
 - **不再**以单一 `cluster` 服务承载 shell+API+edge 作为 Compose 一等路径（回滚可恢复该形态）。
 - **环境变量**：`PUBLIC_URL` / `TRUSTED_HOST` / `EDGE_PORT` / `SHELL_PORT` / `API_FORWARD_PORT` / `API_REPLICAS`（或 compose scale）；`DATABASE_URL` 在 api 容器内指向 `postgres` 服务名。
-- **Helm**：`frontend` Deployment（1）+ `api` Deployment（replicas）+ 共享 PVC/`emptyDir` 文档化；Ingress → frontend。
+- **Helm**：`frontend` Deployment（1，入口 `frontend.mts`）+ `api` Deployment（replicas，入口 `api.mts`）+ 共享 `DSH_HOME` PVC；`api.mts` 应用共享 Postgres overlay，Ingress → frontend。
 - **验收**：SMOKE-core-24；串行；CPU ≤ `cpuThresholdPercent`；断言 `docker compose ps` 可见 frontend 与 api 分离（scale=2 时 ≥2 个 api 容器）。
 
 

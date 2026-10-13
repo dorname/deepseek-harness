@@ -14,56 +14,29 @@ spec:
         app: {{ .Release.Name }}-frontend
     spec:
       containers:
-        - name: shell
+        - name: frontend
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
             - node
             - --import
             - tsx/esm
-            - apps/cli/src/bin.ts
-            - --profile
-            - web
-            - --no-open
-            - --host
-            - 127.0.0.1
-            - --port
-            - {{ .Values.shell.containerPort | quote }}
-            - --public-url
-            - $(PUBLIC_URL)
-            - --trusted-host
-            - $(TRUSTED_HOST)
+            - deploy/cluster-web/frontend.mts
           envFrom:
             - configMapRef:
                 name: {{ .Release.Name }}-cluster-web
-          volumeMounts:
-            - name: dsh-home
-              mountPath: /dsh-home
           env:
-            - name: DSH_HOME
-              value: /dsh-home
-          resources:
-            {{- toYaml .Values.resources.shell | nindent 12 }}
-        - name: edge
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command:
-            - node
-            - --import
-            - tsx/esm
-            - deploy/cluster-web/edge.mts
-          env:
-            - name: EDGE_PORT
-              value: {{ .Values.edge.port | quote }}
-            - name: STATIC_UPSTREAM
-              value: "127.0.0.1:{{ .Values.shell.containerPort }}"
+            - name: SHELL_PORT
+              value: {{ .Values.shell.containerPort | quote }}
             - name: API_UPSTREAMS
               value: "{{ .Release.Name }}-api:{{ .Values.api.forwardPort }}"
+            - name: DSH_HOME
+              value: /dsh-home
           ports:
             - containerPort: {{ .Values.edge.port }}
               name: http
           resources:
-            {{- toYaml .Values.resources.edge | nindent 12 }}
+            {{- toYaml .Values.resources.shell | nindent 12 }}
       volumes:
         - name: dsh-home
           persistentVolumeClaim:

@@ -50,7 +50,7 @@ describe('cluster-web fe-split (S46)', () => {
       child.stderr?.on('data', (chunk: Buffer) => { err += chunk.toString('utf8') })
       child.stdout?.on('data', (chunk: Buffer) => { err += chunk.toString('utf8') })
       const code = await new Promise<number | null>((resolve) => {
-        child.on('exit', c => resolve(c))
+        child.on('exit', (c) => { resolve(c) })
       })
       expect(code).not.toBe(0)
       expect(err).toMatch(/API_REPLICAS=3 exceeds acceptance cap 2/)

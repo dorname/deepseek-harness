@@ -181,7 +181,7 @@ async function main(): Promise<void> {
     if (auth.status !== 303) {
       throw new Error(`expected token exchange 303, got ${String(auth.status)}`)
     }
-    const setCookie = auth.headers.getSetCookie?.() ?? []
+    const setCookie = auth.headers.getSetCookie()
     for (const raw of setCookie) {
       const [pair] = raw.split(';', 1)
       const eq = pair?.indexOf('=') ?? -1

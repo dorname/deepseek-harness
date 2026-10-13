@@ -37,7 +37,7 @@ describe('cluster-web fe-be-containers (S47)', () => {
       res.writeHead(200, { 'content-type': 'text/plain' })
       res.end('ok-from-loopback')
     })
-    await new Promise<void>(resolve => loopback.listen(0, '127.0.0.1', () => resolve()))
+    await new Promise<void>((resolve) => { loopback.listen(0, '127.0.0.1', () => { resolve() }) })
     const loopbackPort = (loopback.address() as { port: number }).port
     const forwardPort = 18080 + Math.floor(Math.random() * 1000)
     const child = spawn(process.execPath, ['--import', 'tsx/esm', FORWARD], {
@@ -60,7 +60,7 @@ describe('cluster-web fe-be-containers (S47)', () => {
           }
         }
         child.stdout?.on('data', onData)
-        setTimeout(() => reject(new Error('forwarder ready timeout')), 10_000)
+        setTimeout(() => { reject(new Error('forwarder ready timeout')) }, 10_000)
       })
       const response = await fetch(`http://127.0.0.1:${String(forwardPort)}/api/ping`)
       expect(response.status).toBe(200)
@@ -93,7 +93,7 @@ describe('cluster-web fe-be-containers (S47)', () => {
       child.stderr?.on('data', (chunk: Buffer) => { err += chunk.toString('utf8') })
       child.stdout?.on('data', (chunk: Buffer) => { err += chunk.toString('utf8') })
       const code = await new Promise<number | null>((resolve) => {
-        child.on('exit', c => resolve(c))
+        child.on('exit', (c) => { resolve(c) })
       })
       expect(code).not.toBe(0)
       expect(err).toMatch(/API_REPLICAS=3 exceeds acceptance cap 2/)

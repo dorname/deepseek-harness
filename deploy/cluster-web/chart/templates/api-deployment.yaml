@@ -14,55 +14,29 @@ spec:
         app: {{ .Release.Name }}-api
     spec:
       containers:
-        - name: dsh
+        - name: api
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
             - node
             - --import
             - tsx/esm
-            - apps/cli/src/bin.ts
-            - --profile
-            - web
-            - --api-only
-            - --no-open
-            - --host
-            - 127.0.0.1
-            - --port
-            - {{ .Values.api.loopbackPort | quote }}
-            - --public-url
-            - $(PUBLIC_URL)
-            - --trusted-host
-            - $(TRUSTED_HOST)
+            - deploy/cluster-web/api.mts
           envFrom:
             - configMapRef:
                 name: {{ .Release.Name }}-cluster-web
-          volumeMounts:
-            - name: dsh-home
-              mountPath: /dsh-home
-          env:
-            - name: DSH_HOME
-              value: /dsh-home
-          resources:
-            {{- toYaml .Values.resources.api | nindent 12 }}
-        - name: forward
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command:
-            - node
-            - --import
-            - tsx/esm
-            - deploy/cluster-web/forward.mts
           env:
             - name: FORWARD_PORT
               value: {{ .Values.api.forwardPort | quote }}
-            - name: LOOPBACK_UPSTREAM
-              value: "127.0.0.1:{{ .Values.api.loopbackPort }}"
+            - name: API_LOOPBACK_PORT
+              value: {{ .Values.api.loopbackPort | quote }}
+            - name: DSH_HOME
+              value: /dsh-home
           ports:
             - containerPort: {{ .Values.api.forwardPort }}
               name: forward
           resources:
-            {{- toYaml .Values.resources.edge | nindent 12 }}
+            {{- toYaml .Values.resources.api | nindent 12 }}
       volumes:
         - name: dsh-home
           persistentVolumeClaim:

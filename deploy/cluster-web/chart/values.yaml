@@ -18,7 +18,6 @@ api:
   # In-network forwarder (Service target); dsh stays on loopbackPort.
   forwardPort: 3080
   loopbackPort: 13080
-  containerPort: 3080
 
 dshHome:
   storage: 1Gi
@@ -43,16 +42,12 @@ ingress:
 resources:
   shell:
     limits:
-      cpu: "1"
-      memory: 1Gi
+      cpu: "1500m"
+      memory: 2Gi
   api:
     limits:
       cpu: "1"
       memory: 1Gi
-  edge:
-    limits:
-      cpu: "200m"
-      memory: 128Mi
   runner:
     limits:
       cpu: "1"
