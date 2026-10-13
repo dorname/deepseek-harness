@@ -5,25 +5,64 @@ kind: "reference"
 
 # cluster-web (Compose · S47)
 
-[English](README.md) | [中文](README.zh.md)
+English | [中文](README.zh.md)
 
 ## Summary
 
-Same-origin one-click deploy: **frontend** exposes one origin (edge + shell); **api** is one container per replica (loopback API-only + in-network forwarder), scalable with `--scale api=2`. Shared `$DSH_HOME` volume makes cookies valid across api containers. See [README.zh.md](README.zh.md) for full Chinese docs.
+Same-origin one-click deployment runs **frontend** as the only externally exposed origin (edge + shell). The **api** service runs one container per replica (loopback API-only dsh plus an in-network forwarder) and can scale with `--scale api=2`. The shared `$DSH_HOME` volume lets API containers accept the same browser cookie. Compose also starts Postgres. Acceptance keeps replicas low by default to avoid saturating the host during verification.
 
 ## Quick start
 
 ```sh
+# Repository root; Docker is required:
 cp deploy/cluster-web/.env.example deploy/cluster-web/.env
 DSH_CLIENT_COMMIT_HASH=$(git rev-parse HEAD) \
   docker compose -f deploy/cluster-web/docker-compose.yml --env-file deploy/cluster-web/.env up --build
-# Open PUBLIC_URL with ?token= from frontend logs
+# Open PUBLIC_URL (default http://127.0.0.1:8080/) with ?token= from the logs.
 ```
 
-Scale API containers (cap 2):
+Multiple API containers (maximum 2):
 
 ```sh
 docker compose -f deploy/cluster-web/docker-compose.yml --env-file deploy/cluster-web/.env up --build --scale api=2
 ```
 
-Without Docker, the process-tree path remains: `pnpm dsh up --edge-port 8080 --api-replicas 1 --skip-overlays --skip-runners`.
+Without Docker, the process-tree path remains available (S46):
+
+```sh
+pnpm dsh up --edge-port 8080 --api-replicas 1 --runner-replicas 0 --skip-overlays --skip-runners
+```
+
+## Topology
+
+| Service | Binding | Role |
+|---------|---------|------|
+| frontend / edge | `0.0.0.0:EDGE_PORT` | Only public listener; `/` and `/plugins` reach shell, `/api` reaches `api:FORWARD` |
+| frontend / shell | `127.0.0.1:SHELL_PORT` | SPA plus `/?token=` cookie exchange |
+| api / forwarder | `0.0.0.0:API_FORWARD_PORT` (Compose network only) | Forwards to loopback dsh in its own container |
+| api / dsh | `127.0.0.1:API_LOOPBACK_PORT` | `--api-only`; never binds `0.0.0.0` |
+| postgres | Compose service | Shared API database when `DATABASE_URL` is set |
+
+## External frontend contract
+
+Follow [public deployments](../../docs/user/guide/public-deployments.md): one origin; `/api` reaches the API pool with equivalent boot and token exchange.
+
+## Acceptance CPU limits
+
+| Control | Smoke default | Hard cap |
+|---------|---------------|----------|
+| `api` scale / `API_REPLICAS` | `1` | `2` |
+
+## Files
+
+| Path | Responsibility |
+|------|----------------|
+| `docker-compose.yml` | Postgres + frontend + api |
+| `frontend.mts` / `api.mts` | Container entrypoints |
+| `forward.mts` | In-network API forwarder |
+| `edge.mts` / `upstream.mts` | Same-origin reverse proxy |
+| `supervise.mts` | Docker-free process tree (S46) |
+
+## Helm
+
+The Helm chart projects the same frontend/api split into Kubernetes. See [chart/README.md](chart/README.md) for image preparation and `apiReplicas` scaling.

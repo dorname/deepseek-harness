@@ -14,11 +14,11 @@ kind: "reference"
 ## 一键启动
 
 ```sh
-# 仓库根目录（需要 Docker）：
+# Repository root; Docker is required:
 cp deploy/cluster-web/.env.example deploy/cluster-web/.env
 DSH_CLIENT_COMMIT_HASH=$(git rev-parse HEAD) \
   docker compose -f deploy/cluster-web/docker-compose.yml --env-file deploy/cluster-web/.env up --build
-# 打开 PUBLIC_URL（默认 http://127.0.0.1:8080/）——须带日志中的 ?token=
+# Open PUBLIC_URL (default http://127.0.0.1:8080/) with ?token= from the logs.
 ```
 
 多 API 容器（上限 2）：
@@ -63,10 +63,6 @@ pnpm dsh up --edge-port 8080 --api-replicas 1 --runner-replicas 0 --skip-overlay
 | `edge.mts` / `upstream.mts` | 同域反代 |
 | `supervise.mts` | 无 Docker 进程树（S46） |
 
-## Helm（P2）
+## Helm
 
-```sh
-helm upgrade --install dsh deploy/cluster-web/chart -n dsh-cluster-web --create-namespace
-```
-
-见 [chart/README.zh.md](chart/README.zh.md)。`apiReplicas` 对应 api Deployment 副本数。
+Helm chart 将相同的 frontend/api 分离拓扑投影到 Kubernetes。镜像准备与 `apiReplicas` 扩缩容见 [chart/README.zh.md](chart/README.zh.md)。

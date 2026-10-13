@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write deploy/cluster-web/README.md
+/:
+  en: c72209db3b9369d3
+  zh: a50be4c24380bb59
+/cluster-web-compose-s47:
+  en: 4a338eb2e3819314
+  zh: d083ace269c2a88b
+/cluster-web-compose-s47/summary:
+  en: 35373a88f93aae45
+  zh: cdc6da393b270a63
+/cluster-web-compose-s47/quick-start:
+  en: 9fe8d5b0adb3366b
+  zh: 49db8b16af6b80e0
+/cluster-web-compose-s47/topology:
+  en: b07f85fd680f0fa3
+  zh: e2196d24477d8e66
+/cluster-web-compose-s47/external-frontend-contract:
+  en: bf8d1c90fb527ca4
+  zh: 3667b61b136c5ac1
+/cluster-web-compose-s47/acceptance-cpu-limits:
+  en: e014239cab4957c1
+  zh: 3af0e79405a51140
+/cluster-web-compose-s47/files:
+  en: b572089bdc7935ae
+  zh: 88f576655bf9fb66
+/cluster-web-compose-s47/helm:
+  en: f36f7b39fd052a11
+  zh: c8bd275fe56102cd
