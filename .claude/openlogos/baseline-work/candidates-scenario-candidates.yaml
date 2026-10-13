@@ -1,0 +1,211 @@
+candidates:
+  - key: "core::01df7b3bfa84"
+    anchor: "scenario:web-first-session"
+    display: "启动 Web UI 并运行首个仓库任务（入口 cli:dsh web）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::de01a490997b"
+    anchor: "scenario:headless-one-shot"
+    display: "一次性无头任务并打印最终答案（入口 cli:dsh headless）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::c1ec9e3724fe"
+    anchor: "scenario:acp-backend"
+    display: "ACP 编辑器/自动化后端会话（入口 cli:dsh acp）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::e48eb5b92f03"
+    anchor: "scenario:plugin-management"
+    display: "为 profile 安装/移除插件（入口 cli:dsh plugin）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::6650b5593bfe"
+    anchor: "scenario:web-public-deploy"
+    display: "反向代理公开部署 Web UI（入口 cli:dsh web --public-url）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::c81777abbc44"
+    anchor: "scenario:python-sdk-embed"
+    display: "Python 程序嵌入 DSH 完成任务（入口 deepseek_harness.DeepSeekHarness）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::782dfc0089fe"
+    anchor: "scenario:typescript-sdk-drive"
+    display: "TypeScript 程序驱动 DSH 运行时（入口 @deepseek-ai/dsh-sdk-client）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::7dbd422f42ed"
+    anchor: "scenario:desktop-first-run"
+    display: "Desktop 首次启动与后台保持运行（入口 apps/desktop）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::fe5cbf156547"
+    anchor: "scenario:claude-code-hooks"
+    display: "复用 Claude Code hooks.json 钩子策略（桥 dsh-hooks-claude-code）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::3f34505c7953"
+    anchor: "scenario:codex-hooks"
+    display: "复用 Codex hooks.json 钩子策略（桥 dsh-hooks-codex）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::cb0e994272e2"
+    anchor: "scenario:plan-mode"
+    display: "计划模式：先规划、审批后执行（工具 exit_plan_mode）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::4ebe9bea1726"
+    anchor: "scenario:todo-list"
+    display: "会话任务清单维护（工具 todo_write）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::435ff52076c2"
+    anchor: "scenario:subagent-delegation"
+    display: "子代理委派：spawn/fork/可延续（工具 subagent）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::34934951ae34"
+    anchor: "scenario:workflow-orchestration"
+    display: "workflow 脚本并行编排子代理（工具 workflow）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::49ecfe1e56ca"
+    anchor: "scenario:compact"
+    display: "长会话压缩：自动与 /compact（命令 /compact）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::c7602fd8c66d"
+    anchor: "scenario:schedule-reminder"
+    display: "跨重启定时提醒（工具 schedule_create）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::e22567c16781"
+    anchor: "scenario:github-pr-review"
+    display: "GitHub PR ready_for_review 触发审查会话（路由 /github）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::646fd86ea841"
+    anchor: "scenario:mcp-tools"
+    display: "接入外部 MCP 工具与资源（桥 mcp-client）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::afcea59da698"
+    anchor: "scenario:skill-loading"
+    display: "发现并加载项目/用户技能（工具 skill）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::55ed779a325a"
+    anchor: "scenario:web-model-settings"
+    display: "Web 设置中配置模型提供商（设置面 web-settings-models）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::41cab54489d5"
+    anchor: "scenario:web-approval"
+    display: "敏感工具调用的人工审批（审批面 web-approval）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::1d61ed314b20"
+    anchor: "scenario:sandbox-escalation"
+    display: "沙箱内执行命令并申请权限升级（工具 bash 沙箱升级）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::3cde3a4cc491"
+    anchor: "scenario:ask-user-question"
+    display: "模型向用户提问获取确认（工具 ask_user_question）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::e14aefd153c9"
+    anchor: "scenario:goal-tracking"
+    display: "会话长期目标的设置与跟踪（命令 /goal）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::884f2b024093"
+    anchor: "scenario:feedback"
+    display: "会话级与消息级反馈（命令 /feedback）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::0381b8854d00"
+    anchor: "scenario:session-persistence"
+    display: "会话持久化、重启恢复与导出（session 数据面）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::1944e6edf513"
+    anchor: "scenario:session-fork"
+    display: "从历史分叉会话（ctx.sessions.fork）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::fc02dc5d6745"
+    anchor: "scenario:session-search"
+    display: "历史会话全文搜索（工具 session_search）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::9ae3a53ad905"
+    anchor: "scenario:present-deliverables"
+    display: "模型声明最终交付文件（工具 present）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::c34315b70a01"
+    anchor: "scenario:image-attachment"
+    display: "提示中附加持久化图片（attachment 服务）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []

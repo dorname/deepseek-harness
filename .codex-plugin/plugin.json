@@ -1,0 +1,13 @@
+{
+  "name": "openlogos",
+  "version": "0.13.4",
+  "description": "OpenLogos methodology — Why→What→How structured AI-driven development",
+  "skills": "./.agents/plugins/openlogos/skills/",
+  "interface": {
+    "display_name": "OpenLogos",
+    "short_description": "Structured development: PRD → Design → Scenarios → API → Code",
+    "default_prompt": [
+      "What should I do next in the OpenLogos workflow?"
+    ]
+  }
+}

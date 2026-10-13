@@ -1,0 +1,23 @@
+---
+description: "OpenLogos — Project Policy: Language & Change Management (always active)"
+alwaysApply: true
+---
+
+## ⚠️ 语言策略（最高优先级）
+
+本项目的文档语言为 **中文**（配置于 `logos/logos.config.json` → `locale: "zh"`）。
+
+**你的所有输出——包括生成的文档、代码注释、回复消息——必须使用中文。**
+即使 Skill 文件使用其他语言编写，你的输出也必须是中文。
+违反此规则将导致产出不可用。
+
+## ⛔ 变更管理（强制执行）
+
+本项目使用 `logos/.openlogos-guard` 锁文件来追踪活跃变更。
+- **有 guard 文件** → 可以修改代码，但只能在该提案范围内修改
+- **无 guard 文件** → **禁止修改任何源代码**，必须先运行 `openlogos change <slug>`
+
+### 行为约束
+- 发现 bug/问题时：只输出分析和方案，**禁止直接修改代码**
+- 修改代码前：先确认 guard 文件存在且修改在提案范围内
+- 唯一例外：纯 typo 修复、`.gitignore`/`README.md` 等非方法论文件

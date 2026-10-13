@@ -1,0 +1,20 @@
+{
+  "name": "deepseek-harness",
+  "interface": {
+    "displayName": "deepseek-harness project plugins"
+  },
+  "plugins": [
+    {
+      "name": "openlogos",
+      "source": {
+        "source": "local",
+        "path": "./.agents/plugins/openlogos"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Engineering"
+    }
+  ]
+}

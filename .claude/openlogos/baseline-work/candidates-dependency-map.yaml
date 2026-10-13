@@ -1,0 +1,106 @@
+candidates:
+  - key: "core::17a10abb4853"
+    anchor: "layer:vendor-cordis"
+    display: "框架层：vendored Cordis（vendor/cordis）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::eb189904fd06"
+    anchor: "layer:util"
+    display: "零依赖工具层（util/）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::cc4971f65534"
+    anchor: "layer:core-spine"
+    display: "产品 API 脊柱（core/）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::acca6780caa6"
+    anchor: "layer:capability-seams"
+    display: "能力缝层（fs/shell/llm/subagent/…）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::c91fd8f80459"
+    anchor: "layer:bundle-profiles"
+    display: "bundle 组合层（bundle/）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::02ce34bcc018"
+    anchor: "layer:apps"
+    display: "应用启动层（apps/）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::10023d3ff2ed"
+    anchor: "layer:client-web"
+    display: "Web 浏览器层（client/ + apps/web）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::ea11f175e706"
+    anchor: "layer:sdk"
+    display: "进程外 SDK 层（sdk/ + python/）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::bc5bc38a74f3"
+    anchor: "layer:native"
+    display: "原生系统原语层（native/）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::d779d247925b"
+    anchor: "rule:service-definition-only"
+    display: "扩展插件只依赖 Service Definition，不依赖具体 Provider"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::fd3b45833a4b"
+    anchor: "rule:composition-bundle-spine"
+    display: "组合 bundle 可依赖脊柱插件"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::86937723af88"
+    anchor: "rule:generated-module-graph"
+    display: "docs/module-graph.md 由 pnpm run gen-module-graph 生成并 CI 保鲜"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::b6b4e6394a76"
+    anchor: "rule:rescope-vendored-peer"
+    display: "vendor 包 rescope；@deepseek-ai/cordis 为全仓 peerDependency"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::6604d875c0f4"
+    anchor: "rule:esm-only"
+    display: "ESM everywhere；dsh 源码启动经 tsx ESM-only hook"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::eb2ab9469791"
+    anchor: "dep:python-runtime-closure"
+    display: "Python wheel 经 dsh-python-runtime-closure 打包 dsh CLI 依赖闭包"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []

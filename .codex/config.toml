@@ -1,0 +1,8 @@
+
+[[hooks.SessionStart]]
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = ".agents/plugins/openlogos/hooks/session-start.sh"
+timeout = 5
+async = false
+statusMessage = "Loading OpenLogos phase context..."

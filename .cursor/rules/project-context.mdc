@@ -1,0 +1,95 @@
+---
+description: DeepSeek Harness (dsh) project context and conventions
+globs:
+alwaysApply: true
+---
+
+# DeepSeek Harness (dsh) Context
+
+Cordis-based plugin agent harness. **Everything is a plugin.** Read `AGENTS.md` (symlinked as `CLAUDE.md`) and `docs/architecture.md` before changing `packages/`.
+
+## Tech Stack
+
+- **Language**: TypeScript 5.x, `strict: true`, `noImplicitAny`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, NodeNext
+- **Runtime**: Node.js `^22.19 || >=24`, pure ESM (`"type": "module"`)
+- **Package manager**: pnpm 11.x workspaces; every npm package is `@deepseek-ai/dsh-<name>`
+- **Plugin framework**: Cordis (vendored at `vendor/`)
+- **Build**: tsc (`lib/` + `types/`) + tsdown (bundles)
+- **Test**: Vitest (unit/coverage/snapshot/e2e); coverage gate is per-file 100% on `packages/*/*/src`
+- **Lint**: oxlint + jscpd
+- **Docs**: bilingual Markdown (en + zh) projected through VitePress (`website/`)
+- **Python SDK**: hatchling + pydantic v2
+- **Native**: C Landlock launcher (`native/landlock-run`)
+
+## Architecture (one-screen)
+
+- **Cordis plugin tree**: composed at boot from ordered layers (bundles → profile → home → `--patch` overlays)
+- **Capability seam = 3 roles**: Service Definition + Provider + Consumer — incomplete = not a seam
+- **Scope** (`dsh-scope`) is a first-class primitive: each live `Agent` is its own scope key; events dispatch only to matching scope (and ancestors)
+- **Session log = source of truth**: `Session.deriveMessages()` projects LLM history from `user/message` + `assistant/message` + `tool/result`. **`Model-visible ⟺ logged`**
+- **Turn / Step**: one step = one model request + tool executions; one turn = 0+ steps
+- **Three event domains**: durable `session/*` events; live `agent/*` events; capability `fs/*`/`tools/*`/`telemetry/*` events
+- **Pre-release stance**: no external consumers → rename/repackage freely; SQLite `SCHEMA_VERSION` monotonic; `dsh-session` `SESSION_FORMAT_VERSION = 0`, no compat promise
+
+## Key Conventions
+
+- **Registrations are effects**: every contribution through `ctx.effect()` / `ctx.on()`; registry `register()` returns a disposer
+- **Closed unions end in `assertNever`**; merge-extensible unions fall through to a documented default
+- **Waterfall listeners MUST call `next()`** to delegate; returning short-circuits
+- **Switch on discriminant tags**, never parallel value checks
+- **Branded ids** (`Branded<B>` from `dsh-brand`) across boundaries — never bare `string`
+- **Trust TypeScript** at typed same-process boundaries; runtime validation only at parser/config/queued/model-tool JSON/durable-file/worker/process/wire boundaries
+- **Source plane vs artifact plane, never mixed**: static gates/tests resolve workspace imports through tsconfig `paths` to `src`; gates consuming built `lib/` declare that dependency
+- **Each package uses one aggregate tsconfig** except `api/remotes`; repo-wide programs seed a face config, never the root solution
+- **An empty `catch` names what it swallows** and why nothing else can reach it; keep the `try` to one statement
+- **Files end with exactly one trailing newline**; pre-commit `git diff --cached --check` gates it
+- **TODO markers** by urgency: `FIXME` / `TODO` / `XXX`
+- **Pure functions for tool UI**: `presentCall(args)` and `presentResult(args, result)` must be pure functions of args
+- **Empty `catch` never swallows unknown errors** — narrow by reason
+
+## Module Map (high-level)
+
+- `packages/core/` — `scope`, `session`, `agent`, `agent-loop`, `system-prompt`, `tools`, `agent-default-model`, `agent-tool-presentation` (the spine)
+- `packages/llm/` — `llm` (Definition) + `llm-deepseek`/`llm-pi-ai` (Providers) + `llm-retry` + `token-meter`
+- `packages/session/` — persistence (jsonl + sqlite), projection, telemetry, titles
+- `packages/sdk/` — JSON-RPC protocol + server + TypeScript client
+- `packages/subagent/` — delegation seam with multiple providers (spawn/fork/ACP/SDK/Claude Code/Codex)
+- `packages/workflow/` + `packages/goal/` + `packages/plan/` + `packages/todo/` — outer policies
+- `packages/{shell,fs,web,subprocess,terminal,skill,spill,storage,sandbox,interaction,credentials,lsp,mcp,compaction,context}/` — capability packages, each with Definition + Provider(s) + Consumer(s)
+- `packages/typert/` — type graph: protocol + generator + registry + loader
+- `packages/bundle/{base,web-app,headless}/` — installable cordis.yml layers
+- `apps/cli` — `dsh` CLI binary; `apps/web` — Vite + React SPA
+- `examples/` — runnable cordis.yml leaves (acp-agent / headless-agent / jsonrpc-agent / mcp-memory / web-cordis / web-schedule)
+- `python/{sdk,sdk-runtime}/` — Python SDK + bundled runtime
+- `native/landlock-run/` — Linux Landlock self-restrict launcher
+- `vendor/cordis/` + vendored Cordis plugins — pinned source
+- `docs/` — bilingual Markdown (`AGENTS.md` owns doc conventions)
+- `.agents/skills/` — repo-specific Agent Skills (code-review, doc-standards, find-simplifications, pre-push-checks, …)
+- `.agents/notes/{proposed,implemented,rejected,archived}/` — Agent Notes archive
+
+## Important Patterns
+
+- **Plugins, not loop changes**: new behavior goes on documented extension points (`agent/*`, `tools/*`, `system-prompt/*`, capability events); changing `agent-loop` requires updating `docs/architecture.md`
+- **Capability seam completeness**: never ship one role alone — split only when roles evolve independently
+- **Explicit > implicit at package boundaries**: defaulting is an explicit `resolve(request): Spec` step, never `?? default` inside `run()` (the `dsh-shell` request/spec split is the template)
+- **No hardcoded tunables in plugins**: deployment-varying choices are validated `Config` fields changeable from cordis.yml; a `DEFAULT_*` constant is not configurability
+- **Misconfiguration fails loud** at load (when self-contained) or at the earliest resolvable point — never silently skip a missing referent
+- **Prefer maintained dependencies over hand-rolling** when they genuinely delete owned code and tests
+- **Tests describe behavior, not correctness** — change obsolete behavior with its tests; explain why in the PR
+- **Non-trivial changes MUST include an Agent Note** in the same PR; only mechanical/local edits are exempt. Archived notes are frozen
+- **Plan unit, e2e, and snapshot coverage** for capability seams, lifecycle paths, and transcript output; include missing snapshot-harness support in the same change
+- **Both SDKs project the loop** — agent-loop, session-lifecycle, and `SessionEventMap` changes update the TypeScript and Python SDK expected outputs in the same PR
+- **Tool UI render intent decided up front**: `generic`/`terminal`/`diff` + `locations`; presentation methods are pure functions of `args`
+- **Snapshot harness fixtures must replay on macOS/Linux** — fix fixtures, not normalizers
+- **Choose PR history deliberately**: split independent changes; fix the introducing PR before propagation; standalone PRs may merge-forward or rebase after review
+- **Rewrites use `--force-with-lease`**, abort on remote movement, never raw `--force`; an in-progress merge-forward preserves its checkpoint before taking a newer base
+- **Sandbox failures**: when `gh`/`pnpm`/build/test/generator fails because the agent sandbox blocks credentials/network/IPC/file watching/nested `sandbox-exec`, retry unchanged with the narrowest host escalation before diagnosing auth/project failure
+
+## Key entry points
+
+- `apps/cli/src/bin.ts` → dispatches by parsed mode (`web` / `headless` / `plugin` / `--dump-config`)
+- `apps/cli/src/profile-boot.ts` — composes bundle layers + user profile + home + `--patch` overlays + telemetry switch
+- `packages/core/agent-loop/src/agent.ts` — `ReactLoopAgent` driver (turn/step/inbox/model-stream/tool scheduler state machine)
+- `packages/core/session/src/index.ts` — `Session`, `SessionStore`, surface, chunk rows
+- `packages/core/tools/src/index.ts` — `ToolRuntime` + 5-stage pipeline
+- `docs/architecture.md` — start here

@@ -1,0 +1,183 @@
+candidates:
+  - key: "core::3e0a62fe1433"
+    anchor: "cli:dsh"
+    display: "dsh CLI 启动器（apps/cli，bin lib/bin.js）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::82c32e94c4f8"
+    anchor: "cli:dsh web"
+    display: "Web GUI profile 简写启动"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::975cac7609b5"
+    anchor: "cli:dsh headless"
+    display: "一次性无头任务 profile"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::67453f02b2d8"
+    anchor: "cli:dsh sdk"
+    display: "SDK JSON-RPC stdio profile"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::35797efdf8cc"
+    anchor: "cli:dsh sdk-minimal"
+    display: "最小 SDK profile"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::b20c9637f753"
+    anchor: "cli:dsh acp"
+    display: "ACP 自动化服务器 profile"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::9a1d53aba5a6"
+    anchor: "cli:dsh plugin"
+    display: "profile 插件管理（转发 pnpm）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::caf942e40b71"
+    anchor: "cli:dsh --profile"
+    display: "指定 profile 启动"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::275ea0ef5610"
+    anchor: "cli:dsh --patch"
+    display: "追加 patch overlay（可重复）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::1c6358931a5b"
+    anchor: "cli:dsh --from-default-profile"
+    display: "用内置模板初始化缺失 profile"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::3989d9295211"
+    anchor: "cli:dsh --dump-config"
+    display: "打印组合后配置并退出"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::2be0a70e0b8a"
+    anchor: "cli:dsh --dump-config-schema"
+    display: "输出 profile/patch JSON Schema"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::525213db4f28"
+    anchor: "cli:dsh --dump-default-config"
+    display: "仅打印 bundle 层配置"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::848f39f3f3d8"
+    anchor: "cli:dsh --version"
+    display: "输出版本号"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::3fa191e6b91f"
+    anchor: "symbol:runCli"
+    display: "CLI 启动函数（apps/cli/src/bin.ts:26）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::c84414c3dec0"
+    anchor: "symbol:parseDshArgs"
+    display: "CLI 参数解析（apps/cli/src/args.ts:146）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::8de3f2eb23e8"
+    anchor: "app:dsh-desktop"
+    display: "Electron 桌面壳（apps/desktop）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::78b6eafea49f"
+    anchor: "app:dsh-desktop-host"
+    display: "Electron Node-mode 宿主进程（apps/desktop-host）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::9187719ede5a"
+    anchor: "app:dsh-web-frontend"
+    display: "Web 前端构建入口（apps/web）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::94e5d43a4c76"
+    anchor: "sdk:python deepseek_harness.DeepSeekHarness"
+    display: "Python 高层 API 类"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::45a79e8740f6"
+    anchor: "sdk:python deepseek_harness.HarnessClient"
+    display: "Python JSON-RPC 客户端"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::8f726cda2262"
+    anchor: "sdk:typescript @deepseek-ai/dsh-sdk-client"
+    display: "TypeScript SDK 客户端包"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::81a5a46d6679"
+    anchor: "bin:deepseek-harness-runtime-bin dsh"
+    display: "Python runtime wheel 控制台脚本"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::d2738d4f68ba"
+    anchor: "native:node-addon-system ./landlock-run"
+    display: "Landlock 沙箱启动器导出"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::f7652382e9d4"
+    anchor: "native:node-addon-system ./flock"
+    display: "异步 POSIX flock 导出"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
+  - key: "core::ef8aa05fb424"
+    anchor: "route:/github"
+    display: "GitHub webhook HTTP 端点（webhook-github）"
+    state: active
+    verified: false
+    aliases: []
+    superseded_by: []
