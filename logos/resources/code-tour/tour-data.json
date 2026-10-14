@@ -2,11 +2,10 @@
   "meta": {
     "project": "DeepSeek Harness",
     "branch": "openlogos/align-core-specs",
-    "commit": "f30b1377da3214572b571a7f7b988c25257ac5ce",
     "analysisSession": "bebd829f8c173c0a",
     "sources": ["grasp packages/core", "manifest", "docs/architecture.md", "README", "source"],
     "depMainChain": ["app-boot", "web-app", "cordis", "agent-loop", "session", "session-persistence", "session-persistence-jsonl", "llm", "llm-deepseek", "tools", "system-prompt"],
-    "note": "验证策略：模块依赖逐条抄自各包 package.json 的 dependencies/peerDependencies（manifest 证据）；执行流步骤的文件/符号/行号由源码取证核实（标注 verified），仅无法落到具体行号的步骤标 partial。overviewEdges 的边语义统一为「调用方 → 被调方」。2026-10-09 对照 HEAD f30b1377da 复核关键行号与符号。"
+    "note": "验证策略：模块依赖逐条抄自各包 package.json 的 dependencies/peerDependencies（manifest 证据）；执行流步骤的文件/符号/行号由源码取证核实（标注 verified），仅无法落到具体行号的步骤标 partial。overviewEdges 的边语义统一为「调用方 → 被调方」。2026-10-09 对照 当日分支源码 复核关键行号与符号。"
   },
   "overviewNodes": [
     {

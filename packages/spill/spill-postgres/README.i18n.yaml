@@ -1,0 +1,55 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/spill/spill-postgres/README.md
+/:
+  en: ccfe68fe4d9b6f09
+  zh: 695f78ecbddb3caa
+/deepseek-ai-dsh-spill-postgres:
+  en: cd269e45be914a95
+  zh: c8eae1e1f0967826
+/deepseek-ai-dsh-spill-postgres/summary:
+  en: 52b82cbcc3cb6ed4
+  zh: 13ea653ee8fe4264
+/deepseek-ai-dsh-spill-postgres/table-of-contents:
+  en: b563e4ec4727d0de
+  zh: e748d178a70e42b9
+/deepseek-ai-dsh-spill-postgres/use-this-package:
+  en: 7faa937c3bbc81c9
+  zh: d7fd0cc565e560dc
+/deepseek-ai-dsh-spill-postgres/use-this-package/observable-behavior:
+  en: ab1919a310f907ef
+  zh: e2abb4a6230cc9bc
+/deepseek-ai-dsh-spill-postgres/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: c5500056b41ce570
+/deepseek-ai-dsh-spill-postgres/understand-the-implementation/design-concept:
+  en: f48f53315a39a9a3
+  zh: c4dcf87c1e571126
+/deepseek-ai-dsh-spill-postgres/understand-the-implementation/source-map:
+  en: 6bc92341d217995e
+  zh: 7694d6dc37f9b882
+/deepseek-ai-dsh-spill-postgres/further-exploration:
+  en: a694eabd11f2daac
+  zh: 44821df5e6ccaf7a
+/deepseek-ai-dsh-spill-postgres/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-spill-postgres/model-experience/spilled-tool-result-text:
+  en: 73b2cfc54ed37330
+  zh: 8e776abbfb35f426
+/deepseek-ai-dsh-spill-postgres/model-experience/spilled-tool-result-text/what-the-model-sees:
+  en: b739ad6d0f1351ff
+  zh: 08973538fcc9cc80
+/deepseek-ai-dsh-spill-postgres/model-experience/spilled-tool-result-text/token-effect:
+  en: 3d67b0396d2e6cfc
+  zh: 9c9469cd26a3e3fc
+/deepseek-ai-dsh-spill-postgres/model-experience/spilled-tool-result-text/kv-cache-effect:
+  en: c13c59d13a5f1651
+  zh: be44e878c2c80f1a
+/deepseek-ai-dsh-spill-postgres/known-limitations-and-deferred-work:
+  en: 92e5decea71c7f6b
+  zh: 06c4c549a5237828
+/deepseek-ai-dsh-spill-postgres/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

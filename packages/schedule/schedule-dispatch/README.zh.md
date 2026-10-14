@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
 `dsh-schedule-dispatch` 是 schedule 交付的集群形态：到期行存于共享 `schedule_due` 表（每任务一行、`next_due_at` 单调推进），runner 节点运行派发循环——以 `FOR UPDATE SKIP LOCKED` 取最新到期行、取会话租约、交付、推进 next-due,全部在一个事务内，其行锁即恰一取用保证。提交前崩溃回滚该行，提醒绝不丢失；recurring 行跳过整个错过的周期、落在首个严格未来时刻，仅交付最近一次错过的 occurrence。单机 `ScheduleService` 为并列形态：未配置共享库时 Host timer 行为不变。本包只在宿主侧：不贡献 prompt、工具或 schema。
 
@@ -19,7 +19,7 @@ kind: "package-reference"
 
 -----
 
-<a id="使用本包"></a>
+<a id="use-this-package"></a>
 ## 使用本包
 
 runner 节点与会话租约提供方一并挂载本循环；`deliver` 回调恢复会话并追加提醒。
@@ -46,14 +46,14 @@ plugins:
 
 -----
 
-<a id="模型体验"></a>
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 集群提醒交付
 
 #### 模型看到什么
 
-无。本包不贡献 prompt、工具或 schema；仅为宿主侧消费方在 Cordis 服务之后交付定时提醒。
+本包不添加提示或工具 schema。`deliver` 回调负责提醒内容及其会话日志；派发器仅选择到期任务。
 
 #### Token 影响
 
@@ -65,12 +65,14 @@ plugins:
 
 ## 已知限制与待办
 
+<a id="known-limitations-and-deferred-work"></a>
+
 - **预发布物理布局**——任何外部戳记的布局版本拒绝而非迁移。
 - **仅固定间隔 recurrence**——共享形态承载 `once` 与 `interval:<ms>` 行；daily/weekly/cron 墙钟规则仍是单机 `ScheduleService` 形态。
 - **数据库与 schema 必须预先存在**——提供方建表不建库；连接或权限故障在首次使用时浮出。
 
 <a id="dev-note"></a>
-### 开发注记
+### 开发备注
 
 <details>
 <summary>维护者的工作上下文——点击展开</summary>

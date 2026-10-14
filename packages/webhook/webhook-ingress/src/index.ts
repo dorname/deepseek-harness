@@ -82,6 +82,7 @@ export class WebhookIngress {
     consume: z.any().required(),
   })
 
+  /** Cordis plugin identifier. */
   readonly name = 'webhook-ingress'
 
   private readonly ready: Promise<postgresType.Sql>

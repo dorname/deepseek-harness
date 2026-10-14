@@ -12,7 +12,7 @@ UI/UX 原型此前由 product-designer 在实现期（提案批准之后、drive
 链路里、纠偏成本最高。
 
 **核心洞察**：把 UI/UX 确认**前移到「批准提案」门**——GUI 项目在提案阶段就产出界面原型，使用户
-能在批准提案时（**面板已渲染原型的前提下**）连界面一起确认。该等价的前提约束见 §10（provenance
+能在批准提案时（**面板已渲染原型的前提下**）连界面一起确认。该等价的前提约束见 §10（原型批准记录
 契约）与 §11（严格性以持久化批准记录为键）。
 
 ### 1.2 关键设计原则（不变量的来源）
@@ -20,7 +20,7 @@ UI/UX 原型此前由 product-designer 在实现期（提案批准之后、drive
 1. **不新增门态、不新增确认标记**：看界面**不是一道新关卡**，它挂在「批准提案」这一现有动作上，
    复用现有 `plan-exit`（批准方案）门。唯一人类确认点仍是 `plan-exit`。
 2. **必须跨仓协同、不宣称 driver 不变**：本特性核心价值（plan 门前产原型 + 面板渲染 + 写
-   provenance）**必然需要 runlogos driver 改动**（producer dispatch / 原型渲染 / provenance 写入 /
+   原型批准记录）**必然需要 runlogos driver 改动**（producer dispatch / 原型渲染 / 原型批准记录 写入 /
    hash 比对）。openlogos 侧**只定契约**，driver 实现归 runlogos 具名协同 change（见 §12）。
 3. **不新增 `ui/` 目录、无额外人工步骤**：原型复用现有 delta 路径映射（`deltas/prd/** →
    resources/prd/**`）落盘，无需新目录、无需人工拷贝步骤（见 §2）。**但落盘实现新增专用事务代码
@@ -73,7 +73,7 @@ logos/changes/<slug>/deltas/prd/2-product-design/2-page-design/core-NN-<slug>.ht
 函数 `commitVerifiedPrototypes()`（`cli/src/commands/merge.ts`，详见 §12.3）——它是所有 `ui_impact`
 原型资产的**唯一落盘入口**，内部按模式选严 / 宽：
 
-- **严格**：`PLAN_APPROVED` 含 UI provenance ⇒ 校验 staged 字节 hash + 原子提交（全有或全无）；
+- **严格**：`PLAN_APPROVED` 含 UI 原型批准记录 ⇒ 校验 staged 字节 hash + 原子提交（全有或全无）；
 - **advisory（宽）**：legacy / degraded / 旧空 marker ⇒ **仍经同一入口**、只是**不做严格 hash 校验**，
   作普通资产整份落盘。
 
@@ -155,8 +155,8 @@ spec/skill/测试阶段落实，非本 proposal 节点产出）。
 - `deltas/spec/**`（`launched.yaml` / `flow-spec.md` / 本规格等）属 `spec` subflow 的 `write-delta`
   节点（plan-exit 门**后**）产物，为 `[delta]`；
 - 运行时代码（`flow-derive.ts` 派生、guard allowlist、`capabilities` 载体、merge 命令级 hash 门、
-  `commitVerifiedPrototypes()`、checker 命令、面板渲染、provenance 写入）属 merge 后 `slice-planner`
-  的 `[code]`；其中 producer dispatch / 面板渲染 / provenance 写入归 runlogos（见 §12）。
+  `commitVerifiedPrototypes()`、checker 命令、面板渲染、原型批准记录 写入）属 merge 后 `slice-planner`
+  的 `[code]`；其中 producer dispatch / 面板渲染 / 原型批准记录 写入归 runlogos（见 §12）。
 - 在 plan 节点产出上述任何一项都会同时违反 (i) plan→spec→code 时序、(ii) 「plan 阶段写入 allowlist
   仅放行原型路径」，故本 proposal 节点不产出它们。
 
@@ -236,7 +236,7 @@ plan-exit 之后产出。
 2. **声明清单 == 产出文件（basename 集合一致）**：把声明清单的 `prototype` basename 集合与
    `2-page-design/` 下实际产出的 `.html` basename 集合做**规范化集合比较**——**排序无关**、**重复失败**、
    **额外文件失败**、**缺失文件失败**；`prototype` 出现 `..` / 子目录 / 非 `.html` 扩展名即判非法失败。
-3. **内容 hash 记录**：以同一 basename 规范键记录逐文件内容 hash（为 §8 provenance / §12 hash 防漂移
+3. **内容 hash 记录**：以同一 basename 规范键记录逐文件内容 hash（为 §8 原型批准记录 / §12 hash 防漂移
    提供输入）；`PLAN_APPROVED.pages` 与 `PLAN_APPROVED.hashes` **复用同一 basename 规范键**。
 
 **分模式要求**：
@@ -353,23 +353,23 @@ product_type，安全默认与诊断暴露二者兼得。
 「可交付」（文件可能为空、非 ui-ux-pro-max 产物、或声明多页只产出一页），故 §6.2 富对账用
 「逐页非空 + 令牌 + 清单一致」收紧收敛，把弱残差压到最小可机器判定面。
 
-## 8. provenance 契约：载体、字段、向后兼容、hash 防漂移
+## 8. 原型批准记录 契约：载体、字段、向后兼容、hash 防漂移
 
-provenance 是 `plan-exit` 批准记录上的**属性**，**非独立文件、非新门**。
+原型批准记录 是 `plan-exit` 批准记录上的**属性**，**非独立文件、非新门**。
 
 ### 8.1 载体与向后兼容（F3）
 
-provenance 落在 **`PLAN_APPROVED` marker 的可选 JSON body**。`PLAN_APPROVED` 是「**存在性 marker +
-可选 provenance body**」的**向后兼容超集**，非破坏性重定义：
+原型批准记录 落在 **`PLAN_APPROVED` marker 的可选 JSON body**。`PLAN_APPROVED` 是「**存在性 marker +
+可选 原型批准记录 body**」的**向后兼容超集**，非破坏性重定义：
 
 - **存在性语义完全不变**：`PLAN_APPROVED` 存在即门已过，**空 marker 仍合法**（现有
   `writePlanApproved()` 空写路径与「仅存在性」读取者不受影响）。
-- provenance 是**可选叠加字段**：缺失 / 空 body ⇒ 安全默认「不宣称 UI 已确认」。
+- 原型批准记录 是**可选叠加字段**：缺失 / 空 body ⇒ 安全默认「不宣称 UI 已确认」。
 - 仅 runlogos 批准路径写 JSON body；仅 UI 确认消费者按存在与否解析、缺失容忍。
 - driver 批准 progress 事件**可镜像但不权威**，判定一律以 `PLAN_APPROVED` 为准。
-- `[code]` 触点：`writePlanApproved()`（可选写 JSON）与 provenance 读取者。
+- `[code]` 触点：`writePlanApproved()`（可选写 JSON）与 原型批准记录 读取者。
 
-### 8.2 provenance body 字段
+### 8.2 原型批准记录 body 字段
 
 ```json
 {
@@ -392,7 +392,7 @@ basename 对齐。**绑定 pages + 内容 hash** 是防批准后漂移的键。
   交付前进（**不是仅 advisory 就放行**）。阻断方式**复用现有 `plan-exit` 门的「批准内容变更即
   批准失效」完整性语义**（原型 hash 变了 → 批准过期 → 必须**重新批准**才能继续），**不新增门**。
 - **缺失 / false**（旧面板 / 未渲染，**非漂移**）= 不宣称 UI 已确认、记 advisory、不阻断（保留 §8.1
-  向后兼容语义：无 provenance ≠ 漂移）；此 advisory 路径的原型**仍经 `commitVerifiedPrototypes()`
+  向后兼容语义：无 原型批准记录 ≠ 漂移）；此 advisory 路径的原型**仍经 `commitVerifiedPrototypes()`
   落盘**（§12.3），只是不做严格 hash 校验，而非走另一条绕过入口。
 
 **适用范围**：仅 `ui_impact:true` 提案要求这些字段有意义；`ui_impact:false` 不涉及。
@@ -423,9 +423,9 @@ done_when/fail_when 均为 cmd:）。节点**仅单 `done_when: cmd:`（无 `fai
 overlay 源文件中的 `<...>` 占位仅文档示意；**运行时 `done_when` 必须是可执行命令字符串**。
 
 **`check-ui-hash-match` 三分支（F6，与 §11.3 / merge 落盘同一「持久化批准记录」分支一致）**：命令读
-`PLAN_APPROVED` 持久化 provenance（**非会话 capability**）分三支：
+`PLAN_APPROVED` 持久化 原型批准记录（**非会话 capability**）分三支：
 
-1. **含 UI provenance**（`ui_prototype_rendered:true` + `pages` + `hashes`）→ 重算 `2-page-design/`
+1. **含 UI 原型批准记录**（`ui_prototype_rendered:true` + `pages` + `hashes`）→ 重算 `2-page-design/`
    现值 hash 与 `PLAN_APPROVED.hashes` 逐文件比对：`hashes` **完好且全匹配** → `exit 0`（node done、
    放行）；**缺失 / 损坏 / 失配** → **非 0 fail closed**（node 未 done、前向阻断）。
 2. **legacy/degraded 或旧空 marker 且无任何「曾渲染确认」证据** → **记 advisory 后 `exit 0`**（node
@@ -433,12 +433,12 @@ overlay 源文件中的 `<...>` 占位仅文档示意；**运行时 `done_when` 
    `PLAN_APPROVED`（legacy/degraded、无曾渲染证据）的提案，此前因 §9.2 只有两果而永久卡在
    `verify-ui-provenance`、advisory 放行不可达」的死锁；此类提案的 advisory 放行现**经本节点 `exit 0`
    达成，而非绕过节点**。
-3. **部分 / 损坏 provenance**（`ui_prototype_rendered:true` 但 `hashes` 缺失 / 为空）→ **不得误判为
+3. **部分 / 损坏 原型批准记录**（`ui_prototype_rendered:true` 但 `hashes` 缺失 / 为空）→ **不得误判为
    legacy** → **fail closed（非 0）**。即「曾声明渲染」证据存在但 hash 载体不全，一律按失效处理，不得
    走第 2 支被放行。
 
 三分支只有第 1 支「完好全匹配」与第 2 支「legacy/advisory」两种成功路径 `exit 0`；第 1 支的
-失配/损坏与第 3 支的部分 provenance 均 `exit` 非 0。单 cmd: 合法（overlay-add，非双 cmd:）。
+失配/损坏与第 3 支的部分 原型批准记录 均 `exit` 非 0。单 cmd: 合法（overlay-add，非双 cmd:）。
 
 ### 9.3 状态转换（诚实边界）
 
@@ -455,9 +455,9 @@ flow 引擎**前向线性、无跨 subflow 自动回退边**。故「退回 plan
 普通方案批准、**不构成 UI 视觉确认**。「文本降级安全」≠「用户已确认 UI」——旧面板把 `.html` 按
 文本列出虽不崩，但用户点批准时并没有**看到渲染后的界面**。
 
-### 10.2 在既有批准事件上加 provenance（非阻断、非新门）
+### 10.2 在既有批准事件上加 原型批准记录（非阻断、非新门）
 
-渲染面板在批准时记录「已展示原型」标记（§8 provenance）；缺该标记（旧面板）则方法论**不宣称 UI
+渲染面板在批准时记录「已展示原型」标记（§8 原型批准记录）；缺该标记（旧面板）则方法论**不宣称 UI
 已确认**、给出 advisory 提示，但**不阻断**（延续「文本降级不阻断」立场）。这是既有批准事件上的
 溯源属性，不是新门 / 新确认标记文件。
 
@@ -480,15 +480,15 @@ flow 引擎**前向线性、无跨 subflow 自动回退边**。故「退回 plan
 
 ### 11.2 模式选择（plan-exit 之前）才读会话 capability
 
-capability 就绪 → 渲染确认模式（要求 provenance + hash）；缺失 → 降级模式（不 claim UI 确认）。
+capability 就绪 → 渲染确认模式（要求 原型批准记录 + hash）；缺失 → 降级模式（不 claim UI 确认）。
 这是 `.session-capabilities.json` 的**唯一**合法用途——只用于 plan-exit **之前**选交互模式，**绝不**
 作为批准后的完整性门降级开关。
 
-### 11.3 强制语义（plan-exit 之后）以 `PLAN_APPROVED` 持久化 provenance 为准
+### 11.3 强制语义（plan-exit 之后）以 `PLAN_APPROVED` 持久化 原型批准记录 为准
 
 merge / 落盘 / 落盘后复核**不再读 session capability**：
 
-- **批准记录含 UI provenance**（`ui_prototype_rendered:true` + `pages` + `hashes`，即该批准曾走渲染
+- **批准记录含 UI 原型批准记录**（`ui_prototype_rendered:true` + `pages` + `hashes`，即该批准曾走渲染
   确认路径）⇒ **所有 merge / 落盘 / 落盘后复核入口永久 fail closed**：`hashes` 必须存在且完好、
   逐文件重算匹配；缺失 / 损坏 / 失配一律拒绝（非零退出、不生成 `MERGE_PROMPT`、不写 resources、
   不写 `SPEC_MERGED`）。**当前会话 capability 文件缺失 / 过期 / 被清理一律不得降级**——「曾渲染
@@ -513,7 +513,7 @@ closed、resources 零残留。用例登记入 `core-S09-test-cases.md`。
 
 flow 的 `verify-ui-provenance` 节点只拦 **driver 流**；`cli/src/commands/merge.ts` 现完全不查 flow /
 `PLAN_APPROVED` / hash，故直接执行 `openlogos merge <slug>` 会绕过漂移检查。修：把 hash 校验**下沉
-进 merge 命令**——对 `ui_impact:true` 且批准记录含 UI provenance 的提案，`merge()` 在扫 delta /
+进 merge 命令**——对 `ui_impact:true` 且批准记录含 UI 原型批准记录 的提案，`merge()` 在扫 delta /
 生成 `MERGE_PROMPT` **之前**读 `PLAN_APPROVED.hashes` 并重算 `2-page-design/` 原型现值 hash，**失配
 即拒绝 merge（非零退出 + 明确错误、不生成 MERGE_PROMPT）**。由此**无论经 driver 流还是直接 CLI
 调用都不可绕过**：flow 节点 = driver 流表示，merge 命令级校验 = 真强制点（single source of
@@ -530,7 +530,7 @@ enforcement）。
 - **落盘后复核（双保险）**：`apply-merge` 完成后代码复核 resources 中已落盘原型 hash ==
   `PLAN_APPROVED.hashes`，不符则**阻断流程前进**（不进 slice/code）；
 - `merge.ts` 生成提示前的检查保留为**早失败优化**；**权威门 = 落盘时刻校验 + 落盘后复核**；
-- 三处（提示前 / 落盘时 / 落盘后）**全部按 §11 的「持久化 provenance 为键」分支**，不以消费时会话
+- 三处（提示前 / 落盘时 / 落盘后）**全部按 §11 的「持久化 原型批准记录 为键」分支**，不以消费时会话
   capability 做严/宽开关。
 
 ### 12.3 事务性原子落盘 `commitVerifiedPrototypes()`（全有或全无、失败零残留）
@@ -549,7 +549,7 @@ enforcement）。
 - **失败语义（无残留）**：任一阶段失败 ⇒ **resources 回到 merge 前状态**（无部分落盘、无未获批
   内容）、`SPEC_MERGED` 不写、流程标记失败并阻断；remediation = 显式重入 plan 刷新 hashes 后重跑。
   即**全有或全无、失败零残留**。
-- **进入事务门的判据**：门控一律以持久化 `PLAN_APPROVED` provenance 为准（§11）——含 UI provenance
+- **进入事务门的判据**：门控一律以持久化 `PLAN_APPROVED` 原型批准记录 为准（§11）——含 UI 原型批准记录
   时**永久进入严格事务门并 fail closed**，当前会话 capability 缺失一律不得跳过；仅 legacy/degraded 或
   旧空 marker 无「曾渲染」证据时走 §8.1 advisory。**注意：advisory 与严格两条分支都在
   `commitVerifiedPrototypes()` 这一唯一入口内分流**——advisory 只是**跳过严格 hash 校验**、作普通资产
@@ -573,8 +573,8 @@ enforcement）。
 
 ### 13.1 跨仓必要交付闭环（两仓都必须落地）
 
-本特性核心价值 = openlogos 契约（本 change：flow 节点 + `ui_impact` flag + 声明段 + provenance 契约 +
-guard allowlist）**且** runlogos 实现（协同 change：producer dispatch + 原型渲染 + provenance 写入 +
+本特性核心价值 = openlogos 契约（本 change：flow 节点 + `ui_impact` flag + 声明段 + 原型批准记录 契约 +
+guard allowlist）**且** runlogos 实现（协同 change：producer dispatch + 原型渲染 + 原型批准记录 写入 +
 hash 比对）。**二者缺一，核心视觉确认价值即不成立**。顺序：openlogos 契约先 merge/发布 → runlogos
 依此实现。runlogos change 是**必须交付的关联件（非可选）**，显式登记为依赖，不得以「另立 change」
 为由默认其存在性。
@@ -596,7 +596,7 @@ merge 后创建并跟踪，二者以此 slug 对齐、非「默认其存在」�
   生成上下文 `capabilities` 段与 JSON `capabilities` 字段。**文件缺失 = 能力缺失（降级模式）**。该
   文件为 runlogos 私有会话态、`logos/` 下（gitignore），非方法论产物。
 - **用途约束**：该 capability **仅用于 plan-exit 之前的模式选择**（§11.2）；plan-exit 之后的强制语义
-  一律以持久化 `PLAN_APPROVED` provenance 为准，绝不因会话 capability 缺失降级（§11.3）。
+  一律以持久化 `PLAN_APPROVED` 原型批准记录 为准，绝不因会话 capability 缺失降级（§11.3）。
 - openlogos 侧在 plan-exit **之前**从上下文读取决定模式——就绪 → 渲染确认模式；缺失 → 降级模式。
   轻量 capability 标志、非 semver 握手。
 - **改源模板不改副本**：两个入口都要改，漏 Codex 入口则 Codex 会话不生效；sync 后自动更新
@@ -632,19 +632,19 @@ UI 时，允许在 plan 阶段产出 page-design 原型 delta（`deltas/prd/2-pr
 `write-ui-prototype` 的 `done_when: cmd:openlogos check-ui-prototype`（真实可执行子命令，`<...>` 仅文档
 示意）富对账通过 → ④ 面板渲染原型、用户批准 → ⑤ 面板/driver 写 `PLAN_APPROVED` body
 （`ui_prototype_rendered` + `pages` + `hashes`）→ ⑥ merge 前 `verify-ui-provenance` 的
-`done_when: cmd:openlogos check-ui-hash-match` 按三分支重算 hash → 含 provenance 完好匹配 / legacy
-advisory 则 done 前进、失配或部分 provenance 则卡未 done。链上每一跳的 actor / 触发 / 产物均已具名。
+`done_when: cmd:openlogos check-ui-hash-match` 按三分支重算 hash → 含 原型批准记录 完好匹配 / legacy
+advisory 则 done 前进、失配或部分 原型批准记录 则卡未 done。链上每一跳的 actor / 触发 / 产物均已具名。
 
 ### 13.7 完整授权链（逐个 actor + 授权依据）
 
 1. **producer（change-writer）** 由 driver 在 plan 节点派发——授权同「写 proposal.md/tasks.md」的
    普通门前生成，**无新授权**；其写入由 guard 的 **plan 阶段 allowlist（仅放行 `2-page-design/
    *.html`）** 授权，越界路径被 guard 拒。
-2. **provenance 写入方（runlogos 面板/driver）** 在批准时写 `PLAN_APPROVED` body——**由用户的批准
+2. **原型批准记录 写入方（runlogos 面板/driver）** 在批准时写 `PLAN_APPROVED` body——**由用户的批准
    动作本身授权**（同一次点击），无独立授权。
-3. **`--auto`**：`plan-exit`（`skippable:true`）自动放行，producer 仍在门前产原型、provenance 仍
+3. **`--auto`**：`plan-exit`（`skippable:true`）自动放行，producer 仍在门前产原型、原型批准记录 仍
    记录；无新授权。
-4. **hash 比对消费者（下游 merge/implement）**：只读 provenance，无写授权需求。
+4. **hash 比对消费者（下游 merge/implement）**：只读 原型批准记录，无写授权需求。
 
 链上无悬空授权、无「谁批准 producer 写」的缺口。
 
@@ -653,7 +653,7 @@ advisory 则 done 前进、失配或部分 provenance 则卡未 done。链上每
 ### 14.1 contract-ready（capability-disabled）
 
 OpenLogos npm 新版本 + 文档站发布即达此态。此态**只交付契约**（flow overlay / `ui_impact` flag /
-声明段 / provenance 契约 / guard allowlist / 会话入口例外文案 / merge 严格校验代码），**默认降级、
+声明段 / 原型批准记录 契约 / guard allowlist / 会话入口例外文案 / merge 严格校验代码），**默认降级、
 不得对外 claim「UI/UX 确认已前移」已启用**；对外宣称边界 = contract-ready。
 
 ### 14.2 feature-enabled
@@ -668,7 +668,7 @@ OpenLogos npm 新版本 + 文档站发布即达此态。此态**只交付契约*
 2. 两个 SessionStart 入口（`plugin/bin/openlogos-phase` + `plugin-codex/session-start.sh`）读取并
    **一致 surface** 该 capability（上下文 `capabilities` 段与 `status`/`next` JSON `capabilities`
    字段一致）；
-3. 面板实际渲染原型并在批准时写入绑定 `pages`/`hashes` 的 `PLAN_APPROVED` provenance；
+3. 面板实际渲染原型并在批准时写入绑定 `pages`/`hashes` 的 `PLAN_APPROVED` 原型批准记录；
 4. merge 严格 hash 校验（§11/§12 fail-closed 路径）对批准后漂移的原型**确实拒绝**；
 5. smoke 能**区分** contract-ready 与 feature-enabled 两态。
 
@@ -709,7 +709,7 @@ merge-executor 的「整份 create/replace」**仅**适用于 `2-page-design/` �
 
 1. **不新增门 / 不新增确认标记**：UI 确认复用 `plan-exit` 门与 `PLAN_APPROVED` marker；不新增门态、
    不新增确认标记文件、不新增 `ui/` 目录。
-2. **`PLAN_APPROVED` 向后兼容超集**：空 marker 恒合法（门已过）；provenance 为可选 JSON body；缺失 /
+2. **`PLAN_APPROVED` 向后兼容超集**：空 marker 恒合法（门已过）；原型批准记录 为可选 JSON body；缺失 /
    空 body ⇒ 安全默认「不宣称 UI 已确认」。
 3. **单一事实源 + 结构化清单**：`ui_impact` 声明段（意图）+ **结构化声明页清单**（每条 `id` +
    `prototype` basename，唯一）+ `2-page-design/` 文件存在性构成唯一 ground truth；对账按精确
@@ -730,18 +730,18 @@ merge-executor 的「整份 create/replace」**仅**适用于 `2-page-design/` �
    `design_system_fallback_reason`（禁伪造令牌、不要求 `design-system.json`）；满足才 `exit 0`。
    消解「降级不产令牌但强制要 `design-system.json` → 永久卡死」矛盾。
 7. **严格性以持久化批准记录为键**：模式选择读会话 capability（仅 plan-exit 之前）；强制语义读
-   `PLAN_APPROVED` provenance（plan-exit 之后）。含 UI provenance ⇒ merge/落盘/复核三处永久 fail
+   `PLAN_APPROVED` 原型批准记录（plan-exit 之后）。含 UI 原型批准记录 ⇒ merge/落盘/复核三处永久 fail
    closed，会话 capability 缺失不得降级。
 7b. **`check-ui-hash-match` 三分支（F6）**：`verify-ui-provenance` 单 `done_when: cmd:`（无 `fail_when`），
-   命令内部按持久化 `PLAN_APPROVED` provenance 分三支——(1) 含 UI provenance：hashes 完好且全匹配
+   命令内部按持久化 `PLAN_APPROVED` 原型批准记录 分三支——(1) 含 UI 原型批准记录：hashes 完好且全匹配
    `exit 0`，缺失/损坏/失配 fail closed；(2) legacy/degraded 或旧空 marker 且无「曾渲染确认」证据：
    记 advisory 后 `exit 0`（第三成功分支，令旧空 marker 的 GUI `ui_impact:true` 提案不永久卡死、
-   advisory 经本节点 `exit 0` 达成而非绕过）；(3) 部分/损坏 provenance（`ui_prototype_rendered:true`
+   advisory 经本节点 `exit 0` 达成而非绕过）；(3) 部分/损坏 原型批准记录（`ui_prototype_rendered:true`
    但 hashes 缺/空）不得误判 legacy → fail closed。
 8. **merge 命令级 hash 强制**：直接 `openlogos merge` 与 driver 流一致强制，无绕过路径；single source
    of enforcement。
 9. **freshness 权威点在落盘时刻**：提示前=早失败优化，权威门=落盘时刻校验 staged 字节 + 落盘后
-   复核；三处一致按 provenance 分支。
+   复核；三处一致按 原型批准记录 分支。
 10. **事务性原子落盘、失败零残留、唯一落盘入口**：`commitVerifiedPrototypes()` 为**所有 `ui_impact`
     原型资产的唯一落盘入口**（不复用旧 merge 拷贝、无第二条绕过路径；advisory 与严格两分支都经此
     入口，仅校验强度不同；merge-executor 绝不触碰原型资产）；verify-all→stage（校验 staged 字节）→

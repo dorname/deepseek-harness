@@ -195,11 +195,15 @@ The mounted domain facility. Opens declared domains over routed backends; one fa
 ```ts cordis-catalog
 /**
  * Open one declared domain. Steps, each failing the whole call: reject a
- * name that is already open (`already-open`); resolve the backend route
- * (`backend-not-found` passes through from the hub); require its `kv` facet
- * (`facet-unsupported`); open the unit projected from the spec (backend
- * `version-mismatch`/`malformed-medium` pass through); load and validate
- * every stored record against the spec's zod schemas (`invalid-record`
+ * name that is already open (`already-open`); reject a name carrying the
+ * namespace-reserved suffix shape (`reserved-unit-name`); resolve the
+ * backend route (`backend-not-found` passes through from the hub); require
+ * its `kv` facet (`facet-unsupported`); open the unit projected from the
+ * spec — under a fleet-injected subject the unit opens under its
+ * subject-derived namespace name, so domains never share a medium's data
+ * across users (backend `version-mismatch`/`malformed-medium` pass
+ * through); load and validate every stored record against the spec's zod
+ * schemas (`invalid-record`
  * with the offending table and key — unless the spec declares
  * `invalidRecords: 'backup-and-skip'` and the unit can move documents aside, in
  * which case the failing record is backed up, logged, and skipped);

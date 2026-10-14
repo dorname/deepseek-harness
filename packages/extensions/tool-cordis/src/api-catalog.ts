@@ -2089,6 +2089,43 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'sessionLease',
+    summary: 'Abstract cross-node session lease.',
+    description: 'Abstract cross-node session lease. Implementations arbitrate atomically on a shared medium: acquiring a free or expired lease and refusing a live one are one atomic statement, so concurrent acquirers get exactly one winner, and an expired holder\'s lease is taken over the same way.',
+    methods: [
+      {
+        signature: 'abstract acquire(id: SessionId, owner: string, ttlMs: number): Promise<AcquireOutcome>',
+        description: 'Atomically acquire the session\'s lease: a free or expired lease becomes the caller\'s; a live foreign lease refuses with its facts.',
+        parameters: [{ name: 'id', description: 'the session to lease.' }, { name: 'owner', description: 'the caller\'s node identifier.' }, { name: 'ttlMs', description: 'lease lifetime in milliseconds from now.' }],
+        returns: '`acquired`, or `held` naming the current holder and expiry.',
+      },
+      {
+        signature: 'abstract renew(id: SessionId, owner: string, ttlMs: number): Promise<boolean>',
+        description: 'Extend the caller\'s lease; only the current owner may renew.',
+        parameters: [{ name: 'id', description: 'the leased session.' }, { name: 'owner', description: 'the caller\'s node identifier.' }, { name: 'ttlMs', description: 'new lifetime in milliseconds from now.' }],
+        returns: 'whether the caller still held the lease.',
+      },
+      {
+        signature: 'abstract release(id: SessionId, owner: string): Promise<boolean>',
+        description: 'Release the lease; only the current owner may release.',
+        parameters: [{ name: 'id', description: 'the leased session.' }, { name: 'owner', description: 'the caller\'s node identifier.' }],
+        returns: 'whether the caller held the lease.',
+      },
+      {
+        signature: 'abstract ownerOf(id: SessionId): Promise<LeaseFacts | undefined>',
+        description: 'Observe the session\'s current holder without taking it.',
+        parameters: [{ name: 'id', description: 'the session to observe.' }],
+        returns: 'the holder facts, or `undefined` when the session is unleased.',
+      },
+      {
+        signature: 'abstract waitLost(id: SessionId, owner: string, pollMs?: number, signal?: AbortSignal): Promise<string>',
+        description: 'Resolve when the caller\'s ownership of the session ends — the lease was released, expired and taken over, or was never the caller\'s. Runners use this to cancel their agent; `agent-loop` stays unaware.',
+        parameters: [{ name: 'id', description: 'the leased session.' }, { name: 'owner', description: 'the caller\'s node identifier.' }, { name: 'pollMs', description: 'polling interval while watching; the loss latency budget.' }, { name: 'signal', description: 'optional cancellation for the watch itself.' }],
+        returns: 'why ownership ended: the taking-over owner, or `\'released\'`.',
+      },
+    ],
+  },
+  {
     key: 'sessionPersistence',
     summary: 'Durable append-only session storage addressed through per-session handles.',
     description: 'Durable append-only session storage addressed through per-session handles.\n\nStorage semantics shared by every backend: events are contiguous from seq 0 and never rewritten; a torn physical tail is never returned to a reader and is truncated by the write path before its first append; reads validate current-format records only and refuse unknown vocabulary fail-closed. `append` persists best-effort; `flush` — per handle or service-wide — is the durability barrier.\n\nVisibility: a created session is observable through `stat`/`list`/`open` in this process from the moment `create` resolves, even while a backend defers physical materialization (a pure optimization); other processes see the session only once it materializes, and a session that never materialized before a crash never existed. `SessionHandle.flush` forces materialization.\n\nFreshness: once an `append` or `flush` resolves, reads started afterwards on this backend instance observe at least that prefix.',
@@ -2849,7 +2886,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     methods: [
       {
         signature: 'async open<S extends DomainSpec>(spec: S): Promise<Domain<S>>',
-        description: 'Open one declared domain. Steps, each failing the whole call: reject a name that is already open (`already-open`); resolve the backend route (`backend-not-found` passes through from the hub); require its `kv` facet (`facet-unsupported`); open the unit projected from the spec (backend `version-mismatch`/`malformed-medium` pass through); load and validate every stored record against the spec\'s zod schemas (`invalid-record` with the offending table and key — unless the spec declares `invalidRecords: \'backup-and-skip\'` and the unit can move documents aside, in which case the failing record is backed up, logged, and skipped); construct the domain.\n\nLifecycle: the CALLER owns the returned handle and closes it via `Domain.close()` (typically as its own `ctx.effect` disposer) — the facility does not tie the domain to any consumer fiber. Domains still open when the facility unmounts are closed by the plugin disposer.',
+        description: 'Open one declared domain. Steps, each failing the whole call: reject a name that is already open (`already-open`); reject a name carrying the namespace-reserved suffix shape (`reserved-unit-name`); resolve the backend route (`backend-not-found` passes through from the hub); require its `kv` facet (`facet-unsupported`); open the unit projected from the spec — under a fleet-injected subject the unit opens under its subject-derived namespace name, so domains never share a medium\'s data across users (backend `version-mismatch`/`malformed-medium` pass through); load and validate every stored record against the spec\'s zod schemas (`invalid-record` with the offending table and key — unless the spec declares `invalidRecords: \'backup-and-skip\'` and the unit can move documents aside, in which case the failing record is backed up, logged, and skipped); construct the domain.\n\nLifecycle: the CALLER owns the returned handle and closes it via `Domain.close()` (typically as its own `ctx.effect` disposer) — the facility does not tie the domain to any consumer fiber. Domains still open when the facility unmounts are closed by the plugin disposer.',
         parameters: [{ name: 'spec', description: 'The domain declaration, typically from `defineDomain`.' }],
         returns: 'the opened domain handle, typed by the spec.',
       },
@@ -2864,6 +2901,37 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Close every domain still open on this facility. The unmount path for consumers that never called `Domain.close()` themselves; closing is idempotent, so double-closing an already-closed domain is harmless.',
         parameters: [],
         returns: 'resolution after every unit is released.',
+      },
+    ],
+  },
+  {
+    key: 'streamRelay',
+    summary: 'Abstract stream relay.',
+    description: 'Abstract stream relay. Implementations publish each record atomically with its next per-session sequence number and wake subscribers; subscribers replay from a cursor so a late join or a missed wake never leaves a gap or a duplicate.',
+    methods: [
+      {
+        signature: 'abstract publish(id: SessionId, kind: RelayRecordKind, payload: JsonValue): Promise<number>',
+        description: 'Publish one record with the session\'s next sequence number.',
+        parameters: [{ name: 'id', description: 'the session the record belongs to.' }, { name: 'kind', description: 'the record kind.' }, { name: 'payload', description: 'the serialized record body.' }],
+        returns: 'the record\'s sequence number.',
+      },
+      {
+        signature: 'abstract read(id: SessionId, afterSeq: number): Promise<readonly RelayRecord[]>',
+        description: 'Read the session\'s records strictly after a cursor, in sequence order.',
+        parameters: [{ name: 'id', description: 'the session to read.' }, { name: 'afterSeq', description: 'the cursor; 0 replays from the first record.' }],
+        returns: 'the records after the cursor, possibly empty.',
+      },
+      {
+        signature: 'abstract maxSeq(id: SessionId): Promise<number>',
+        description: 'Observe the session\'s latest sequence number.',
+        parameters: [{ name: 'id', description: 'the session to observe.' }],
+        returns: 'the latest sequence number, or 0 when nothing is published.',
+      },
+      {
+        signature: 'abstract subscribe( id: SessionId, afterSeq: number, onRecord: RelayRecordHandler, pollMs?: number, signal?: AbortSignal, ): Promise<() => void>',
+        description: 'Subscribe to the session\'s records from a cursor: existing records after the cursor replay first, then live records arrive as published. Wakes may be lost; the implementation catches up on its next wake or poll tick, so a late join and a missed wake both replay without gaps or duplicates.',
+        parameters: [{ name: 'id', description: 'the session to subscribe to.' }, { name: 'afterSeq', description: 'the cursor; 0 subscribes from the first record.' }, { name: 'onRecord', description: 'invoked once per record in sequence order.' }, { name: 'pollMs', description: 'fallback polling interval; 0 disables polling.' }, { name: 'signal', description: 'cancels the subscription and stops delivery.' }],
+        returns: 'resolution with the unsubscribe function once listening is active.',
       },
     ],
   },
@@ -4469,6 +4537,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface AccountWallet {\n    readonly currency: \'CNY\' | \'USD\';\n    readonly balance: string;\n}',
   },
   {
+    name: 'AcquireOutcome',
+    declaration: 'export type AcquireOutcome = {\n    readonly status: \'acquired\';\n} | {\n    readonly status: \'held\';\n    readonly holder: LeaseFacts;\n};',
+  },
+  {
     name: 'AdapterRegistrationHandle',
     declaration: 'export interface AdapterRegistrationHandle {\n    (): void;\n    replace(providers: string[]): void;\n}',
   },
@@ -5645,6 +5717,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface KvUnitDescriptor {\n    readonly name: string;\n    readonly version: number;\n    readonly tables: readonly string[];\n    readonly hasGlobal: boolean;\n    readonly layout?: \'single\' | \'per-record\';\n    readonly compatibleVersions?: readonly number[];\n}',
   },
   {
+    name: 'LeaseFacts',
+    declaration: 'export interface LeaseFacts {\n    readonly owner: string;\n    readonly expiresAt: number;\n}',
+  },
+  {
     name: 'LlmAdapter',
     declaration: 'export abstract class LlmAdapter {\n    providerInfo(provider: string): LlmProviderInfo;\n    providerRetryPolicy(_provider: string): ResolvedRetryPolicy | undefined;\n    imageRequestPricing(_provider: string, _model: string): LlmImageRequestPricing | undefined;\n    listModels(_provider: string): Promise<readonly LlmModelInfo[]>;\n    resolveModel(provider: string, model: string, _signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall>;\n    abstract stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
   },
@@ -6307,6 +6383,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'Registry',
     declaration: 'export type Registry = string | null;',
+  },
+  {
+    name: 'RelayRecord',
+    declaration: 'export interface RelayRecord {\n    readonly seq: number;\n    readonly kind: RelayRecordKind;\n    readonly payload: JsonValue;\n}',
+  },
+  {
+    name: 'RelayRecordHandler',
+    declaration: 'export type RelayRecordHandler = (record: RelayRecord) => void;',
+  },
+  {
+    name: 'RelayRecordKind',
+    declaration: 'export type RelayRecordKind = \'session-event\' | \'stream-frame\';',
   },
   {
     name: 'Reload',

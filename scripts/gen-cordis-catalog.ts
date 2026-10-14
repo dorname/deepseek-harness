@@ -50,6 +50,8 @@ export { REGION_BEGIN, REGION_END }
  * errors, so the partition can never silently drift from the service API.
  */
 export const SERVICE_PAGE: Record<string, string> = {
+  sessionLease: 'core.md',
+  streamRelay: 'core.md',
   speechToText: 'voice-input.md',
   speechController: 'voice-input.md',
   otel: 'otel.md',
@@ -276,6 +278,12 @@ export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
  * appear on more than one page.
  */
 export const LINK_MAP: Readonly<Record<string, string>> = {
+  LeaseFacts: 'core.md',
+  AcquireOutcome: 'core.md',
+  RelayRecordKind: 'core.md',
+  RelayRecord: 'core.md',
+  RelayRecordHandler: 'core.md',
+
   EventLogOptions: 'otel.md',
   EventLogReporter: 'otel.md',
   SessionLogOptions: 'otel.md',

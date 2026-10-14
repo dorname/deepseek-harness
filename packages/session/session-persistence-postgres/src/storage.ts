@@ -442,6 +442,7 @@ export class PostgresBackendTracker {
   /**
    * The pending entry for a created-but-unmaterialized session, if any.
    * @param id - the session to look up.
+   * @returns the pending entry, or `undefined` when untracked.
    */
   pendingOf(id: SessionId): PendingSession | undefined {
     return this.pending.get(id)
@@ -450,6 +451,7 @@ export class PostgresBackendTracker {
   /**
    * Whether this process still tracks a created-but-unmaterialized session.
    * @param id - the session to test.
+   * @returns whether the pending registry contains the session.
    */
   hasPending(id: SessionId): boolean {
     return this.pending.has(id)
@@ -457,6 +459,7 @@ export class PostgresBackendTracker {
 
   /**
    * Iterate the pending sessions for listing.
+   * @returns the live iterator over pending session identifiers and entries.
    */
   pendingEntries(): IterableIterator<[SessionId, PendingSession]> {
     return this.pending.entries()

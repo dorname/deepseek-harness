@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write logos/resources/code-tour/README.md
+/code-tour-deepseek-harness-source-explorer:
+  en: e1c0f2bead628f36
+  zh: 808ee4eb4ded47b0
+/code-tour-deepseek-harness-source-explorer/summary:
+  en: 9398599eadddf327
+  zh: f6de84cd0c408d30
+/code-tour-deepseek-harness-source-explorer/table-of-contents:
+  en: 11342294fde590a6
+  zh: 6ce48b08519fe828
+/code-tour-deepseek-harness-source-explorer/regenerate:
+  en: fc5595223da0607e
+  zh: 6053b54594175e79
+/code-tour-deepseek-harness-source-explorer/source-files:
+  en: f24270b05e24c2eb
+  zh: 4e3f910918ed0723
+/code-tour-deepseek-harness-source-explorer/data-maintenance:
+  en: 41f1075413e751ee
+  zh: 03e46e148481dc91

@@ -2351,6 +2351,31 @@
       "doc": "docs/subsystems/product-telemetry.md",
       "symbol": "ProductTelemetryRecord",
       "source": "packages/host/product-telemetry-otel/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "LeaseFacts",
+      "source": "packages/core/session-lease/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "AcquireOutcome",
+      "source": "packages/core/session-lease/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "RelayRecordKind",
+      "source": "packages/core/stream-relay/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "RelayRecord",
+      "source": "packages/core/stream-relay/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "RelayRecordHandler",
+      "source": "packages/core/stream-relay/src/index.ts"
     }
   ]
 }

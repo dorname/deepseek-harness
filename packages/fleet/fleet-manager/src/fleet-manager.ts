@@ -90,12 +90,19 @@ export class FleetManager {
     this.logger = options.logger ?? defaultLogger
   }
 
-  /** Subjects with a registered process (starting, ready, or restarting). */
+  /**
+   * Subjects with a registered process (starting, ready, or restarting).
+   * @returns the registered subjects.
+   */
   listActive(): string[] {
     return [...this.processes.keys()]
   }
 
-  /** Observation handle for one subject's registered process, or `undefined`. */
+  /**
+   * Observation handle for one subject's registered process.
+   * @param subject - the authenticated fleet subject.
+   * @returns process coordinates, or `undefined` when unregistered.
+   */
   processInfo(subject: string): { port: number; pid: number | undefined; home: string; launchUrl: string } | undefined {
     const registered = this.processes.get(subject)
     if (registered === undefined) {
@@ -137,7 +144,10 @@ export class FleetManager {
     return { kind: 'ready', subject, ...ready }
   }
 
-  /** Mark a subject's process active, deferring idle recycling. */
+  /**
+   * Mark a subject's process active, deferring idle recycling.
+   * @param subject - the authenticated fleet subject; unknown subjects are ignored.
+   */
   touch(subject: string): void {
     const registered = this.processes.get(subject)
     if (registered !== undefined) {

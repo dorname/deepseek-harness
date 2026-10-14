@@ -1,0 +1,58 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/session/session-persistence-postgres/README.md
+/:
+  en: 393ef03245a2ded0
+  zh: fcceeba606f9c142
+/deepseek-ai-dsh-session-persistence-postgres:
+  en: 86138501ff9d3e04
+  zh: fb58372531817828
+/deepseek-ai-dsh-session-persistence-postgres/summary:
+  en: 2984f4ca4a60473c
+  zh: d7e9b409997ac948
+/deepseek-ai-dsh-session-persistence-postgres/table-of-contents:
+  en: b563e4ec4727d0de
+  zh: e748d178a70e42b9
+/deepseek-ai-dsh-session-persistence-postgres/use-this-package:
+  en: c098bb5b769e0586
+  zh: 84ace10c6dc0f6c8
+/deepseek-ai-dsh-session-persistence-postgres/use-this-package/observable-behavior:
+  en: 9e26f5cf1d9cd625
+  zh: a5b72983729c53cf
+/deepseek-ai-dsh-session-persistence-postgres/understand-the-implementation:
+  en: eb72f33bf39730dc
+  zh: 9e8077e40cdad4bc
+/deepseek-ai-dsh-session-persistence-postgres/understand-the-implementation/design-concept:
+  en: 40b8d1a6487579be
+  zh: 0e2800e51c0685c8
+/deepseek-ai-dsh-session-persistence-postgres/understand-the-implementation/write-path:
+  en: df5bd88cf5b992d3
+  zh: 47e508108435de84
+/deepseek-ai-dsh-session-persistence-postgres/understand-the-implementation/source-map:
+  en: 40b86beef63ed54d
+  zh: 382509ae68ffb843
+/deepseek-ai-dsh-session-persistence-postgres/further-exploration:
+  en: 575eae5bf93be9fd
+  zh: be14dc0a5578b04e
+/deepseek-ai-dsh-session-persistence-postgres/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-session-persistence-postgres/model-experience/stored-session-events:
+  en: f9084fc112ff67bb
+  zh: 38c70907e42c0e49
+/deepseek-ai-dsh-session-persistence-postgres/model-experience/stored-session-events/what-the-model-sees:
+  en: 419e23dcd1a902e9
+  zh: 53fb7974242bb301
+/deepseek-ai-dsh-session-persistence-postgres/model-experience/stored-session-events/token-effect:
+  en: 592ed887c69e5c46
+  zh: dcdc70f2bf4e02cd
+/deepseek-ai-dsh-session-persistence-postgres/model-experience/stored-session-events/kv-cache-effect:
+  en: c13c59d13a5f1651
+  zh: 4e23b7dac484d8d0
+/deepseek-ai-dsh-session-persistence-postgres/known-limitations-and-deferred-work:
+  en: 62ef23bbb02326a3
+  zh: 549629236955f3f3
+/deepseek-ai-dsh-session-persistence-postgres/known-limitations-and-deferred-work/dev-note:
+  en: 0d5ac122f7c996df
+  zh: 919b3d5540017bbb

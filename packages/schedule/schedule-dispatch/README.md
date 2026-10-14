@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-schedule-dispatch` is the cluster form of schedule delivery: due rows live in one shared `schedule_due` table (one row per task, `next_due_at` advancing monotonically), and runner nodes run the dispatch loop — take the newest due row with `FOR UPDATE SKIP LOCKED`, acquire the session lease, deliver, and advance next-due inside one transaction whose row lock is the exactly-once take guarantee. A crash before commit rolls the row back, so reminders are never lost; a recurring row skips whole missed periods and lands on the first strictly future instant, so only the latest missed occurrence is delivered. The single-host `ScheduleService` is the parallel form: without the shared database configured, Host-timer behavior is unchanged. The package is host-side only: it contributes no prompt, tool, or schema.
+Deliver scheduled reminders from a shared PostgreSQL database across runner nodes. Each due task is locked while its session lease is acquired and its delivery callback runs. Failed transactions leave the task due for retry, so callbacks must tolerate repeated invocation. Fixed-interval tasks skip missed periods and advance to the next future occurrence. The callback owns reminder content and session logging.
 
 ## Table of Contents
 
@@ -53,7 +53,7 @@ A fresh database is stamped with the physical layout version inside one transact
 
 #### What the model sees
 
-Nothing. This package contributes no prompt, tool, or schema; it delivers scheduled reminders behind Cordis services for host-side consumers only.
+The package adds no prompt or tool schema. The `deliver` callback owns reminder content and its session logging; the dispatcher only selects due tasks.
 
 #### Token effect
 
@@ -64,6 +64,8 @@ Zero live-request tokens.
 None — the package never touches live request prefixes.
 
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **Pre-release physical layout** — any foreign stamped layout version refuses rather than migrates.
 - **Fixed-interval recurrence only** — the shared form carries `once` and `interval:<ms>` rows; daily/weekly/cron wall-clock rules remain the single-host `ScheduleService` form.

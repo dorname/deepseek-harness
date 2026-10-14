@@ -26,7 +26,11 @@ export interface RepositoryReference {
 }
 
 function isMaintained(file: string): boolean {
-  return !excludedPrefixes.some(prefix => file.startsWith(prefix))
+  // Archived deltas and committed seed copies retain historical source evidence;
+  // seed journals bind resolved copies to hashes used for recovery and audit.
+  const historicalSnapshot = /^logos\/changes\/archive\/[^/]+\/deltas\//u.test(file)
+    || /^logos\/resources\/verify\/baseline-seed-runs\/[^/]+\/(?:resolved|staging)\//u.test(file)
+  return !historicalSnapshot && !excludedPrefixes.some(prefix => file.startsWith(prefix))
 }
 
 /**
@@ -93,7 +97,7 @@ function repositoryCommits(repoRoot: string, sources: Iterable<string>): Set<str
 /**
  * Scan tracked and nonignored new files using only the local Git object database.
  * @param repoRoot - Working tree whose files and Git objects are inspected.
- * @returns Prohibited references outside vendor and frozen Agent Notes; absent shallow-history objects cannot match.
+ * @returns Prohibited references outside vendor and historical records; absent shallow-history objects cannot match.
  */
 export function scanRepositoryReferences(repoRoot: string): RepositoryReference[] {
   const sources = readMaintainedFiles(repoRoot)

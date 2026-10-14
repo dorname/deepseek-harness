@@ -1101,7 +1101,7 @@ agent dispatch 的完成校验不得只输出 pass/fail。OpenLogos / driver 至
   before: generate-merge-prompt   # merge subflow 入口、原型落盘 resources 之前
   node:
     id: verify-ui-provenance
-    name: 校验 UI provenance
+    name: 校验 UI 原型批准记录
     when: ui_impact
     produces: null
     done_when: "cmd:openlogos check-ui-hash-match"   # 运行时资产必为可执行命令；命令内部三分支
@@ -1112,12 +1112,12 @@ agent dispatch 的完成校验不得只输出 pass/fail。OpenLogos / driver 至
   该节点**仅以 `when: ui_impact` 控参与**，故 GUI `ui_impact:true` 但**旧空 `PLAN_APPROVED`（无曾渲染证据）**的 legacy/degraded 提案**仍会进入本节点**；
   若命令只有「匹配→0 / 缺失失配→非0」两果，空 marker 无 hashes 将**永远无法匹配**、节点永久未 done → advisory 放行不可达（旧面板卡死）。故命令内部按
   **持久化批准记录（`PLAN_APPROVED`）**分三支（与 merge / 落盘同一批准记录分支、以持久化记录为键，与 F4 R7 一致）：
-  1. **`PLAN_APPROVED` 含 UI provenance**（`ui_prototype_rendered:true` + `pages` + `hashes`）→ 重算 `2-page-design/` 现值 hash 与固化 `hashes` 比对：
+  1. **`PLAN_APPROVED` 含 UI 原型批准记录**（`ui_prototype_rendered:true` + `pages` + `hashes`）→ 重算 `2-page-design/` 现值 hash 与固化 `hashes` 比对：
      **完好且全匹配 → exit 0**（节点 done → 放行前进）；**缺失 / 损坏 / 失配 → 非 0（fail closed 阻断）**。
   2. **legacy/degraded，或旧空 marker 且无任何「曾渲染」证据**（无 `ui_prototype_rendered`、无 `hashes`）→ **记 advisory 后 exit 0**
      （节点 done → merge 可达）。**← 新增的第三成功分支**，专解「旧空 marker 永久未 done、advisory 放行不可达」的卡死。
-  3. **部分 / 损坏 provenance**（`ui_prototype_rendered:true` 但缺 / 空 `hashes`）→ **不得**误判为 legacy → **fail closed（非 0）**。
-  即：匹配成功 **或** 合法 legacy（分支 2）都 `exit 0`；失配 / 损坏 / 部分 provenance（分支 1 尾、分支 3）非 0。
+  3. **部分 / 损坏 原型批准记录**（`ui_prototype_rendered:true` 但缺 / 空 `hashes`）→ **不得**误判为 legacy → **fail closed（非 0）**。
+  即：匹配成功 **或** 合法 legacy（分支 2）都 `exit 0`；失配 / 损坏 / 部分 原型批准记录（分支 1 尾、分支 3）非 0。
   失配非 0 时节点未 done（active/pending）→ **前向阻断**，remediation 见下方状态转换。
 - **状态转换（诚实边界）**：flow 引擎**前向线性、无跨 subflow 自动回退边**。「退回 plan-exit」**非引擎自动 rewind**——
   `verify-ui-provenance` 未 done ⇒ 阻断；remediation = **driver / 人工显式重入 plan**（重跑 producer 产原型 + plan-exit 重批，

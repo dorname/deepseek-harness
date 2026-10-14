@@ -1,7 +1,7 @@
 # DeepSeek Harness 需求文档（dsh · core 模块）
 
 > 最后更新：2026-10-09
-> 文档性质：存量项目（`bootstrap: adopted`）逆向整理的需求基线，描述 0.2.1-alpha.1（commit `5badb15009`）当前实现所承载的用户需求；场景事实来源为 `logos/resources/prd/3-technical-plan/2-scenario-implementation/core-scenario-candidates.md`（逆向候选，verified:false）中的可验证事实。
+> 文档性质：存量项目（`bootstrap: adopted`）逆向整理的需求基线，描述 0.2.1-alpha.1 所承载的用户需求；场景事实来源为 `logos/resources/prd/3-technical-plan/2-scenario-implementation/core-scenario-candidates.md`（逆向候选，verified:false）中的可验证事实。
 
 ## 一、产品背景与目标
 

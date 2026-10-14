@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Service Definition: cross-node relay of one session's events and assistant-stream frames by monotonic sequence. The package is host-side only: it contributes no prompt, tool, or schema, so the model and the agent loop never see it.
+Publish existing session events and assistant-stream frames for other replicas to replay. Each session has increasing sequence numbers; subscribers replay after a cursor before receiving new records. Mount a provider such as `stream-relay-postgres` to supply the shared transport. The relay adds no model input.
 
 ## Table of Contents
 
@@ -22,11 +22,11 @@ Service Definition: cross-node relay of one session's events and assistant-strea
 <a id="use-this-package"></a>
 ## Use this package
 
-Load it in a profile's `cordis.yml` alongside the rest of the execution-pool deployment (`session-persistence-postgres` for durable logs); runner nodes mount the lease and dispatch, Web/API replicas mount the relay subscription.
+Consumers use `ctx.streamRelay`. Mount the [PostgreSQL provider](../stream-relay-postgres/README.md) to register a concrete implementation; this abstract service alone supplies no database connection.
 
 ### Observable behavior
 
-A fresh shared database is stamped with the physical layout version inside one transaction; any other stamped version rejects — no migration, pre-release stance. Lease acquire/renew/release and relay publish/read reject loudly on a medium failure; `waitLost` and relay subscriptions settle or cancel cleanly with their signals.
+`publish` assigns the next session sequence number. `read` returns records strictly after a cursor; `subscribe` replays existing records before live delivery and accepts cancellation. Payloads remain unchanged.
 
 -----
 
@@ -37,7 +37,7 @@ A fresh shared database is stamped with the physical layout version inside one t
 
 #### What the model sees
 
-Nothing. This package contributes no prompt, tool, or schema; it arbitrates or transports session state behind Cordis services for host-side consumers only.
+Nothing directly. `ctx.streamRelay` coordinates host-side session work without adding prompts, tools, or schemas.
 
 #### Token effect
 
@@ -49,9 +49,11 @@ None — the package never touches live request prefixes.
 
 ## Known Limitations and Deferred Work
 
-- **Pre-release physical layout** — any foreign stamped layout version refuses rather than migrates.
-- **Provider-local semantics** — the package owns no retention or cleanup; the shared tables accumulate until removed externally.
-- **The database and schema must pre-exist** — the provider creates tables, never databases; connection or permission failures surface at the first use.
+<a id="known-limitations-and-deferred-work"></a>
+
+- **A provider is required** — this package declares the service and has no storage implementation.
+- **No retention API** — cleanup belongs to the provider or deployment.
+- **Host-side coordination only** — callers own session execution, durable logging, and browser delivery.
 
 <a id="dev-note"></a>
 ### Dev Note

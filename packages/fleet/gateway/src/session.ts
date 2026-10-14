@@ -39,7 +39,12 @@ function signature(secret: Buffer, body: string): Buffer {
   return createHmac('sha256', secret).update(body).digest()
 }
 
-/** Read the exact generated cookie without implementing general Cookie decoding. */
+/**
+ * Read the exact generated cookie without implementing general Cookie decoding.
+ * @param headerValue - the request's Cookie header, when present.
+ * @param name - the cookie name to match exactly.
+ * @returns the trimmed value, or `undefined` when absent.
+ */
 export function cookieValue(headerValue: string | undefined, name: string): string | undefined {
   if (headerValue === undefined) return undefined
   for (const segment of headerValue.split(';')) {
@@ -50,7 +55,13 @@ export function cookieValue(headerValue: string | undefined, name: string): stri
   return undefined
 }
 
-/** Serialize the fixed session cookie attributes; the name and value are cookie-safe. */
+/**
+ * Serialize the fixed session cookie attributes; the name and value are cookie-safe.
+ * @param value - the cookie-safe signed session value.
+ * @param expiresAt - expiry in epoch milliseconds.
+ * @param maxAgeSeconds - browser retention duration in seconds.
+ * @returns the Set-Cookie header value.
+ */
 export function sessionCookie(value: string, expiresAt: number, maxAgeSeconds: number): string {
   return `${GATEWAY_COOKIE_NAME}=${value}; Max-Age=${String(maxAgeSeconds)}; Path=/; Expires=${new Date(expiresAt).toUTCString()}; HttpOnly; SameSite=Lax`
 }

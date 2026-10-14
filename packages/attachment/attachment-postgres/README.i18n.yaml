@@ -1,0 +1,55 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/attachment/attachment-postgres/README.md
+/:
+  en: d20c8060994f238e
+  zh: 69cc7d604f738f28
+/deepseek-ai-dsh-attachment-postgres:
+  en: c235b1b624c3db88
+  zh: 61217662a65b94a4
+/deepseek-ai-dsh-attachment-postgres/summary:
+  en: aadca351f42ca821
+  zh: 4f35f68a69e130eb
+/deepseek-ai-dsh-attachment-postgres/table-of-contents:
+  en: b563e4ec4727d0de
+  zh: e748d178a70e42b9
+/deepseek-ai-dsh-attachment-postgres/use-this-package:
+  en: 3a9db646ff73f0e2
+  zh: 498b8df5f8431ef8
+/deepseek-ai-dsh-attachment-postgres/use-this-package/observable-behavior:
+  en: 8762630ac0238555
+  zh: 72358f511b3ebb1e
+/deepseek-ai-dsh-attachment-postgres/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: c5500056b41ce570
+/deepseek-ai-dsh-attachment-postgres/understand-the-implementation/design-concept:
+  en: a3b1677dd7fb80e9
+  zh: e6030e832717ca80
+/deepseek-ai-dsh-attachment-postgres/understand-the-implementation/source-map:
+  en: b5ede690e8132c14
+  zh: ba638bee5a23e397
+/deepseek-ai-dsh-attachment-postgres/further-exploration:
+  en: e7a8da893625f2a6
+  zh: 996a718dd80da5fa
+/deepseek-ai-dsh-attachment-postgres/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-attachment-postgres/model-experience/stored-attachment-objects:
+  en: eb65ee971ff21d93
+  zh: 2f7ef576cd89dafe
+/deepseek-ai-dsh-attachment-postgres/model-experience/stored-attachment-objects/what-the-model-sees:
+  en: 635a67e77f8f4f09
+  zh: 573b09bfa17e4b15
+/deepseek-ai-dsh-attachment-postgres/model-experience/stored-attachment-objects/token-effect:
+  en: 592ed887c69e5c46
+  zh: dcdc70f2bf4e02cd
+/deepseek-ai-dsh-attachment-postgres/model-experience/stored-attachment-objects/kv-cache-effect:
+  en: c13c59d13a5f1651
+  zh: be44e878c2c80f1a
+/deepseek-ai-dsh-attachment-postgres/known-limitations-and-deferred-work:
+  en: be9ba0272d92ebd2
+  zh: fd0f342bf0465c48
+/deepseek-ai-dsh-attachment-postgres/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

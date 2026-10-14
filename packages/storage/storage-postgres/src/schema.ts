@@ -31,12 +31,19 @@ const LAYOUT_LOCK_KEY = 'dsh-storage-postgres:layout'
  * Physical table name for one unit table. Both segments must already be
  * validated against the storage hub's unit-name pattern, so the result is
  * safe to interpolate into DDL and statement text.
+ * @param unit - the validated unit name.
+ * @param table - the validated table name.
+ * @returns the physical record table name.
  */
 export function recordTableName(unit: string, table: string): string {
   return `u_${unit}_${table}`
 }
 
-/** Physical table holding one unit's version stamp (`u_<unit>___unit_meta`). */
+/**
+ * Physical table holding one unit's version stamp (`u_<unit>___unit_meta`).
+ * @param unit - the validated unit name.
+ * @returns the physical version table name.
+ */
 export function unitMetaTableName(unit: string): string {
   return `u_${unit}___unit_meta`
 }

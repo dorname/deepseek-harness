@@ -7,21 +7,21 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
 `dsh-attachment-postgres` 是一个附件后端:每个获准图像作为一条不可变内容寻址行(`(namespace, sha256)` 主键)存入共享 PostgreSQL 库,注册为 `ctx.attachments`。多个 dsh 节点可指向同一数据库,经 `DSH_FLEET_USER_ID` 注入的 fleet 主体派生 namespace 列,不同主体的节点互相够不到对方对象。这是缝允许的最小共享介质实现:图像校验与持久图像引用;逐字文件与请求投影保持缝的默认拒绝。
 
 ## 目录
 
-- [使用本包](#使用本包)
-- [理解实现](#理解实现)
-- [延伸阅读](#延伸阅读)
-- [模型体验](#模型体验)
-- [已知限制与待办](#已知限制与待办)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [延伸阅读](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与待办](#known-limitations-and-deferred-work)
 
 -----
 
-<a id="使用本包"></a>
+<a id="use-this-package"></a>
 ## 使用本包
 
 在 profile 的 `cordis.yml` 中加载本后端(仅宿主侧;模型不可见):
@@ -50,7 +50,7 @@ plugins:
 
 -----
 
-<a id="理解实现"></a>
+<a id="understand-the-implementation"></a>
 ## 理解实现
 
 <details>
@@ -75,7 +75,7 @@ plugins:
 
 -----
 
-<a id="延伸阅读"></a>
+<a id="further-exploration"></a>
 ## 延伸阅读
 
 - [附件子系统](../../../docs/subsystems/attachment.zh.md)——存储契约、获准语义与请求投影。
@@ -84,7 +84,7 @@ plugins:
 
 -----
 
-<a id="模型体验"></a>
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 存储的附件对象
@@ -103,6 +103,8 @@ plugins:
 
 ## 已知限制与待办
 
+<a id="known-limitations-and-deferred-work"></a>
+
 这些限制界定本后端何时不适用或需要特殊运维关注。它们是当前包约束,不是任务清单。
 
 - **逐字文件与请求投影保持缝的默认拒绝**——`saveFile`/`saveFileStream`/`readFileStream`/`readImageRequest` 以 `ATTACHMENT_FILES_UNSUPPORTED`/`ATTACHMENT_PROJECTION_UNSUPPORTED` 拒绝;共享介质变更只覆盖图像存储。
@@ -111,7 +113,7 @@ plugins:
 - **数据库与 schema 必须预先存在**——后端建表不建库;连接或权限故障在首次使用时浮出。
 
 <a id="dev-note"></a>
-### 开发注记
+### 开发备注
 
 <details>
 <summary>维护者的工作上下文——点击展开</summary>

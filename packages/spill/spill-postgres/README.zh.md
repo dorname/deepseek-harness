@@ -7,21 +7,21 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
 `dsh-spill-postgres` 是一个溢出后端:每条溢出文本作为一行存入共享 `spill_texts` 表,以后端自造的不透明引用为键,注册为 `ctx.spillStore`。多个 dsh 节点可指向同一数据库,经 `DSH_FLEET_USER_ID` 注入的 fleet 主体派生 namespace 列,不同主体的节点互相看不到对方的溢出。缝保持刻意最小:只有 `saveText`——保留、替换与检索归各自的包负责。
 
 ## 目录
 
-- [使用本包](#使用本包)
-- [理解实现](#理解实现)
-- [延伸阅读](#延伸阅读)
-- [模型体验](#模型体验)
-- [已知限制与待办](#已知限制与待办)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [延伸阅读](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与待办](#known-limitations-and-deferred-work)
 
 -----
 
-<a id="使用本包"></a>
+<a id="use-this-package"></a>
 ## 使用本包
 
 在 profile 的 `cordis.yml` 中加载本后端(仅宿主侧;模型不可见):
@@ -45,7 +45,7 @@ plugins:
 
 -----
 
-<a id="理解实现"></a>
+<a id="understand-the-implementation"></a>
 ## 理解实现
 
 <details>
@@ -68,7 +68,7 @@ plugins:
 
 -----
 
-<a id="延伸阅读"></a>
+<a id="further-exploration"></a>
 ## 延伸阅读
 
 - [Spill 包地图](../README.zh.md)——该家族的包及其仓库位置。
@@ -76,14 +76,14 @@ plugins:
 
 -----
 
-<a id="模型体验"></a>
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 溢出的工具结果文本
 
 #### 模型看到什么
 
-本后端引用在溢出结果占位符内携带的 locator 与取回指引;请求中的其他内容不变。
+溢出结果占位符包含 `pgspill_` 引用及检索提示；请求的其余内容不变。
 
 #### Token 影响
 
@@ -95,6 +95,8 @@ plugins:
 
 ## 已知限制与待办
 
+<a id="known-limitations-and-deferred-work"></a>
+
 这些限制界定本后端何时不适用或需要特殊运维关注。它们是当前包约束,不是任务清单。
 
 - **无读取 API**——缝只暴露 `saveText`;检索是运维方按引用对共享介质的操作。
@@ -102,7 +104,7 @@ plugins:
 - **数据库与 schema 必须预先存在**——后端建表不建库;连接或权限故障在首次使用时浮出。
 
 <a id="dev-note"></a>
-### 开发注记
+### 开发备注
 
 <details>
 <summary>维护者的工作上下文——点击展开</summary>

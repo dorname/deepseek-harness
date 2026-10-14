@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/fleet/fleet-manager/README.md
+/:
+  en: 884ebdcea02081da
+  zh: 37e3be54d22201cd
+/deepseek-ai-dsh-fleet-manager:
+  en: 8f5814536664a418
+  zh: 9eae8005508c40fd
+/deepseek-ai-dsh-fleet-manager/summary:
+  en: c1198598338374b4
+  zh: a4e68d9d45c11063
+/deepseek-ai-dsh-fleet-manager/table-of-contents:
+  en: 3460b3e585e0c020
+  zh: bb83d3d282b286d8
+/deepseek-ai-dsh-fleet-manager/use-this-package:
+  en: 7d68ffb7b3abf870
+  zh: f771a6d632ac7c07
+/deepseek-ai-dsh-fleet-manager/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: c5500056b41ce570
+/deepseek-ai-dsh-fleet-manager/understand-the-implementation/design-notes:
+  en: b44d161d23295013
+  zh: b0ab95333ffd209c
+/deepseek-ai-dsh-fleet-manager/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-fleet-manager/model-experience/process-provisioning:
+  en: 884419343ff9e04b
+  zh: 000c6f060f1c55a3
+/deepseek-ai-dsh-fleet-manager/model-experience/process-provisioning/what-the-model-sees:
+  en: 0f8a9cda66da0055
+  zh: bc8686baef8b56fb
+/deepseek-ai-dsh-fleet-manager/model-experience/process-provisioning/token-effect:
+  en: c56fdca79898302e
+  zh: fdda1dc029f72455
+/deepseek-ai-dsh-fleet-manager/model-experience/process-provisioning/kv-cache-effect:
+  en: 8859eae79cb1488d
+  zh: 9626ddbf164f8a21
+/deepseek-ai-dsh-fleet-manager/known-limitations-and-deferred-work:
+  en: 883d3f3125633c08
+  zh: f2be35d06be94701
+/deepseek-ai-dsh-fleet-manager/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: e88aeb617ffb74ea

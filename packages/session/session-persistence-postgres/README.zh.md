@@ -7,21 +7,21 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
 `dsh-session-persistence-postgres` 是一个持久会话后端:每个会话的头与已提交代际指针存为一行 `sessions` 记录,已提交世代为不可变字节行,最新写入落在 live tail,注册为 `ctx.sessionPersistence`。多个 dsh 节点可指向同一数据库:会话级 advisory lock 仲裁唯一写者,世代发布与指针推进同事务,中断尾永不回读、由下一次写式打开修复。本后端只在宿主侧:不贡献 prompt、工具或 schema,模型与 agent 循环完全不可见。
 
 ## 目录
 
-- [使用本包](#使用本包)
-- [理解实现](#理解实现)
-- [延伸阅读](#延伸阅读)
-- [模型体验](#模型体验)
-- [已知限制与待办](#已知限制与待办)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [延伸阅读](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与待办](#known-limitations-and-deferred-work)
 
 -----
 
-<a id="使用本包"></a>
+<a id="use-this-package"></a>
 ## 使用本包
 
 在 profile 的 `cordis.yml` 中加载本后端(仅宿主侧;模型不可见):
@@ -45,7 +45,7 @@ plugins:
 
 -----
 
-<a id="理解实现"></a>
+<a id="understand-the-implementation"></a>
 ## 理解实现
 
 <details>
@@ -79,7 +79,7 @@ plugins:
 
 -----
 
-<a id="延伸阅读"></a>
+<a id="further-exploration"></a>
 ## 延伸阅读
 
 当本后端的视角不够时阅读:缝契约是权威,兄弟后端展示单机介质。
@@ -90,7 +90,7 @@ plugins:
 
 -----
 
-<a id="模型体验"></a>
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 存储的会话事件
@@ -111,7 +111,7 @@ plugins:
 
 ## 已知限制与待办
 
-<a id="已知限制与待办"></a>
+<a id="known-limitations-and-deferred-work"></a>
 
 这些限制界定本后端何时不适用或需要特殊运维关注。它们是当前包约束,不是任务清单。
 
@@ -123,7 +123,7 @@ plugins:
 -----
 
 <a id="dev-note"></a>
-### 开发注记
+### 开发备注
 
 <details>
 <summary>维护者的工作上下文——点击展开</summary>

@@ -1,6 +1,6 @@
 # core 依赖地图（dependency-map）
 
-> **逆向基线声明**：本文档是 brownfield-adopter（S33）逆向扫描产出的**现状快照**，不是权威意图文档。所有事实均可从代码与随仓文档验证；候选一律 `verified: false`（冻结字段）。扫描基线：`dsh` 0.2.1-alpha.1（`origin/master`，commit `5badb15009`），扫描日期 2026-10-06。
+> **逆向基线声明**：本文档是 brownfield-adopter（S33）逆向扫描产出的**现状快照**，不是权威意图文档。所有事实均可从代码与随仓文档验证；候选一律 `verified: false`（冻结字段）。扫描基线：`dsh` 0.2.1-alpha.1（`origin/master`），扫描日期 2026-10-06。
 
 ## 1. 分层依赖模型
 

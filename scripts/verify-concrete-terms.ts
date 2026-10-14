@@ -10,6 +10,18 @@ const root = resolve(import.meta.dirname, '..')
 const blockedTerm = 'prove' + 'nance'
 const excludedPrefixes = ['vendor/', '.agents/notes/archived/'] as const
 
+// OpenLogos owns these protocol identifiers; local documentation cannot rename them.
+const externalIdentifierFiles = new Set([
+  'logos/spec/cli-json-output.md',
+  'logos/spec/flow-spec.md',
+  'logos/spec/logos-project.md',
+  'logos/spec/proposal-ui-ux-first.md',
+])
+const externalIdentifiers = new RegExp(
+  `(?<![a-zA-Z0-9_-])(?:verify-ui-${blockedTerm}|BASELINE_${blockedTerm.toUpperCase()}_INVALID)(?![a-zA-Z0-9_-])`,
+  'g',
+)
+
 /** One blocked term occurrence in a tracked path or text line. */
 export interface ConcreteTermViolation {
   /** Repository-relative tracked path. */
@@ -44,7 +56,8 @@ export function findConcreteTermViolations(file: string, source: string): Concre
   const schemaRegion = historicalSchemaRegion(file, source)
   for (const [index, line] of lines.entries()) {
     if (schemaRegion !== undefined && index >= schemaRegion[0] && index < schemaRegion[1]) continue
-    if (containsBlockedTerm(line)) violations.push({ file, line: index + 1 })
+    const prose = externalIdentifierFiles.has(file) ? line.replace(externalIdentifiers, '') : line
+    if (containsBlockedTerm(prose)) violations.push({ file, line: index + 1 })
   }
   return violations
 }

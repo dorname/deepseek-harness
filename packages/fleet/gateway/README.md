@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The gateway is the single authenticated entry point of a User Fleet deployment. Browsers authenticate through an OIDC authorization-code flow hosted by the identity provider; the gateway answers the callback by exchanging the code for the authenticated subject and binding the browser to it with a signed, HttpOnly session cookie. Every subsequent request — ordinary HTTP, server-sent events, and protocol upgrades — routes strictly by that cookie's subject into the subject's own process loopback port. There is no code path that routes a session to another subject's process. The user processes' launch-token URLs are consumed once on the loopback (the gateway exchanges each for a browser-session cookie it keeps in a per-subject jar); they are never forwarded outward, and neither are the processes' own cookies. The fleet manager owns the processes; the gateway only asks it to ensure and observe them.
+Authenticate browser users through OIDC and route each request to that user’s dedicated web process. Signed HttpOnly cookies bind requests to an authenticated subject; launch tokens and upstream cookies stay on the loopback. The fleet manager owns process provisioning and capacity. Deploy the gateway behind a TLS terminator and configure the public URL for the identity provider callback.
 
 ## Table of Contents
 
@@ -36,6 +36,9 @@ Run one gateway in front of the fleet manager. Point `homesDir` at the same home
 
 ```ts
 import { FleetGateway } from '@deepseek-ai/dsh-gateway'
+import { FleetManager } from '@deepseek-ai/dsh-fleet-manager'
+
+const fleetManager = new FleetManager({ homesDir: '/data/homes' })
 
 const gateway = new FleetGateway(
   { homesDir: '/data/homes', oidc: { issuer: 'https://idp.example', clientId: '...', clientSecret: '...' } },
@@ -43,6 +46,7 @@ const gateway = new FleetGateway(
 )
 const { port } = await gateway.start()
 await gateway.dispose()
+await fleetManager.dispose()
 ```
 
 Misconfiguration fails loud at resolve: a missing homes root, issuer, client binding, or a malformed secret refuses to start. With an OS-assigned port and no explicit `publicUrl`, the redirect target is re-pinned to the bound port so the provider's callback reaches this gateway. A login attempt older than ten minutes is discarded through its CSRF state; a rejected or broken exchange answers 401 with an explicit reason and opens no session. When the fleet manager reports the deployment at capacity, browsers get a 503 instead of a queue.
@@ -77,11 +81,19 @@ Misconfiguration fails loud at resolve: a missing homes root, issuer, client bin
 <a id="model-experience"></a>
 ## Model Experience
 
-None. The gateway proxies the user processes' existing web surfaces; once routed, a session behaves exactly as it would against its own single-user process.
+### Authenticated routing
+
+#### What the model sees
+
+Nothing directly. `FleetGateway` manages host-side processes or routing without changing model requests.
+
+#### Token effect
+
+No additional request tokens.
 
 #### KV Cache effect
 
-None.
+None; request prefixes are unchanged.
 
 ## Known Limitations and Deferred Work
 
@@ -92,3 +104,13 @@ None.
 - **TLS terminates upstream.** The gateway speaks plain HTTP and is meant to sit behind the deployment's TLS terminator; `publicUrl` must be the externally visible root.
 - **Local trust model.** The loopback between gateway and user processes is trusted by construction; an administrative user of the host can reach every process directly.
 - **Windows untested.** The suite spawns real child processes and is excluded from the Windows lanes together with the fleet manager.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

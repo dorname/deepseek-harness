@@ -7,6 +7,15 @@ A service can be a core spine service, a swappable capability seam, a bundle/com
 
 ```mermaid
 flowchart LR
+  pkg_session_lease["session-lease"]
+  svc_sessionLease["ctx.sessionLease<br/>Cross-node session writer leases"]
+  pkg_session_lease_postgres["session-lease-postgres"]
+  pkg_agent_dispatch["agent-dispatch"]
+  pkg_schedule_dispatch["schedule-dispatch"]
+  pkg_stream_relay["stream-relay"]
+  svc_streamRelay["ctx.streamRelay<br/>Cross-node session event and stream relay"]
+  pkg_stream_relay_postgres["stream-relay-postgres"]
+  pkg_session_controller["session-controller"]
   pkg_hmr["hmr"]
   svc_hmr["ctx.hmr<br/>Serialized module and configuration reloads"]
   pkg_app_boot["app-boot"]
@@ -368,6 +377,8 @@ flowchart LR
   pkg_sandbox_windows_acl --> svc_skills
   pkg_schedule --> svc_schedule
   pkg_session --> svc_sessions
+  pkg_session_lease --> svc_sessionLease
+  pkg_session_lease_postgres --> svc_sessionLease
   pkg_session_log_deepseek --> svc_deepseekLlmApiExtensions
   pkg_session_persistence --> svc_sessionPersistence
   pkg_session_persistence_jsonl --> svc_sessionPersistence
@@ -395,6 +406,8 @@ flowchart LR
   pkg_storage_domain --> svc_storageDomain
   pkg_storage_json --> svc_storage
   pkg_storage_sqlite --> svc_storage
+  pkg_stream_relay --> svc_streamRelay
+  pkg_stream_relay_postgres --> svc_streamRelay
   pkg_subagent --> svc_subagents
   pkg_subagent_acp --> svc_subagents
   pkg_subagent_claude_code --> svc_subagents
@@ -488,6 +501,8 @@ flowchart LR
   svc_sandboxPolicy --> pkg_bash_sandbox
   svc_sandboxPolicy --> pkg_fs_sandbox
   svc_sandboxPolicy --> pkg_terminal_bash
+  svc_sessionLease --> pkg_agent_dispatch
+  svc_sessionLease --> pkg_schedule_dispatch
   svc_sessionPersistence --> pkg_agent_loop
   svc_sessionPersistence --> pkg_hooks_claude_code
   svc_sessionPersistence --> pkg_hooks_codex
@@ -525,6 +540,8 @@ flowchart LR
   svc_ssh --> pkg_subprocess_ssh
   svc_storage --> pkg_storage_domain
   svc_storageDomain --> pkg_workspace
+  svc_streamRelay --> pkg_agent_dispatch
+  svc_streamRelay --> pkg_session_controller
   svc_subagentModelSelection --> pkg_tool_subagent
   svc_subagents --> pkg_tool_ralph
   svc_subagents --> pkg_tool_subagent
@@ -571,6 +588,8 @@ flowchart LR
 
 | ctx key | Role | Owner | Implementations | Direct consumers | Companion plugins | Note |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.sessionLease` | `seam` | [`session-lease`](../packages/core/session-lease) | [`session-lease-postgres`](../packages/core/session-lease-postgres) | [`agent-dispatch`](../packages/core/agent-dispatch), [`schedule-dispatch`](../packages/schedule/schedule-dispatch) | - | Arbitrates one session writer through atomic acquisition, renewal, release, and lease-loss observation. |
+| `ctx.streamRelay` | `seam` | [`stream-relay`](../packages/core/stream-relay) | [`stream-relay-postgres`](../packages/core/stream-relay-postgres) | [`agent-dispatch`](../packages/core/agent-dispatch), `session-controller` | - | Transports existing session events and stream frames in per-session sequence order for replay and subscription. |
 | `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | Owns module and exact configuration watchers; application mutations share its queue and automatic reloads await the application file lock. |
 | `ctx.pluginRegistryProbe` | `core` | [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager) | - | [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager) | - | Races public registry responses on the Host; the Client owns the initial registry recommendation. |
 | `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager), `ui-settings-plugin-inventory` | - | Shares profile package operations with the CLI and reports persisted and running state to Web and agent callers. |

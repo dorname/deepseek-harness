@@ -7,6 +7,16 @@ import { findConcreteTermViolations, readTrackedSource } from './verify-concrete
 const blockedTerm = 'prove' + 'nance'
 
 describe('concrete terminology policy', () => {
+  it('preserves exact external protocol identifiers only in OpenLogos specifications', () => {
+    const identifier = `verify-ui-${blockedTerm}`
+    const errorCode = `BASELINE_${blockedTerm.toUpperCase()}_INVALID`
+    const file = 'logos/spec/flow-spec.md'
+    expect(findConcreteTermViolations(file, `${identifier}; ${errorCode}`)).toEqual([])
+    expect(findConcreteTermViolations(file, `${identifier}; ${blockedTerm}`)).toEqual([{ file, line: 1 }])
+    expect(findConcreteTermViolations(file, `${identifier}-extra`)).toEqual([{ file, line: 1 }])
+    const unrelated = 'docs/development.md'
+    expect(findConcreteTermViolations(unrelated, identifier)).toEqual([{ file: unrelated, line: 1 }])
+  })
   it('rejects case variants in paths, prose, and identifiers', () => {
     expect(findConcreteTermViolations(`docs/${blockedTerm}-notes.md`, [
       'origin metadata',

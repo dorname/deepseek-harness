@@ -419,6 +419,57 @@ type Branded<B extends string> = string & { readonly [BRAND]: B }
 
 两个核心 ID 是 `ToolCallId`（关联工具调用及其结果；dsh-llm）和 `SessionId`（活跃 agent 与持久会话共享的标识；dsh-session）。能力包也会品牌化各自的 id，例如 [jobs.md](jobs.zh.md) 中的 `JobId`。
 
+## 跨节点协调类型
+
+Runner 租约决定会话写入方；转发服务按会话序号传输已有会话事件和流帧。这两个服务均不添加模型输入。
+
+### LeaseFacts
+
+```ts type-equiv
+/** Who holds a lease and until when (epoch milliseconds). */
+interface LeaseFacts {
+  /** The holding runner's node identifier. */
+  readonly owner: string
+  /** Expiry in epoch milliseconds; a lease past this moment is takeable. */
+  readonly expiresAt: number
+}
+```
+
+### AcquireOutcome
+
+```ts type-equiv
+/** One `acquire` attempt: either the caller now holds the lease, or another live holder refused it. */
+type AcquireOutcome =
+  | { readonly status: 'acquired' }
+  | { readonly status: 'held'; readonly holder: LeaseFacts }
+```
+
+### RelayRecordKind
+
+```ts type-equiv
+/** The record kinds the relay transports. */
+type RelayRecordKind = 'session-event' | 'stream-frame'
+```
+
+### RelayRecord
+
+```ts type-equiv
+/** One relayed record: its per-session sequence number, kind, and serialized payload. */
+interface RelayRecord {
+  /** Per-session sequence number; strictly increasing, gapless from 1. */
+  readonly seq: number
+  readonly kind: RelayRecordKind
+  readonly payload: JsonValue
+}
+```
+
+### RelayRecordHandler
+
+```ts type-equiv
+/** Handler invoked once per record, in sequence order, exactly once per subscriber. */
+type RelayRecordHandler = (record: RelayRecord) => void
+```
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -766,6 +817,110 @@ roots(): Agent[]
 ```
 
 Source: [`packages/core/agent/src/index.ts`](../../packages/core/agent/src/index.ts)
+
+<a id="ctxsessionlease--sessionlease-abstract-seam"></a>
+
+### `ctx.sessionLease` — `SessionLease` (abstract seam)
+
+Abstract cross-node session lease. Implementations arbitrate atomically on a shared medium: acquiring a free or expired lease and refusing a live one are one atomic statement, so concurrent acquirers get exactly one winner, and an expired holder's lease is taken over the same way.
+
+```ts cordis-catalog
+/**
+ * Atomically acquire the session's lease: a free or expired lease becomes
+ * the caller's; a live foreign lease refuses with its facts.
+ * @param id - the session to lease.
+ * @param owner - the caller's node identifier.
+ * @param ttlMs - lease lifetime in milliseconds from now.
+ * @returns `acquired`, or `held` naming the current holder and expiry.
+ */
+abstract acquire(id: SessionId, owner: string, ttlMs: number): Promise<AcquireOutcome>
+
+/**
+ * Extend the caller's lease; only the current owner may renew.
+ * @param id - the leased session.
+ * @param owner - the caller's node identifier.
+ * @param ttlMs - new lifetime in milliseconds from now.
+ * @returns whether the caller still held the lease.
+ */
+abstract renew(id: SessionId, owner: string, ttlMs: number): Promise<boolean>
+
+/**
+ * Release the lease; only the current owner may release.
+ * @param id - the leased session.
+ * @param owner - the caller's node identifier.
+ * @returns whether the caller held the lease.
+ */
+abstract release(id: SessionId, owner: string): Promise<boolean>
+
+/**
+ * Observe the session's current holder without taking it.
+ * @param id - the session to observe.
+ * @returns the holder facts, or `undefined` when the session is unleased.
+ */
+abstract ownerOf(id: SessionId): Promise<LeaseFacts | undefined>
+
+/**
+ * Resolve when the caller's ownership of the session ends — the lease was
+ * released, expired and taken over, or was never the caller's. Runners use
+ * this to cancel their agent; `agent-loop` stays unaware.
+ * @param id - the leased session.
+ * @param owner - the caller's node identifier.
+ * @param pollMs - polling interval while watching; the loss latency budget.
+ * @param signal - optional cancellation for the watch itself.
+ * @returns why ownership ended: the taking-over owner, or `'released'`.
+ */
+abstract waitLost(id: SessionId, owner: string, pollMs?: number, signal?: AbortSignal): Promise<string>
+```
+
+Source: [`packages/core/session-lease/src/index.ts`](../../packages/core/session-lease/src/index.ts)
+
+<a id="ctxstreamrelay--streamrelay-abstract-seam"></a>
+
+### `ctx.streamRelay` — `StreamRelay` (abstract seam)
+
+Abstract stream relay. Implementations publish each record atomically with its next per-session sequence number and wake subscribers; subscribers replay from a cursor so a late join or a missed wake never leaves a gap or a duplicate.
+
+```ts cordis-catalog
+/**
+ * Publish one record with the session's next sequence number.
+ * @param id - the session the record belongs to.
+ * @param kind - the record kind.
+ * @param payload - the serialized record body.
+ * @returns the record's sequence number.
+ */
+abstract publish(id: SessionId, kind: RelayRecordKind, payload: JsonValue): Promise<number>
+
+/**
+ * Read the session's records strictly after a cursor, in sequence order.
+ * @param id - the session to read.
+ * @param afterSeq - the cursor; 0 replays from the first record.
+ * @returns the records after the cursor, possibly empty.
+ */
+abstract read(id: SessionId, afterSeq: number): Promise<readonly RelayRecord[]>
+
+/**
+ * Observe the session's latest sequence number.
+ * @param id - the session to observe.
+ * @returns the latest sequence number, or 0 when nothing is published.
+ */
+abstract maxSeq(id: SessionId): Promise<number>
+
+/**
+ * Subscribe to the session's records from a cursor: existing records after
+ * the cursor replay first, then live records arrive as published. Wakes may
+ * be lost; the implementation catches up on its next wake or poll tick, so
+ * a late join and a missed wake both replay without gaps or duplicates.
+ * @param id - the session to subscribe to.
+ * @param afterSeq - the cursor; 0 subscribes from the first record.
+ * @param onRecord - invoked once per record in sequence order.
+ * @param pollMs - fallback polling interval; 0 disables polling.
+ * @param signal - cancels the subscription and stops delivery.
+ * @returns resolution with the unsubscribe function once listening is active.
+ */
+abstract subscribe( id: SessionId, afterSeq: number, onRecord: RelayRecordHandler, pollMs?: number, signal?: AbortSignal, ): Promise<() => void>
+```
+
+Source: [`packages/core/stream-relay/src/index.ts`](../../packages/core/stream-relay/src/index.ts)
 
 <a id="agent-events"></a>
 

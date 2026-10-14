@@ -37,7 +37,7 @@ A fresh shared database is stamped with the physical layout version inside one t
 
 #### What the model sees
 
-Nothing. This package contributes no prompt, tool, or schema; it arbitrates or transports session state behind Cordis services for host-side consumers only.
+Nothing directly. `ctx.sessionLease` coordinates host-side session work without adding prompts, tools, or schemas.
 
 #### Token effect
 
@@ -48,6 +48,8 @@ Zero live-request tokens.
 None — the package never touches live request prefixes.
 
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **Pre-release physical layout** — any foreign stamped layout version refuses rather than migrates.
 - **Provider-local semantics** — the package owns no retention or cleanup; the shared tables accumulate until removed externally.

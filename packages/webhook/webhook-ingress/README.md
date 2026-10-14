@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-webhook-ingress` is the stateless webhook entry for cluster deployments: entry replicas verify the HMAC-SHA256 signature and queue the event into one shared `webhook_events` table (the dedupe key is the primary key, so replicated entries and sender retries collapse to one row) plus a `NOTIFY` wake, then respond immediately. The consumer loop takes pending events with `FOR UPDATE SKIP LOCKED`, creates the Workspace Session through the injected consume callback, and marks the event done in the same transaction — a crash rolls the take back and the next round recreates, so no event is lost and no session is duplicated. The created session's id goes to the execution-pool queue; entry, consumption, and execution scale independently. The package is host-side only.
+Queue external events in shared PostgreSQL storage and let consumer nodes create Workspace Sessions through a callback. Repeated submissions with one dedupe key share one queue row. Consumers lock pending rows during delivery; a failure before commit leaves the event available for retry. Session creation must be idempotent by dedupe key because callback invocation is at least once. HTTP entry, consumption, and session execution can be deployed separately.
 
 ## Table of Contents
 
@@ -50,7 +50,7 @@ A fresh database is stamped with the physical layout version inside one transact
 
 #### What the model sees
 
-Nothing. This package contributes no prompt, tool, or schema; it queues external events behind Cordis services for host-side consumers only.
+The package adds no prompt or tool schema. The `consume` callback owns session creation and model-visible input; the ingress only queues and delivers events.
 
 #### Token effect
 
@@ -61,6 +61,8 @@ Zero live-request tokens.
 None — the package never touches live request prefixes.
 
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **Pre-release physical layout** — any foreign stamped layout version refuses rather than migrates.
 - **At-least-once consume** — a crash between session creation and commit can re-consume one event; session creation must be idempotent by dedupe key.

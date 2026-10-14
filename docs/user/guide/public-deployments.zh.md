@@ -34,4 +34,4 @@ dsh --profile web --public-url https://app.example/ui/ --trusted-host app.exampl
 
 ## 同域前后端分离（cluster-web）
 
-[`deploy/cluster-web`](../../../deploy/cluster-web/README.zh.md) 在 Compose 下一等路径为 **frontend**（edge + shell）与可 scale 的 **api** 容器（loopback API-only + 内网 forwarder）：`/` 与 `/plugins` 打到 shell；`/api` 经 Docker DNS 打到 api 服务。API 进程使用 `--api-only`（或 `serveFrontend: false`），且不绑 `0.0.0.0`。浏览器 RPC 仍用文档相对路径——不要把 SPA 指到另一 origin。外仓前端只有在保持同域、并提供等价 boot 注入与启动 token 换 cookie 时，才可替换 shell。
+[`deploy/cluster-web`](../../../deploy/cluster-web/README.zh.md) Compose 部署包含 **frontend**（edge + shell）与可 scale 的 **api** 容器（loopback API-only + 内网 forwarder）：`/` 与 `/plugins` 打到 shell；`/api` 经 Docker DNS 打到 api 服务。API 进程使用 `--api-only`（或 `serveFrontend: false`），且不绑 `0.0.0.0`。浏览器 RPC 仍用文档相对路径——不要把 SPA 指到另一 origin。外仓前端只有在保持同域、并提供等价 boot 注入与启动 token 换 cookie 时，才可替换 shell。

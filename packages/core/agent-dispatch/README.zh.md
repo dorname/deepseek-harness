@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
 `dsh-agent-dispatch` 是执行池的派发队列加 runner 编排循环。入口面把会话 id 投递到共享表（`INSERT … ON CONFLICT DO NOTHING`，同一会话至多一行）；runner 节点取走一条、取得其会话租约、从共享持久层恢复会话（durable inbox 投影驱动接续）、`waitLost` 一 settle 即取消 agent、空闲即释放。`agent-loop` 零感知租约。本包只在宿主侧：不贡献 prompt、工具或 schema，模型与 agent 循环完全不可见。
 
@@ -19,7 +19,7 @@ kind: "package-reference"
 
 -----
 
-<a id="使用本包"></a>
+<a id="use-this-package"></a>
 ## 使用本包
 
 runner 节点与会话租约提供方、持久化后端一并挂载本循环：
@@ -46,14 +46,14 @@ plugins:
 
 -----
 
-<a id="模型体验"></a>
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 执行池派发
 
 #### 模型看到什么
 
-无。本包不贡献 prompt、工具或 schema；仅为宿主侧消费方在 Cordis 服务之后编排会话执行。
+无直接影响。`PostgresAgentDispatch` 协调宿主侧会话工作，不添加提示、工具或 schema。
 
 #### Token 影响
 
@@ -65,12 +65,14 @@ plugins:
 
 ## 已知限制与待办
 
+<a id="known-limitations-and-deferred-work"></a>
+
 - **预发布物理布局**——任何外部戳记的布局版本拒绝而非迁移。
 - **队列为部署级、不按用户命名空间**——会话到达派发时已携其 fleet 主体；表即普通 `session_id` 队列。
 - **数据库与 schema 必须预先存在**——提供方建表不建库；连接或权限故障在首次使用时浮出。
 
 <a id="dev-note"></a>
-### 开发注记
+### 开发备注
 
 <details>
 <summary>维护者的工作上下文——点击展开</summary>

@@ -1,6 +1,6 @@
 # core 场景候选清单（scenario-candidates）
 
-> **逆向基线声明**：本文档是 brownfield-adopter（S33）逆向扫描产出的**现状快照**，不是权威意图文档。以下场景全部从代码与随仓文档逆向提取，`verified: false` 恒冻结；它们是**场景候选**——未登记进 `scenarios[]`、不分配 `Sxx` 编号、不改动 `scenario_counter`，后续经 `feature-backfill` 等前向流程去重登记（已登记去重硬门：同 module 同 name 逐字相等即剔除）。扫描基线：`dsh` 0.2.1-alpha.1（`origin/master`，commit `5badb15009`），扫描日期 2026-10-06。
+> **逆向基线声明**：本文档是 brownfield-adopter（S33）逆向扫描产出的**现状快照**，不是权威意图文档。以下场景全部从代码与随仓文档逆向提取，`verified: false` 恒冻结；它们是**场景候选**——未登记进 `scenarios[]`、不分配 `Sxx` 编号、不改动 `scenario_counter`，后续经 `feature-backfill` 等前向流程去重登记（已登记去重硬门：同 module 同 name 逐字相等即剔除）。扫描基线：`dsh` 0.2.1-alpha.1（`origin/master`），扫描日期 2026-10-06。
 
 ## 候选总表
 

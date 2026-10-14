@@ -103,6 +103,8 @@ None — the backend never touches live request prefixes.
 
 ## Known Limitations and Deferred Work
 
+<a id="known-limitations-and-deferred-work"></a>
+
 These limits define when this backend is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
 
 - **Verbatim files and request projection keep the seam's default refusals** — `saveFile`/`saveFileStream`/`readFileStream`/`readImageRequest` reject `ATTACHMENT_FILES_UNSUPPORTED`/`ATTACHMENT_PROJECTION_UNSUPPORTED`; the shared-medium change covers image storage only.

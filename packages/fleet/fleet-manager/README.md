@@ -5,11 +5,11 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-fleet-manager
 
-English
+English | [中文](README.zh.md)
 
 ## Summary
 
-The fleet manager is the process authority of a User Fleet deployment. For every authenticated user it keeps exactly one `dsh --profile web` process running with that user's dedicated `$DSH_HOME` (`<homesDir>/<subject>`), and for nobody else. It recycles processes idle beyond the configured threshold (keeping their data), restarts crashed processes within a bounded sliding window, and enforces the deployment's concurrency limit so a burst of logins can never oversubscribe the host. Every transition is emitted as a structured lifecycle event for operators. Deployment operators run it directly; the gateway is its only intended consumer.
+Provision a dedicated `dsh --profile web` process for each authenticated user, with data in that user’s `$DSH_HOME` (`<homesDir>/<subject>`). Recycle idle processes while retaining data, restart crashed processes within a bounded window, and cap concurrent user processes. Lifecycle events report each transition. Deployment entry points and the gateway use this library to manage user processes.
 
 ## Table of Contents
 
@@ -39,9 +39,7 @@ Run one fleet manager per host. Point `homesDir` at the directory that will hold
 import { FleetManager } from '@deepseek-ai/dsh-fleet-manager'
 
 const fleet = new FleetManager({ homesDir: '/data/homes', maxUsers: 4 })
-fleet.startRecycleLoop()
-const outcome = await fleet.ensureProcess(subject) // ready { port, home } | rejected 'limit'
-fleet.processInfo(subject) // { port, pid, home, launchUrl } | undefined, for observation
+fleet.listActive() // [] until a user process is provisioned
 await fleet.dispose()
 ```
 
@@ -76,11 +74,19 @@ Invalid subjects (anything outside `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`) throw: t
 <a id="model-experience"></a>
 ## Model Experience
 
-None. The fleet manager runs deployment-side processes and touches no model-visible surface; user sessions inside each process behave exactly as in a single-user deployment.
+### Process provisioning
+
+#### What the model sees
+
+Nothing directly. `FleetManager` manages host-side processes without changing model requests.
+
+#### Token effect
+
+No additional request tokens.
 
 #### KV Cache effect
 
-None.
+None; request prefixes are unchanged.
 
 ## Known Limitations and Deferred Work
 
@@ -90,3 +96,13 @@ None.
 - **Idle detection is touch-driven.** Activity is observed through `ensureProcess`/`touch`; a long-running turn with no gateway forwarding can still be recycled once its grace expires.
 - **Local trust model.** The host's administrative user can reach every process and home; hardening the management plane is out of scope for this milestone.
 - **Windows untested.** The POSIX process semantics (SIGTERM escalation, signal-based crash detection) are exercised on POSIX only; the test suites are excluded from the Windows lanes.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

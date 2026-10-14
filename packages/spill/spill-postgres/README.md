@@ -83,7 +83,7 @@ A fresh database is stamped with the physical layout version inside one transact
 
 #### What the model sees
 
-The locator and retrieval hint this backend's references carry inside the spilled result placeholder; nothing else changes in the request.
+The `pgspill_` locator and retrieval hint this backend's references carry inside the spilled result placeholder; nothing else changes in the request.
 
 #### Token effect
 
@@ -94,6 +94,8 @@ Zero live-request tokens — spilling replaces oversized inline text, it never a
 None — the backend never touches live request prefixes.
 
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 These limits define when this backend is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
 

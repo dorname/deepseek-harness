@@ -35,3 +35,21 @@
 /core/repo-wide-type-patterns/branded-ids:
   en: 10f8ac0f97e7c54a
   zh: 75cd2311aabfe464
+/core/cross-node-coordination-types:
+  en: cf8855aff8023584
+  zh: 060a8f322d633980
+/core/cross-node-coordination-types/leasefacts:
+  en: 0bef7fb3ba5b0f95
+  zh: 0bef7fb3ba5b0f95
+/core/cross-node-coordination-types/acquireoutcome:
+  en: ba750e3095c3a074
+  zh: ba750e3095c3a074
+/core/cross-node-coordination-types/relayrecordkind:
+  en: e1be5747db6d5ae5
+  zh: e1be5747db6d5ae5
+/core/cross-node-coordination-types/relayrecord:
+  en: 32c0e30f6a02c00a
+  zh: 32c0e30f6a02c00a
+/core/cross-node-coordination-types/relayrecordhandler:
+  en: 0f3b3a3323f027af
+  zh: 0f3b3a3323f027af

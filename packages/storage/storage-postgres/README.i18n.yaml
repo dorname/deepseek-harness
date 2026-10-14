@@ -1,0 +1,64 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/storage/storage-postgres/README.md
+/:
+  en: d98baa2697af13d2
+  zh: a0f18affa3b26a1a
+/deepseek-ai-dsh-storage-postgres:
+  en: 672218e28f3fa27b
+  zh: 81f4aee84b9c7f40
+/deepseek-ai-dsh-storage-postgres/summary:
+  en: c0af748615c953ec
+  zh: 9349df58fb3ad370
+/deepseek-ai-dsh-storage-postgres/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-storage-postgres/use-this-package:
+  en: d9118e49e78426ad
+  zh: e4accec037c579a9
+/deepseek-ai-dsh-storage-postgres/use-this-package/when-to-choose-it:
+  en: e2a876de414ba9d9
+  zh: c1bfe8a2acda7f61
+/deepseek-ai-dsh-storage-postgres/use-this-package/configuration:
+  en: fb82c717dd5b4cb6
+  zh: 96593ecf282cd3a7
+/deepseek-ai-dsh-storage-postgres/use-this-package/observable-behavior:
+  en: dc2177442b56f78f
+  zh: 0879e9feb0a30286
+/deepseek-ai-dsh-storage-postgres/understand-the-implementation:
+  en: 42f75cb420c0cfd9
+  zh: 3e26c04b5be1643c
+/deepseek-ai-dsh-storage-postgres/understand-the-implementation/design-concept:
+  en: 391eb8bbf5b93b76
+  zh: da6ddad96b495d28
+/deepseek-ai-dsh-storage-postgres/understand-the-implementation/open-sequence:
+  en: 3060eaa7b6e345a7
+  zh: 537885fe0ac01dba
+/deepseek-ai-dsh-storage-postgres/understand-the-implementation/source-map:
+  en: 53344e39359c1cee
+  zh: a415e9003eee1b1d
+/deepseek-ai-dsh-storage-postgres/further-exploration:
+  en: fc40578276dbf856
+  zh: ecad7e48f844cf51
+/deepseek-ai-dsh-storage-postgres/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-storage-postgres/model-experience/stored-domain-records:
+  en: c5d5ffaf6b114f3e
+  zh: 63556d1f8f7333ba
+/deepseek-ai-dsh-storage-postgres/model-experience/stored-domain-records/what-the-model-sees:
+  en: d0798e9e30583b55
+  zh: f7f0777cb46f85ab
+/deepseek-ai-dsh-storage-postgres/model-experience/stored-domain-records/token-effect:
+  en: 592ed887c69e5c46
+  zh: 48d1998406667c3f
+/deepseek-ai-dsh-storage-postgres/model-experience/stored-domain-records/kv-cache-effect:
+  en: c13c59d13a5f1651
+  zh: be44e878c2c80f1a
+/deepseek-ai-dsh-storage-postgres/known-limitations-and-deferred-work:
+  en: fc565f415dd05483
+  zh: 06fd0d504b5941f8
+/deepseek-ai-dsh-storage-postgres/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: e88aeb617ffb74ea

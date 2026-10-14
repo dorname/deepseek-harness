@@ -53,7 +53,7 @@ A fresh database is stamped with the physical layout version inside one transact
 
 #### What the model sees
 
-Nothing. This package contributes no prompt, tool, or schema; it orchestrates session execution behind Cordis services for host-side consumers only.
+Nothing directly. `PostgresAgentDispatch` coordinates host-side session work without adding prompts, tools, or schemas.
 
 #### Token effect
 
@@ -64,6 +64,8 @@ Zero live-request tokens.
 None — the package never touches live request prefixes.
 
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **Pre-release physical layout** — any foreign stamped layout version refuses rather than migrates.
 - **The queue is deployment-scoped, not per-user-namespaced** — sessions already carry their fleet subject by the time they reach dispatch; the table is a plain `session_id` queue.

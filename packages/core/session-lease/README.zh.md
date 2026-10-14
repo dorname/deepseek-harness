@@ -7,9 +7,9 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
-Service Definition：单会话跨节点单写者认领——acquire/renew/release/ownerOf/waitLost。 本包只在宿主侧：不贡献 prompt、工具或 schema，模型与 agent 循环完全不可见。
+通过原子获取、续约和释放租约，在 runner 节点间协调单个会话写入方。消费方观察租约丢失，并在所有权到期时取消工作。挂载 `session-lease-postgres` 等提供方以实现共享存储。抽象服务不添加模型输入。
 
 ## 目录
 
@@ -19,25 +19,25 @@ Service Definition：单会话跨节点单写者认领——acquire/renew/releas
 
 -----
 
-<a id="使用本包"></a>
+<a id="use-this-package"></a>
 ## 使用本包
 
-在 profile 的 `cordis.yml` 中与执行池部署的其余部分一同加载（持久日志用 `session-persistence-postgres`）；runner 节点挂租约与派发，Web/API 副本挂中继订阅。
+消费方使用 `ctx.sessionLease`。挂载 [PostgreSQL 提供方](../session-lease-postgres/README.zh.md)注册具体实现；抽象服务本身不连接数据库。
 
 ### 可观察行为
 
-全新共享库在一个事务内盖物理布局版本戳；其他已戳版本拒绝——不迁移，预发布立场。租约获取/续约/释放与中继发布/读取在介质故障时响亮拒绝；`waitLost` 与中继订阅随其 signal 干净 settle 或取消。
+空闲或到期租约可被原子获取；仍由其他节点持有的有效租约返回持有者和到期时间。仅所有者可续约或释放。`waitLost` 在所有权丢失时完成，并接受取消。
 
 -----
 
-<a id="模型体验"></a>
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 跨节点会话执行
 
 #### 模型看到什么
 
-无。本包不贡献 prompt、工具或 schema；仅为宿主侧消费方在 Cordis 服务之后仲裁或传输会话状态。
+无直接影响。`ctx.sessionLease` 协调宿主侧会话工作，不添加提示、工具或 schema。
 
 #### Token 影响
 
@@ -49,12 +49,14 @@ Service Definition：单会话跨节点单写者认领——acquire/renew/releas
 
 ## 已知限制与待办
 
-- **预发布物理布局**——任何外部戳记的布局版本拒绝而非迁移。
-- **提供方本地语义**——本包不拥有保留或清理；共享表持续累积直至外部删除。
-- **数据库与 schema 必须预先存在**——提供方建表不建库；连接或权限故障在首次使用时浮出。
+<a id="known-limitations-and-deferred-work"></a>
+
+- **必须有提供方** — 本包声明服务，不实现存储。
+- **无保留 API** — 清理由提供方或部署负责。
+- **仅宿主侧协调** — 调用方负责会话执行、持久日志和浏览器交付。
 
 <a id="dev-note"></a>
-### 开发注记
+### 开发备注
 
 <details>
 <summary>维护者的工作上下文——点击展开</summary>

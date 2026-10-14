@@ -32,11 +32,17 @@ export type Recurrence = 'once' | `interval:${number}`
 
 /** One scheduled task row as stored and delivered. */
 export interface ScheduleTask {
+  /** Stable task identifier used for upsert and cancellation. */
   readonly taskId: string
+  /** Session to receive the reminder. */
   readonly sessionId: string
+  /** Human-readable reminder title. */
   readonly title: string
+  /** Reminder text supplied to the delivery callback. */
   readonly prompt: string
+  /** One-shot delivery or a fixed interval in milliseconds. */
   readonly recurrence: Recurrence
+  /** Next delivery time in epoch milliseconds. */
   readonly nextDueAt: number
 }
 
@@ -94,6 +100,7 @@ export class PostgresScheduleDispatch {
     deliver: z.any().required(),
   })
 
+  /** Cordis plugin identifier. */
   readonly name = 'schedule-dispatch'
 
   private readonly ready: Promise<postgresType.Sql>

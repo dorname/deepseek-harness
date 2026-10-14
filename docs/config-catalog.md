@@ -54,6 +54,42 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-agent-default-model -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-agent-dispatch -->
+<a id="deepseek-aidsh-agent-dispatch"></a>
+
+## `@deepseek-ai/dsh-agent-dispatch`
+
+- `source`: [`packages/core/agent-dispatch/src/index.ts:35`](../packages/core/agent-dispatch/src/index.ts)
+
+```ts config-catalog
+/** Plugin configuration. */
+export interface Config {
+  /**
+   * `postgres://` connection string of the shared dispatch database. The
+   * database (and schema) must already exist; the provider creates its
+   * tables on connect. Connect failures surface at the first use.
+   */
+  connectionString: string
+  /** Connection pool size; queue traffic is one-statement and low-volume. */
+  max?: number
+  /** This runner node's lease identity; required to start the loop. */
+  nodeId?: string
+  /** Lease lifetime in milliseconds; the heartbeat interval derives from it. */
+  leaseTtlMs?: number
+  /** Fallback polling interval while waiting for queued work. */
+  pollMs?: number
+  /** Grace period after a resumed session's agent goes idle before the lease releases. */
+  idleGraceMs?: number
+  /**
+   * Runner form: with `nodeId` set, loading auto-starts the dispatch loop
+   * and fiber disposal (SIGTERM on every orchestrator) drains it — stop
+   * taking new work, wait for the in-flight drive to its turn boundary.
+   */
+  runner?: boolean
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-agent-dispatch -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-agent-instructions -->
 <a id="deepseek-aidsh-agent-instructions"></a>
 
@@ -387,7 +423,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-attachment-postgres`
 
-- `source`: [`packages/attachment/attachment-postgres/src/index.ts:92`](../packages/attachment/attachment-postgres/src/index.ts)
+- `source`: [`packages/attachment/attachment-postgres/src/index.ts:97`](../packages/attachment/attachment-postgres/src/index.ts)
 
 ```ts config-catalog
 /** Plugin configuration for the PostgreSQL attachment backend. */
@@ -2562,6 +2598,64 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-schedule -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-schedule-dispatch -->
+<a id="deepseek-aidsh-schedule-dispatch"></a>
+
+## `@deepseek-ai/dsh-schedule-dispatch`
+
+- `source`: [`packages/schedule/schedule-dispatch/src/index.ts:50`](../packages/schedule/schedule-dispatch/src/index.ts)
+
+```ts config-catalog
+/** Plugin configuration. */
+export interface Config {
+  /**
+   * `postgres://` connection string of the shared schedule database. The
+   * database (and schema) must already exist; the provider creates its
+   * tables on connect. Connect failures surface at the first use.
+   */
+  connectionString: string
+  /** Connection pool size; due-row traffic is one-statement and low-volume. */
+  max?: number
+  /** This runner node's lease identity; required to run the loop. */
+  nodeId?: string
+  /** Lease lifetime in milliseconds for the delivery window. */
+  leaseTtlMs?: number
+  /** Fallback polling interval while waiting for due work. */
+  pollMs?: number
+  /**
+   * Loop form: loading auto-starts the dispatch loop and fiber disposal
+   * (SIGTERM on every orchestrator) aborts it after the in-flight round.
+   */
+  loop?: boolean
+  /**
+   * Deliver one due task: resume the session and append the reminder. The
+   * dispatch guarantees at-least-once invocation per occurrence — a throw
+   * rolls the take back and the next round redelivers.
+   */
+  deliver: (task: ScheduleTask) => Promise<void>
+}
+
+/** One scheduled task row as stored and delivered. */
+export interface ScheduleTask {
+  /** Stable task identifier used for upsert and cancellation. */
+  readonly taskId: string
+  /** Session to receive the reminder. */
+  readonly sessionId: string
+  /** Human-readable reminder title. */
+  readonly title: string
+  /** Reminder text supplied to the delivery callback. */
+  readonly prompt: string
+  /** One-shot delivery or a fixed interval in milliseconds. */
+  readonly recurrence: Recurrence
+  /** Next delivery time in epoch milliseconds. */
+  readonly nextDueAt: number
+}
+
+/** The recurrence encoding stored in the `recurrence` column. */
+export type Recurrence = 'once' | `interval:${number}`
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-schedule-dispatch -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-sdk-app -->
 <a id="deepseek-aidsh-sdk-app"></a>
 
@@ -2602,6 +2696,28 @@ export interface JsonRpcConfig {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-sdk-jsonrpc-server -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-session-lease-postgres -->
+<a id="deepseek-aidsh-session-lease-postgres"></a>
+
+## `@deepseek-ai/dsh-session-lease-postgres`
+
+- `source`: [`packages/core/session-lease-postgres/src/index.ts:29`](../packages/core/session-lease-postgres/src/index.ts)
+
+```ts config-catalog
+/** Plugin configuration. */
+export interface Config {
+  /**
+   * `postgres://` connection string of the shared lease database. The
+   * database (and schema) must already exist; the provider creates its
+   * tables on connect. Connect failures surface at the first use.
+   */
+  connectionString: string
+  /** Connection pool size; lease traffic is one-statement and low-volume. */
+  max?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-session-lease-postgres -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-session-log-deepseek -->
 <a id="deepseek-aidsh-session-log-deepseek"></a>
@@ -3204,6 +3320,28 @@ export interface Config {
 export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-storage-sqlite -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-stream-relay-postgres -->
+<a id="deepseek-aidsh-stream-relay-postgres"></a>
+
+## `@deepseek-ai/dsh-stream-relay-postgres`
+
+- `source`: [`packages/core/stream-relay-postgres/src/index.ts:33`](../packages/core/stream-relay-postgres/src/index.ts)
+
+```ts config-catalog
+/** Plugin configuration. */
+export interface Config {
+  /**
+   * `postgres://` connection string of the shared relay database. The
+   * database (and schema) must already exist; the provider creates its
+   * tables on connect. Connect failures surface at the first use.
+   */
+  connectionString: string
+  /** Connection pool size for publishes and cursor reads. */
+  max?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-stream-relay-postgres -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-subagent -->
 <a id="deepseek-aidsh-subagent"></a>
@@ -4278,6 +4416,12 @@ export interface Config {
    * is otherwise not the only loopback peer able to set forwarded headers.
    */
   trustLoopbackGateway: boolean
+  /**
+   * Mount `frontend-static` over the built SPA dist. Cluster API-only replicas
+   * set this to `false` so `/` is not served here; the same-origin shell (or an
+   * external front) owns index injection and `/?token=` exchange.
+   */
+  serveFrontend: boolean
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-web-app -->
@@ -4409,6 +4553,43 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-webhook-github -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-webhook-ingress -->
+<a id="deepseek-aidsh-webhook-ingress"></a>
+
+## `@deepseek-ai/dsh-webhook-ingress`
+
+- `refs`: [`JsonValue`](../packages/util/values/src/index.ts)
+- `source`: [`packages/webhook/webhook-ingress/src/index.ts:45`](../packages/webhook/webhook-ingress/src/index.ts)
+
+```ts config-catalog
+/** Plugin configuration. */
+export interface Config {
+  /**
+   * `postgres://` connection string of the shared events database. The
+   * database (and schema) must already exist; the provider creates its
+   * tables on connect. Connect failures surface at the first use.
+   */
+  connectionString: string
+  /** Connection pool size for event writes and consumption. */
+  max?: number
+  /** Fallback polling interval while waiting for pending events. */
+  pollMs?: number
+  /**
+   * Consumer form: loading auto-starts the consume loop and fiber disposal
+   * (SIGTERM on every orchestrator) aborts it after the in-flight round.
+   */
+  consumer?: boolean
+  /**
+   * Consume one pending event: create the Workspace Session from the event
+   * payload and hand its id to the execution pool. The dispatch guarantees
+   * at-least-once invocation — a throw rolls the take back and the next
+   * round recreates.
+   */
+  consume: (dedupeKey: string, payload: JsonValue) => Promise<void>
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-webhook-ingress -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-workflow-ptc -->
 <a id="deepseek-aidsh-workflow-ptc"></a>
@@ -4589,10 +4770,12 @@ Abstract service classes — a deployment loads a concrete implementation packag
 | `@deepseek-ai/dsh-jobs` | `JobRegistry` | — | [`packages/jobs/jobs/src/index.ts`](../packages/jobs/jobs/src/index.ts) |
 | `@deepseek-ai/dsh-ptc-runtime` | `PtcRuntime` | — | [`packages/ptc-runtime/ptc-runtime/src/index.ts`](../packages/ptc-runtime/ptc-runtime/src/index.ts) |
 | `@deepseek-ai/dsh-sandbox` | `SandboxProvider` | — | [`packages/sandbox/sandbox/src/index.ts`](../packages/sandbox/sandbox/src/index.ts) |
+| `@deepseek-ai/dsh-session-lease` | `SessionLease` | — | [`packages/core/session-lease/src/index.ts`](../packages/core/session-lease/src/index.ts) |
 | `@deepseek-ai/dsh-session-persistence` | `SessionPersistence` | — | [`packages/session/session-persistence/src/index.ts`](../packages/session/session-persistence/src/index.ts) |
 | `@deepseek-ai/dsh-session-query` | `SessionQueryEngine` | — | [`packages/session-query/session-query/src/index.ts`](../packages/session-query/session-query/src/index.ts) |
 | `@deepseek-ai/dsh-shell` | `ShellExecutor` | — | [`packages/shell/shell/src/index.ts`](../packages/shell/shell/src/index.ts) |
 | `@deepseek-ai/dsh-spill` | `SpillStore` | — | [`packages/spill/spill/src/index.ts`](../packages/spill/spill/src/index.ts) |
+| `@deepseek-ai/dsh-stream-relay` | `StreamRelay` | — | [`packages/core/stream-relay/src/index.ts`](../packages/core/stream-relay/src/index.ts) |
 | `@deepseek-ai/dsh-subprocess` | `SubprocessRuntime` | — | [`packages/subprocess/subprocess/src/index.ts`](../packages/subprocess/subprocess/src/index.ts) |
 | `@deepseek-ai/dsh-workflow` | `WorkflowEngine` | — | [`packages/workflow/workflow/src/index.ts`](../packages/workflow/workflow/src/index.ts) |
 <!-- END GENERATED config-catalog:seam -->

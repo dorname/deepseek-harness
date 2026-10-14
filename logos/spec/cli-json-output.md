@@ -147,17 +147,17 @@ status / next 的 `data.modules[]` 新增**可选字段 `features`**，承载 mo
   零候选时 `baseline_candidates_total: 0`（**键仍在场**,区分"零候选"与"旧实现无键")。**首轮 backfill（候选尚未登记进 `scenarios[]`）计数与旧行为一致**——已登记去重只在候选已有同 module 同 name 登记条目时减少计数,不影响真·新增候选。
 - **`--module` 口径(回应 F5)**：传 `--module` 只纳入该 module 候选、未注册 → 错误码 `MODULE_NOT_FOUND`(与 `feature list` 一致);无 `--module` 按 `modules[]` 顺序聚合全项目;`baseline_candidates_total` 恒等于过滤后最终纳入数。
 - **降级(回应 F6，唯一行为)**：索引 stale → 锁内从权威文档重算(成功、照常纳入);**权威章节解析失败 → 走通用错误 envelope、错误码 `BASELINE_PROVENANCE_INVALID`、非零退出、不写/不覆盖 prompt**（不以 `baseline_candidates_total=0` 冒充非存量零候选、不走 warning 成功)。
-- **红线**：本命令仍**只生成 prompt、不改 `logos-project.yaml`、不改 `## 逆向基线来源` 章节、不触发覆盖率副作用**;逆向候选进 `scenarios[]`（含 scenario 取号/计数器推进）与 feature 分配由 AI 按 prompt 回写,且**不改动 provenance `verified`**（导航 ≠ 可信度）。
+- **红线**：本命令仍**只生成 prompt、不改 `logos-project.yaml`、不改 `## 逆向基线来源` 章节、不触发覆盖率副作用**;逆向候选进 `scenarios[]`（含 scenario 取号/计数器推进）与 feature 分配由 AI 按 prompt 回写,且**不改动 逆向基线来源 `verified`**（导航 ≠ 可信度）。
 - **status/next 契约不变**：status/next 仍只读 `scenarios[]`、不吞逆向候选;条件版本（§1.4）不变。
 
-### 1.5.1 feature-backfill 错误 envelope 富化：触发文件路径 + 分类（provenance-scan-canonical-recompute）
+### 1.5.1 feature-backfill 错误 envelope 富化：触发文件路径 + 分类（逆向基线扫描与索引重算）
 
 扩展 §1.5：`feature-backfill` 报 `BASELINE_PROVENANCE_INVALID` 时，通用错误 envelope（§6）的 `error` 对象**新增两字段**（向后兼容 = 新增字段；错误码语义、非零退出、「不写/不覆盖 prompt」红线均不变）：
 
-- **`paths`**（`string[]`，键恒在场，可为空数组）：本次判定为 provenance 迹象、导致失败的文件**相对项目根路径**清单，确定性排序（按路径升序）。
+- **`paths`**（`string[]`，键恒在场，可为空数组）：本次判定为 逆向基线来源 迹象、导致失败的文件**相对项目根路径**清单，确定性排序（按路径升序）。
 - **`reason`**（`string` 闭合枚举）：失败原因分类——
   - `unparseable`：权威/约定目标 `## 逆向基线来源` 坏 fenced YAML（解析失败）；
-  - `unclassifiable-evidence`：有 provenance / `baseline_index` 迹象，但无 committed run manifest 且无约定命名文件（`<module>-scenario-candidates.md`），不可定类。
+  - `unclassifiable-evidence`：有 逆向基线来源 / `baseline_index` 迹象，但无 committed run manifest 且无约定命名文件（`<module>-scenario-candidates.md`），不可定类。
 
 错误形态示例：
 
@@ -165,7 +165,6 @@ status / next 的 `data.modules[]` 新增**可选字段 `features`**，承载 mo
 {
   "error": {
     "code": "BASELINE_PROVENANCE_INVALID",
-    "message": "reverse baseline provenance section invalid/unparseable for module(s): core. reason=unparseable; paths=[logos/resources/reference/x.md]",
     "paths": ["logos/resources/reference/x.md"],
     "reason": "unparseable"
   }
@@ -173,7 +172,7 @@ status / next 的 `data.modules[]` 新增**可选字段 `features`**，承载 mo
 ```
 
 - **与扫描侧 canonical 采信（core-06 §一.A / feature-specs §2.27.10）配合**：格式合法但 hash 失配的编造/示例 key 在候选采信阶段即被排除、**不再进入本错误路径**（此前会误报）。进入本路径者必为真实坏结构或真不可定类，`paths` 直指问题文件。
-- **消费方约定**：`reason` 遇未知值 → 保守分支（当作一般 provenance 失败处理）；`paths` 缺失 → 视为空清单（旧实现无该字段）。
+- **消费方约定**：`reason` 遇未知值 → 保守分支（当作一般 逆向基线来源 失败处理）；`paths` 缺失 → 视为空清单（旧实现无该字段）。
 ---
 
 ## 2. `openlogos detect --format json`
@@ -854,19 +853,19 @@ implement（code/verify）子流程的 resolved loop 定义满足 `max_iters > 1
 
 - **模式选择（plan-exit 之前）** 才读 `capabilities`：
   - `capabilities.ui_prototype_render == true`（会话就绪）→ **渲染确认模式**：面板渲染原型，批准即构成 UI 视觉确认，
-    要求写入绑定 `pages` / `hashes` 的 `PLAN_APPROVED` provenance。
+    要求写入绑定 `pages` / `hashes` 的 `PLAN_APPROVED` 逆向基线来源。
   - `capabilities` 缺失 / `ui_prototype_render == false`（旧面板 / openlogos-CLI-only）→ **降级模式**：
     不 claim「UI/UX 确认已前移」，给 advisory 提示、不阻断。
 - **这是 `logos/.session-capabilities.json` 与本 `capabilities` 段的唯一合法用途**——只用于 plan-exit **之前**选择交互模式。
 
 - **强制语义（plan-exit *之后*：merge / 落盘 / 落盘后复核）绝不读会话 capability**，一律以持久化
-  `PLAN_APPROVED` provenance 为准：
-  - `PLAN_APPROVED` 含 UI provenance（`ui_prototype_rendered:true` + `pages` + `hashes`，即该批准曾走渲染确认路径）
+  `PLAN_APPROVED` 逆向基线来源 为准：
+  - `PLAN_APPROVED` 含 UI 原型批准记录（`ui_prototype_rendered:true` + `pages` + `hashes`，即该批准曾走渲染确认路径）
     ⇒ 所有 merge / 落盘 / 落盘后复核入口**永久 fail closed**：`hashes` 必须存在且逐文件重算匹配；
     缺失 / 损坏 / 失配一律拒绝。**当前会话 `capabilities` 段缺失 / `.session-capabilities.json` 被清理一律不得降级**——
     「曾渲染确认」的证据已固化在批准记录里，易失会话态无权推翻它。
   - 仅当批准记录明确为 legacy/degraded、或旧空 marker 且无任何「曾渲染确认」证据时，才走 F3 向后兼容 advisory 放行。
-- **反例（明令禁止）**：不得以「消费 merge 时 `capabilities` 段缺失」为由，对已含 UI provenance 的 `PLAN_APPROVED`
+- **反例（明令禁止）**：不得以「消费 merge 时 `capabilities` 段缺失」为由，对已含 UI 原型批准记录 的 `PLAN_APPROVED`
   放行漂移原型——这构成跨会话降级绕过（渲染会话写 `hashes` → 原型被改 → 新 CLI-only 会话 merge 放行「确认 vX、实现 vY」）。
 
 ### (5) JSON 字段示例

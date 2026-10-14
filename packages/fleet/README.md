@@ -5,7 +5,7 @@ kind: "package-group"
 
 # fleet/ — User Fleet deployment components
 
-English
+English | [中文](README.zh.md)
 
 ## Summary
 

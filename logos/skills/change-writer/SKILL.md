@@ -302,7 +302,7 @@ change-flow-redesign 把前段流程拆为 `plan{写提案, 划分tasks}` → `s
 
 对已 `launched` 的 **GUI 产品项目**（网站 / 桌面应用 / 移动 App），当本次变更触及界面时，change-writer 在**提案阶段**（plan 节点、`plan-exit` 门**前**）就用 `ui-ux-pro-max` 设计系统产出界面原型，使用户在批准提案时（**面板已渲染原型的前提下**）连界面一起确认，避免「批准后自动实现才发现界面不对」的高成本返工。**复用现有 `plan-exit`（批准方案）门——不新增门态、不新增确认标记、不新增 `ui/` 目录。** 非 GUI 项目（纯 CLI / API / 纯后端服务 / Skills）整个特性不启用，本节全部跳过、流程零改动。
 
-> 本节只定义 change-writer 侧的 **producer 产出职责与可交付要求**；driver 在 plan 节点**派发** change-writer 产原型（producer dispatch）、面板渲染原型、批准时写 provenance 均归 runlogos 关联 change `ui-ux-first-panel`，本节不含其实现。
+> 本节只定义 change-writer 侧的 **producer 产出职责与可交付要求**；driver 在 plan 节点**派发** change-writer 产原型（producer dispatch）、面板渲染原型、批准时写 原型批准记录 均归 runlogos 关联 change `ui-ux-first-panel`，本节不含其实现。
 
 ### ① 触发条件：先判 `product_type`，再判本次是否动界面（去循环依赖）
 
@@ -324,7 +324,7 @@ change-flow-redesign 把前段流程拆为 `plan{写提案, 划分tasks}` → `s
 - 原型产出是 **plan 节点门前的普通内容生成**，授权状态与「写 `proposal.md` / `tasks.md`」**完全相同**——**不新增授权、不新增门**。唯一人类确认点仍是 `plan-exit`。
 - driver 在 plan 节点判定 `ui_impact:true` 且**前置能力就绪**时，**派发 change-writer（用 ui-ux-pro-max）在 `plan-exit` 前产出原型**（producer dispatch）。这属既有 plan 节点执行范围，driver 实现归 runlogos `ui-ux-first-panel`。
 - change-writer 的写入由 guard 的 **plan 阶段写入 allowlist（仅放行 `deltas/prd/2-product-design/2-page-design/*.html`）** 授权；其余 `deltas/**` 在 plan 阶段仍禁止写入，越界路径被 guard 拒。
-- `--auto` 下 `plan-exit`（`skippable:true`）自动放行，但原型已在门前产出、provenance 已记录。
+- `--auto` 下 `plan-exit`（`skippable:true`）自动放行，但原型已在门前产出、原型批准记录 已记录。
 
 ### ③ ui-ux-pro-max 生成步骤（调用设计系统）
 

@@ -17,3 +17,6 @@
 /publish-the-web-ui-behind-a-reverse-proxy/secure-the-external-leg:
   en: a833880da5c8bbf4
   zh: 6f9bd565b7266241
+/publish-the-web-ui-behind-a-reverse-proxy/same-origin-frontend-split-cluster-web:
+  en: 5620f26c6ec7ded1
+  zh: b8c66ec90a6a80ab

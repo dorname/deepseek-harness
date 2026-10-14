@@ -9,8 +9,8 @@
   en: db965babf4e4b165
   zh: f1f1e37c17f3b2da
 /deepseek-ai-dsh-gateway/summary:
-  en: 309c001f7d4c3e13
-  zh: 52dfdcdb6c92bd45
+  en: c1f8bec0f6eb5f5d
+  zh: c78ca7c7cf1bf669
 /deepseek-ai-dsh-gateway/table-of-contents:
   en: 3460b3e585e0c020
   zh: bb83d3d282b286d8
@@ -24,11 +24,23 @@
   en: 7582878bd4276d3f
   zh: d1a7a229752aa80d
 /deepseek-ai-dsh-gateway/model-experience:
-  en: 8ea4df80fc50a131
-  zh: 6cfc88d7f37a5dcd
-/deepseek-ai-dsh-gateway/model-experience/kv-cache-effect:
-  en: 4f0eadf94828e66e
-  zh: 4f8a6ec170ebbfb6
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-gateway/model-experience/authenticated-routing:
+  en: dcd6e2d711b64186
+  zh: 923ee09c893801bb
+/deepseek-ai-dsh-gateway/model-experience/authenticated-routing/what-the-model-sees:
+  en: 6378997d0b21c131
+  zh: e9bbdc8d54014ca9
+/deepseek-ai-dsh-gateway/model-experience/authenticated-routing/token-effect:
+  en: c56fdca79898302e
+  zh: fdda1dc029f72455
+/deepseek-ai-dsh-gateway/model-experience/authenticated-routing/kv-cache-effect:
+  en: 8859eae79cb1488d
+  zh: 9626ddbf164f8a21
 /deepseek-ai-dsh-gateway/known-limitations-and-deferred-work:
-  en: 108f6e54652ec034
-  zh: b861f94acf8deb1c
+  en: f18eb1f034ea392d
+  zh: 567e56e37de86d16
+/deepseek-ai-dsh-gateway/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: e88aeb617ffb74ea

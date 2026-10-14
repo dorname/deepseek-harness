@@ -7,9 +7,9 @@ kind: "package-library"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
-网关是 User Fleet 部署的唯一认证入口。浏览器通过身份提供方托管的 OIDC 授权码流程完成登录；网关在回调中用授权码换取已认证主体，并用签名 HttpOnly 会话 cookie 把浏览器绑定到该主体。之后的每个请求——普通 HTTP、服务端推送事件、协议升级——都严格按该 cookie 中的主体路由进主体自己的进程 loopback 端口。不存在把会话路由到其他主体进程的代码路径。用户进程的启动令牌 URL 只在回环内被消费一次（网关用它换取进程的浏览器会话 cookie，保存在按主体隔离的 cookie jar 中）；启动令牌与进程自身的 cookie 都不会向外转发。进程由 fleet manager 拥有；网关只请求它确保与观察进程。
+通过 OIDC 认证浏览器用户，并将每个请求路由到该用户的独立 Web 进程。签名的 HttpOnly cookie 将请求绑定到认证主体；启动令牌和上游 cookie 留在回环内。fleet manager 负责进程启动和容量限制。网关应部署在 TLS 终结器之后，并配置身份提供方回调所需的公开 URL。
 
 ## 目录
 
@@ -36,6 +36,9 @@ kind: "package-library"
 
 ```ts
 import { FleetGateway } from '@deepseek-ai/dsh-gateway'
+import { FleetManager } from '@deepseek-ai/dsh-fleet-manager'
+
+const fleetManager = new FleetManager({ homesDir: '/data/homes' })
 
 const gateway = new FleetGateway(
   { homesDir: '/data/homes', oidc: { issuer: 'https://idp.example', clientId: '...', clientSecret: '...' } },
@@ -43,6 +46,7 @@ const gateway = new FleetGateway(
 )
 const { port } = await gateway.start()
 await gateway.dispose()
+await fleetManager.dispose()
 ```
 
 配置错误在解析时即响亮失败：缺失 homes 根、issuer、客户端绑定或畸形密钥都会拒绝启动。端口由操作系统分配且未显式配置 `publicUrl` 时，重定向目标会重新钉到实际绑定端口，保证提供方的回调能到达本网关。超过十分钟的登录尝试会随其 CSRF state 一并丢弃；被拒绝或失败的兑换以 401 附带明确原因作答，不开启会话。fleet manager 报告部署满载时，浏览器收到 503 而不是排队。
@@ -77,11 +81,19 @@ await gateway.dispose()
 <a id="model-experience"></a>
 ## 模型体验
 
-无。网关代理的是用户进程既有的 web 面；路由完成后，会话的行为与直连其单用户进程完全一致。
+### 认证路由
+
+#### 模型看到什么
+
+无直接影响。`FleetGateway` 负责宿主侧路由，不改变模型请求。
+
+#### Token 影响
+
+不增加请求 token。
 
 #### KV Cache 影响
 
-无。
+无；请求前缀保持不变。
 
 ## 已知限制与延期工作
 
@@ -92,3 +104,13 @@ await gateway.dispose()
 - **TLS 在上游终结。** 网关使用纯 HTTP，应部署在部署方 TLS 终结器之后；`publicUrl` 必须是外部可见根地址。
 - **本地信任模型。** 网关与用户进程之间的回环按构造可信；主机的管理员用户可以直接触达每个进程。
 - **Windows 未测试。** 本套件会派生真实子进程，与 fleet manager 一同排除在 Windows 车道之外。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者工作上下文——点击展开</summary>
+
+无。
+
+</details>

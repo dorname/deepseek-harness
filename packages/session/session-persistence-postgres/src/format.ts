@@ -27,7 +27,11 @@ export function assertSeededCut(header: SessionHeader, inheritedEventCount?: Ses
   }
 }
 
-/** Encode one append batch or generation body as newline-terminated event lines. */
+/**
+ * Encode one append batch or generation body as newline-terminated event lines.
+ * @param events - event records in append order.
+ * @returns serialized JSON lines, or an empty string for an empty batch.
+ */
 export function encodeEventLines(events: readonly SessionEvent[]): string {
   let text = ''
   for (const event of events) text += `${JSON.stringify(event)}\n`

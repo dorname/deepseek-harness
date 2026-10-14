@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/fleet/README.md
+/:
+  en: d284efcf0ffaa594
+  zh: 9170724ce14ea12e
+/fleet-user-fleet-deployment-components:
+  en: d95842fa27e5a8fc
+  zh: fa02dee00584c326
+/fleet-user-fleet-deployment-components/summary:
+  en: 848441ab77c65f64
+  zh: a6b2220b29451cc3
+/fleet-user-fleet-deployment-components/table-of-contents:
+  en: 559619aefcb7fc3c
+  zh: 6c510edf720b4c2f
+/fleet-user-fleet-deployment-components/packages:
+  en: a806270deebc54fc
+  zh: 49cce3ab7c296b77
+/fleet-user-fleet-deployment-components/related-documentation:
+  en: 1c300c730653e240
+  zh: fada958c9daf8aff

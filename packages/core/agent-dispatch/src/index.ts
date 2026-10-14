@@ -77,6 +77,7 @@ export class PostgresAgentDispatch {
     runner: z.boolean().default(false),
   })
 
+  /** Cordis plugin identifier. */
   readonly name = 'agent-dispatch'
 
   private readonly ready: Promise<postgresType.Sql>

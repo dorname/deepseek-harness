@@ -108,6 +108,24 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
+    key: 'sessionLease',
+    pkg: 'session-lease',
+    title: 'Cross-node session writer leases',
+    mode: 'seam',
+    implementations: ['session-lease-postgres'],
+    consumers: ['agent-dispatch', 'schedule-dispatch'],
+    note: 'Arbitrates one session writer through atomic acquisition, renewal, release, and lease-loss observation.',
+  },
+  {
+    key: 'streamRelay',
+    pkg: 'stream-relay',
+    title: 'Cross-node session event and stream relay',
+    mode: 'seam',
+    implementations: ['stream-relay-postgres'],
+    consumers: ['agent-dispatch', 'session-controller'],
+    note: 'Transports existing session events and stream frames in per-session sequence order for replay and subscription.',
+  },
+  {
     key: 'hmr',
     pkg: 'hmr',
     title: 'Serialized module and configuration reloads',

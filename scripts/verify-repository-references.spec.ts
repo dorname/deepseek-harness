@@ -7,6 +7,28 @@ import { findRepositoryReferences, scanRepositoryReferences } from './verify-rep
 
 const organizationUrl = `https://${['github.com', ['deepseek', 'harness'].join('-')].join('/')}`
 
+describe('historical OpenLogos source snapshots', () => {
+  it('preserves archived deltas and seed copies while inspecting current resources', () => {
+    const commit = 'abc1234'
+    const commits = new Set([commit])
+    for (const file of [
+      'logos/changes/archive/dated-change/deltas/prd/architecture.md',
+      'logos/resources/verify/baseline-seed-runs/seed-1/resolved/architecture.md',
+      'logos/resources/verify/baseline-seed-runs/seed-1/staging/architecture.md',
+    ]) {
+      expect(findRepositoryReferences(file, commit, commits)).toEqual([])
+    }
+    for (const file of [
+      'logos/resources/prd/architecture.md',
+      'logos/changes/current/deltas/prd/architecture.md',
+      'logos/resources/verify/baseline-seed-runs/seed-1/report.md',
+      'logos/changes/archive/dated-change/proposal.md',
+    ]) {
+      expect(findRepositoryReferences(file, commit, commits)).toEqual([{ file, line: 1, kind: 'commit-hash' }])
+    }
+  })
+})
+
 function repository(test: TestContext) {
   const root = mkdtempSync(join(tmpdir(), 'dsh-repository-references-'))
   test.onTestFinished(() => {
