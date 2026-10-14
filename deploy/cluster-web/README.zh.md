@@ -29,6 +29,8 @@ docker compose -f deploy/cluster-web/docker-compose.yml --env-file deploy/cluste
 
 无 Docker 时仍可用进程树（S46 路径）：
 
+`dsh up` 将 SIGINT 与 SIGTERM 转发给 supervisor，并在进程树及其输出流关闭后返回。
+
 ```sh
 pnpm dsh up --edge-port 8080 --api-replicas 1 --runner-replicas 0 --skip-overlays --skip-runners
 ```
@@ -62,6 +64,8 @@ pnpm dsh up --edge-port 8080 --api-replicas 1 --runner-replicas 0 --skip-overlay
 | `forward.mts` | API 内网转发 |
 | `edge.mts` / `upstream.mts` | 同域反代 |
 | `supervise.mts` | 无 Docker 进程树（S46） |
+
+镜像通过 Docker `CMD` 默认启动 `supervise.mts`；Compose 将其替换为专用的 frontend 或 API 入口。SMOKE-core-24 检查各容器的 PID 1 命令，并验证 shell 签发的 cookie 能通过 API 路由认证。
 
 ## Helm
 

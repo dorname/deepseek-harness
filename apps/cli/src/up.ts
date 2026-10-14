@@ -117,6 +117,7 @@ export function parseUpArgs(argv: readonly string[]): UpOptions {
 
 /**
  * Run the cluster-web supervisor until it exits.
+ * SIGINT and SIGTERM reach the supervisor; the launcher waits for its exit and closed stdio.
  * @param options - validated up flags.
  * @returns the supervise process exit code.
  */
@@ -141,8 +142,17 @@ export async function runUp(options: UpOptions): Promise<number> {
       stdio: 'inherit',
       cwd: repoRootFromHere(),
     })
-    child.on('error', reject)
-    child.on('exit', (code, signal) => {
+    const forwardInterrupt = (): void => { child.kill('SIGINT') }
+    const forwardTermination = (): void => { child.kill('SIGTERM') }
+    process.on('SIGINT', forwardInterrupt)
+    process.on('SIGTERM', forwardTermination)
+    const cleanup = (): void => {
+      process.off('SIGINT', forwardInterrupt)
+      process.off('SIGTERM', forwardTermination)
+    }
+    child.once('error', (error) => { cleanup(); reject(error) })
+    child.once('close', (code, signal) => {
+      cleanup()
       if (signal) resolveExit(1)
       else resolveExit(code ?? 1)
     })

@@ -5,6 +5,11 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: {{ .Values.apiReplicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: {{ .Release.Name }}-api
@@ -13,6 +18,19 @@ spec:
       labels:
         app: {{ .Release.Name }}-api
     spec:
+      {{- if .Values.postgres.enabled }}
+      initContainers:
+        - name: wait-postgres
+          image: {{ .Values.postgres.image }}
+          command:
+            - sh
+            - -c
+            - 'until pg_isready -h "$1" -U "$2" -d "$3"; do sleep 1; done'
+            - wait-postgres
+            - {{ printf "%s-postgres" .Release.Name | quote }}
+            - {{ .Values.postgres.user | quote }}
+            - {{ .Values.postgres.database | quote }}
+      {{- end }}
       containers:
         - name: api
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -35,8 +53,14 @@ spec:
           ports:
             - containerPort: {{ .Values.api.forwardPort }}
               name: forward
+          readinessProbe:
+            tcpSocket:
+              port: forward
           resources:
             {{- toYaml .Values.resources.api | nindent 12 }}
+          volumeMounts:
+            - name: dsh-home
+              mountPath: /dsh-home
       volumes:
         - name: dsh-home
           persistentVolumeClaim:

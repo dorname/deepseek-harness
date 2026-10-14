@@ -12,7 +12,7 @@
 
 import { spawn, type ChildProcess } from 'node:child_process'
 import { appendFileSync, existsSync, readFileSync } from 'node:fs'
-import { createServer } from 'node:net'
+import { createServer, type Server } from 'node:net'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { startCpuMonitor } from './fleet-staging/cpu-monitor.ts'
@@ -23,6 +23,7 @@ const RESULT_PATH = process.env.OPENLOGOS_SMOKE_RESULT_PATH
   ?? join(REPO_ROOT, 'logos', 'resources', 'verify', 'smoke-results.jsonl')
 const SUPERVISE = join(REPO_ROOT, 'deploy', 'cluster-web', 'supervise.mts')
 const DEPLOY_DIR = join(REPO_ROOT, 'deploy', 'cluster-web')
+const reservedServers: Server[] = []
 
 function report(id: string, outcome: {
   durationMs: number
@@ -55,13 +56,17 @@ async function freePort(): Promise<number> {
         return
       }
       const { port } = address
-      server.close((error) => {
-        if (error) reject(error)
-        else resolve(port)
-      })
+      reservedServers.push(server)
+      resolve(port)
     })
     server.on('error', reject)
   })
+}
+
+async function releasePorts(): Promise<void> {
+  await Promise.all(reservedServers.splice(0).map(server => new Promise<void>((resolve, reject) => {
+    server.close((error) => { if (error) reject(error); else resolve() })
+  })))
 }
 
 function waitFor(pattern: RegExp, child: ChildProcess, timeoutMs: number): Promise<void> {
@@ -78,13 +83,19 @@ function waitFor(pattern: RegExp, child: ChildProcess, timeoutMs: number): Promi
       cleanup()
       reject(new Error(`timed out waiting for ${pattern}; log tail:\n${buffer.slice(-2000)}`))
     }, timeoutMs)
+    const onClose = (): void => {
+      cleanup()
+      reject(new Error(`supervisor exited before readiness; log tail:\n${buffer.slice(-2000)}`))
+    }
     const cleanup = (): void => {
       clearTimeout(timer)
       child.stdout?.off('data', onData)
       child.stderr?.off('data', onData)
+      child.off('close', onClose)
     }
     child.stdout?.on('data', onData)
     child.stderr?.on('data', onData)
+    child.once('close', onClose)
   })
 }
 
@@ -127,6 +138,7 @@ async function main(): Promise<void> {
     const shellPort = await freePort()
     const apiPort = await freePort()
     const publicUrl = `http://127.0.0.1:${String(edgePort)}/`
+    await releasePorts()
     child = spawn(process.execPath, ['--import', 'tsx/esm', SUPERVISE], {
       cwd: REPO_ROOT,
       env: {
@@ -202,6 +214,8 @@ async function main(): Promise<void> {
       cpuPeakPercent: peak,
     })
     process.exitCode = 1
+  } finally {
+    await releasePorts()
   }
 }
 

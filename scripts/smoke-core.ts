@@ -378,6 +378,15 @@ const cases: Array<{ id: string; scenario: string; run: () => CaseOutcome | void
     },
   },
   {
+    id: 'SMOKE-core-08',
+    scenario: 'Desktop first launch (manual)',
+    run: () => ({
+      durationMs: 0,
+      scenario: 'Desktop first launch requires manual verification with a signed installer',
+      status: 'skip',
+    }),
+  },
+  {
     id: 'SMOKE-core-09',
     scenario: 'fleet gateway authentication and per-user routing',
     run: async () => {

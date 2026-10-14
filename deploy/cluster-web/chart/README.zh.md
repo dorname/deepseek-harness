@@ -32,9 +32,13 @@ helm upgrade --install dsh deploy/cluster-web/chart -n dsh-cluster-web --reuse-v
 
 ## Pod 布局
 
-| Deployment | 副本 | 容器 | 网络 |
+| Deployment | 副本 | 单个容器内的进程 | 网络 |
 |------------|------|------|------|
 | `frontend` | 1 | loopback `shell`、对外 `edge` | Ingress 与 frontend Service 只到达 `edge` |
 | `api` | `apiReplicas` | loopback API-only `dsh`、网内 `forward` | frontend 到达 api Service，由其选择 forwarder 容器 |
 
 两个 Deployment 挂载同一个 ReadWriteMany PVC。启用 Postgres 时，API 入口应用 `overlays/api.overlay.yml`，会话持久化与流转发状态存入 Postgres 而不是 API Pod。PVC 拥有跨副本浏览器会话密钥。`apiReplicas` 默认为 1；验收冒烟保持不超过 2。
+
+存储类必须支持 ReadWriteMany。就绪探针在 frontend 公网监听与 API forwarder 开始监听前，阻止 Service 向对应 Pod 分发请求。内置 Postgres Deployment 使用临时存储，适用于本地 staging；替换数据库 Pod 会丢失其中的数据。
+
+启用内置 Postgres 时，API 初始化会等待其 Service 接受数据库连接。Frontend 与 API 更新时不增加额外的滚动副本。命名空间由 Helm 的 `--create-namespace` 创建；chart 不会再创建第二个 Namespace 资源。

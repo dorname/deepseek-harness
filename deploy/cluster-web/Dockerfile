@@ -43,4 +43,4 @@ ENV DSH_CONFIG_READONLY=1
 EXPOSE 8080
 # Compose overrides command per service (`frontend.mts` / `api.mts`).
 # Default remains the single-process-tree supervise for non-compose launchers.
-ENTRYPOINT ["node", "--import", "tsx/esm", "deploy/cluster-web/supervise.mts"]
+CMD ["node", "--import", "tsx/esm", "deploy/cluster-web/supervise.mts"]

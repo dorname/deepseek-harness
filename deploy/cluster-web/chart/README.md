@@ -32,9 +32,13 @@ helm upgrade --install dsh deploy/cluster-web/chart -n dsh-cluster-web --reuse-v
 
 ## Pod layout
 
-| Deployment | Replicas | Containers | Network |
+| Deployment | Replicas | Processes in one container | Network |
 |------------|----------|------------|---------|
 | `frontend` | 1 | `shell` on loopback, public `edge` | Ingress and frontend Service reach only `edge` |
 | `api` | `apiReplicas` | API-only `dsh` on loopback, `forward` in-network | frontend reaches the api Service, which selects forwarder containers |
 
 Both Deployments mount the same ReadWriteMany PVC. The API entry applies `overlays/api.overlay.yml` when Postgres is enabled, so session persistence and stream relay state are stored in Postgres rather than an API pod. The PVC owns the cross-replica browser-session key. `apiReplicas` defaults to 1; acceptance smoke keeps it at 2 or fewer.
+
+The storage class must support ReadWriteMany. Readiness probes keep frontend and API pods out of their Services until their public listener and forwarder are listening. The bundled Postgres Deployment uses ephemeral storage and is intended for local staging; its data does not survive pod replacement.
+
+When bundled Postgres is enabled, API initialization waits for its Service to accept database connections. Frontend and API updates use no extra rollout replicas. Helm's `--create-namespace` owns namespace creation; the chart does not create a second Namespace resource.

@@ -29,6 +29,8 @@ docker compose -f deploy/cluster-web/docker-compose.yml --env-file deploy/cluste
 
 Without Docker, the process-tree path remains available (S46):
 
+`dsh up` forwards SIGINT and SIGTERM to its supervisor and waits for the process tree and its output streams to close before returning.
+
 ```sh
 pnpm dsh up --edge-port 8080 --api-replicas 1 --runner-replicas 0 --skip-overlays --skip-runners
 ```
@@ -62,6 +64,8 @@ Follow [public deployments](../../docs/user/guide/public-deployments.md): one or
 | `forward.mts` | In-network API forwarder |
 | `edge.mts` / `upstream.mts` | Same-origin reverse proxy |
 | `supervise.mts` | Docker-free process tree (S46) |
+
+The image defaults to `supervise.mts` through Docker `CMD`; Compose replaces it with the dedicated frontend or API entry. SMOKE-core-24 checks each container's PID 1 command and verifies that the shell cookie reaches the API router.
 
 ## Helm
 

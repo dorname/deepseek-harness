@@ -19,6 +19,14 @@ spec:
           image: {{ .Values.postgres.image }}
           ports:
             - containerPort: 5432
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - {{ .Values.postgres.user | quote }}
+                - -d
+                - {{ .Values.postgres.database | quote }}
           env:
             - name: POSTGRES_USER
               value: {{ .Values.postgres.user | quote }}

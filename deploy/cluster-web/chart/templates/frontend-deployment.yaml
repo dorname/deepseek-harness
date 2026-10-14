@@ -5,6 +5,11 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: {{ .Release.Name }}-frontend
@@ -35,8 +40,14 @@ spec:
           ports:
             - containerPort: {{ .Values.edge.port }}
               name: http
+          readinessProbe:
+            tcpSocket:
+              port: http
           resources:
             {{- toYaml .Values.resources.shell | nindent 12 }}
+          volumeMounts:
+            - name: dsh-home
+              mountPath: /dsh-home
       volumes:
         - name: dsh-home
           persistentVolumeClaim:

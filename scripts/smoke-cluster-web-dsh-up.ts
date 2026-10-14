@@ -114,12 +114,13 @@ async function main(): Promise<void> {
     const response = await fetch(publicUrl, { redirect: 'manual' })
     if (response.status >= 500) throw new Error(`edge returned ${String(response.status)}`)
 
-    child.kill('SIGTERM')
     const code = await new Promise<number | null>((resolve) => {
       const timer = setTimeout(() => { resolve(-1) }, 30_000)
-      child?.on('exit', (c) => { clearTimeout(timer); resolve(c) })
+      child?.once('close', (c) => { clearTimeout(timer); resolve(c) })
+      child?.kill('SIGTERM')
     })
     if (code === -1) throw new Error('dsh up did not exit within 30s after SIGTERM')
+    if (code !== 0) throw new Error(`dsh up did not drain cleanly: exit code ${String(code)}`)
 
     peak = monitor.peakPercent()
     monitor.stop()

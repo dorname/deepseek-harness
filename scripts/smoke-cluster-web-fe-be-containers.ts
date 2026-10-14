@@ -173,6 +173,17 @@ async function main(): Promise<void> {
     }
     void apiContainers
 
+    for (const [service, entry] of [['frontend', 'frontend.mts'], ['api', 'api.mts']] as const) {
+      const command = spawnSync('docker', composeArgs(['exec', '-T', service, 'node', '-e',
+        "process.stdout.write(require('node:fs').readFileSync('/proc/1/cmdline', 'utf8'))"]), {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      })
+      if (command.status !== 0 || !command.stdout.includes(`deploy/cluster-web/${entry}`)) {
+        throw new Error(`${service} did not start its dedicated entry: ${command.stdout} ${command.stderr}`)
+      }
+    }
+
     const publicUrl = 'http://127.0.0.1:8080/'
     const token = await waitReady(publicUrl, 300_000)
     if (token === undefined) throw new Error('could not find shell launch token in frontend logs')
@@ -205,6 +216,12 @@ async function main(): Promise<void> {
     if (apiBare.status !== 401) {
       throw new Error(`expected 401 for /api without cookie, got ${String(apiBare.status)}`)
     }
+
+    const apiAuthed = await fetch(`${publicUrl}api/`, { headers: { cookie: jar.join('; ') } })
+    if (apiAuthed.status !== 404) {
+      throw new Error(`authenticated GET /api/ must reach the API router (404), got ${String(apiAuthed.status)}`)
+    }
+    await apiAuthed.text()
 
     peak = monitor.peakPercent()
     monitor.stop()

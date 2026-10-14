@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { connect } from 'node:net'
+import { connect, type Socket } from 'node:net'
 import { createHmac } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -224,6 +224,7 @@ async function startFakeUserProcess(subject: string): Promise<FakeUserProcess> {
   let launchToken = `fake-${subject}`
   const requests: string[] = []
   const cookieName = `dsh-auth-${subject}`
+  const sockets = new Set<Socket>()
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://process.invalid')
     requests.push(request.url ?? '/')
@@ -287,6 +288,10 @@ async function startFakeUserProcess(subject: string): Promise<FakeUserProcess> {
     response.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' })
     response.end(`${subject} home ${url.pathname}\n`)
   })
+  server.on('connection', (socket) => {
+    sockets.add(socket)
+    socket.once('close', () => sockets.delete(socket))
+  })
   server.on('upgrade', (request, socket) => {
     requests.push(`upgrade ${request.url ?? '/'}`)
     socket.end(`HTTP/1.1 101 Switching Protocols\r\nupgrade: websocket\r\nconnection: Upgrade\r\n\r\nupgraded-${subject}`)
@@ -309,8 +314,9 @@ async function startFakeUserProcess(subject: string): Promise<FakeUserProcess> {
         server.close(() => {
           resolve()
         })
+        // HTTP server closeAllConnections excludes upgraded sockets.
+        for (const socket of sockets) socket.destroy()
       })
-      server.closeAllConnections()
     },
   }
 }
