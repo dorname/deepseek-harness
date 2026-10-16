@@ -1,0 +1,4 @@
+已按用户明确授权完成本地 staging 部署复核。
+Docker Compose：API health gate 在 `/healthz` 通过后才启动 frontend；SMOKE-core-24 通过。
+Docker Desktop Kubernetes：API 2/2，两个 endpoint 均恢复 ready/serving；故障副本摘除与 liveness 自动恢复通过。
+部署证据与验证范围：logos/resources/verify/cluster-web-staging-report.md。

@@ -5,7 +5,7 @@ description: "cluster-web 本地 Compose 与 Docker Desktop Kubernetes staging �
 
 # cluster-web 本地 staging 验证
 
-验证日期：2026-10-14。执行范围经用户明确授权：`openlogos verify`、`openlogos smoke`、本地 Docker Compose 和 Docker Desktop Kubernetes staging 部署验证。
+验证日期：2026-10-14 至 2026-10-16。执行范围经用户明确授权：`openlogos verify`、`openlogos smoke`、本地 Docker Compose 和 Docker Desktop Kubernetes staging 部署验证。
 
 ## 实际部署证据
 
@@ -44,9 +44,27 @@ description: "cluster-web 本地 Compose 与 Docker Desktop Kubernetes staging �
 | `pnpm run test:docs` | 14 项通过、7 项失败；失败信息见 `/tmp/dsh-cluster-test-docs.log` |
 | `pnpm run doc-sync` | 28 项通过、14 项失败；失败信息见 `/tmp/dsh-cluster-doc-sync.log` |
 | `openlogos verify` | Gate 3.6 PASS；预跑 exit 0，100 个测试通过、97 个测试跳过；验收账本 36 项通过、141 项跳过，无失败 |
-| `openlogos smoke --env staging` | Gate 3.8 PASS；24 项均有记录，13 项通过、11 项跳过，无失败；SMOKE-core-24 CPU 峰值 39.2% |
+| `openlogos smoke --env staging` | 2026-10-16 Gate 3.8 PASS；24 项均有记录，13 项通过、11 项跳过，无失败；SMOKE-core-24 运行时 CPU 峰值 11.5% |
 
 此前正式验收曾因容器构建期间 CPU 峰值超过 80% 而失败；这些失败不等同于部署功能通过，也不计为通过。嵌入式 Postgres 的部分用例因 root 环境明确跳过，真实模型用例受凭证可用性约束；跳过不代表已验证。
+
+## 2026-10-15 HTTP 探针补充验证
+
+本地 staging 继续使用 namespace `dsh-cluster-web-staging`、Helm release `dsh` 与镜像 `dsh-cluster-web-http-probes:local`。API Deployment 保持 2 副本，startup、readiness、liveness 均通过 HTTP 访问 forwarder 端口 `/healthz`。
+
+| 检查 | 结果 |
+|---|---|
+| focused 回归 | `cluster-web-health.spec.ts` 与既有 `cluster-web-fe-be-containers.spec.ts` 共 2 个文件、4 个测试通过 |
+| 文档与静态门禁 | `pnpm run doc-sync` 42/42 通过；`pnpm run lint` 通过 |
+| Helm 校验 | Alpine Helm 3.16.4 `lint --strict` 通过；默认内置 Postgres 与 `postgres.enabled=false` 两套渲染清单均通过 `kubectl apply --dry-run=client --validate=strict` |
+| 故障注入 | 仅暂停 `dsh-api-879d7d49d-g55w4` 中 argv 精确包含 `--api-only` 且入口以 `/apps/cli/lib/bin.js` 结尾的真实 API 进程 |
+| 摘除流量 | 该 Pod `Ready=False` / `ContainersReady=False`；EndpointSlice 中 `10.1.1.59` 为 `ready=false, serving=false`，另一 API endpoint 保持 ready |
+| 自动恢复 | liveness 事件记录 `/healthz` 返回 503 并 Killing；容器重启后 Pod 恢复 Ready，两个 endpoint 均为 ready，Deployment 恢复 2/2 |
+| 故障后冒烟 | frontend 内部请求验证 token 换票 303、未认证 API 401、SPA 200 且含 boot、认证 `session/list` 200 且 `result.ok=true` |
+| 2026-10-16 staging 复核 | `dsh-api` 保持 2/2；两个 API endpoint 均为 `ready=true, serving=true, terminating=false`；三类探针均指向 `/healthz` |
+
+故障注入脚本按 argv 精确匹配目标进程，没有暂停探针执行用的临时 Node 进程。Pod 重启消除了被暂停进程，不需要遗留 `SIGCONT` 清理。
+SMOKE-core-24 的 CPU 门禁从镜像构建和容器启动完成后开始采样；镜像构建属于构建验证，不再计入部署运行时 CPU 峰值。
 
 ## 验证范围
 

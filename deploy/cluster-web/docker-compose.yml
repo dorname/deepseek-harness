@@ -35,7 +35,7 @@ services:
       postgres:
         condition: service_healthy
       api:
-        condition: service_started
+        condition: service_healthy
     command:
       - node
       - --import
@@ -88,6 +88,16 @@ services:
       API_LOOPBACK_PORT: ${API_LOOPBACK_PORT:-13080}
       DSH_HOME: /dsh-home
       DSH_CONFIG_READONLY: '1'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - 'fetch("http://127.0.0.1:3080/healthz").then((response) => { if (response.status !== 200) process.exit(1) }, () => process.exit(1))'
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
     volumes:
       - dsh-home:/dsh-home
     # No host ports: only reachable as compose DNS `api:FORWARD_PORT`.

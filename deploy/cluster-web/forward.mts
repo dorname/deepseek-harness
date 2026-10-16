@@ -1,11 +1,15 @@
 /**
  * In-network HTTP forwarder for API containers (S47): binds FORWARD_PORT on
  * 0.0.0.0 (Docker network only when the compose port is not published) and
- * proxies every request to loopback dsh. Keeps `dsh --host 0.0.0.0` forbidden.
+ * proxies application requests to loopback dsh. GET /healthz verifies that
+ * the API rejects an unauthenticated request with 401; other statuses and
+ * connection failures return 503. Keeps `dsh --host 0.0.0.0` forbidden.
  *
  * Env:
  * - `FORWARD_PORT` (default 3080)
  * - `LOOPBACK_UPSTREAM` — `host:port` for dsh (default `127.0.0.1:13080`)
+ * - `FORWARD_HEALTH_TIMEOUT_MS` — health request deadline (default 1000)
+ * - `TRUSTED_HOST` — Host header for the internal health request
  *
  * @module
  */
@@ -21,9 +25,14 @@ import { parseHostPort } from './upstream.mts'
 
 const forwardPort = Number(process.env.FORWARD_PORT ?? '3080')
 const loopbackRaw = (process.env.LOOPBACK_UPSTREAM ?? '127.0.0.1:13080').trim()
+const healthTimeoutMs = Number(process.env.FORWARD_HEALTH_TIMEOUT_MS ?? '1000')
 
-if (!Number.isFinite(forwardPort) || forwardPort <= 0) {
-  console.error('cluster-web-forward: FORWARD_PORT must be a positive number')
+if (!Number.isInteger(forwardPort) || forwardPort < 0 || forwardPort > 65535) {
+  console.error('cluster-web-forward: FORWARD_PORT must be an integer from 0 to 65535')
+  process.exit(2)
+}
+if (!Number.isInteger(healthTimeoutMs) || healthTimeoutMs <= 0) {
+  console.error('cluster-web-forward: FORWARD_HEALTH_TIMEOUT_MS must be a positive integer')
   process.exit(2)
 }
 if (loopbackRaw.length === 0) {
@@ -59,7 +68,32 @@ function proxyHttp(req: IncomingMessage, res: ServerResponse): void {
   req.pipe(proxyReq)
 }
 
-const server = createServer(proxyHttp)
+function health(res: ServerResponse): void {
+  const check = httpRequest({
+    hostname: upstream.host,
+    port: upstream.port,
+    path: '/api/404',
+    method: 'GET',
+    headers: { host: process.env.TRUSTED_HOST ?? loopbackRaw },
+    signal: AbortSignal.timeout(healthTimeoutMs),
+  }, reply => {
+    reply.resume()
+    res.writeHead(reply.statusCode === 401 ? 200 : 503, { 'content-type': 'text/plain', 'cache-control': 'no-store' })
+    res.end(reply.statusCode === 401 ? 'ok\n' : 'unavailable\n')
+  })
+  check.on('error', () => {
+    if (res.writableEnded || res.destroyed) return
+    res.writeHead(503, { 'content-type': 'text/plain', 'cache-control': 'no-store' })
+    res.end('unavailable\n')
+  })
+  res.on('close', () => check.destroy())
+  check.end()
+}
+
+const server = createServer((req, res) => {
+  if (req.method === 'GET' && req.url === '/healthz') health(res)
+  else proxyHttp(req, res)
+})
 
 server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
   const urlPath = req.url ?? '/'
@@ -90,8 +124,10 @@ server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
 })
 
 server.listen(forwardPort, '0.0.0.0', () => {
+  const address = server.address()
+  if (address === null || typeof address === 'string') throw new Error('forwarder has no TCP address')
   console.log(
-    `cluster-web-forward: ready on 0.0.0.0:${String(forwardPort)} → ${loopbackRaw}`,
+    `cluster-web-forward: ready on 0.0.0.0:${String(address.port)} → ${loopbackRaw}`,
   )
 })
 

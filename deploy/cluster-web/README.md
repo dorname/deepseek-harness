@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Same-origin one-click deployment runs **frontend** as the only externally exposed origin (edge + shell). The **api** service runs one container per replica (loopback API-only dsh plus an in-network forwarder) and can scale with `--scale api=2`. The shared `$DSH_HOME` volume lets API containers accept the same browser cookie. Compose also starts Postgres. Acceptance keeps replicas low by default to avoid saturating the host during verification.
+Same-origin one-click deployment runs **frontend** as the only externally exposed origin (edge + shell). The **api** service runs one container per replica (loopback API-only dsh plus an in-network forwarder) and can scale with `--scale api=2`. Compose marks API replicas healthy through the forwarder's `/healthz` and starts the frontend only after they are ready. The shared `$DSH_HOME` volume lets API containers accept the same browser cookie. Compose also starts Postgres. Acceptance keeps replicas low by default to avoid saturating the host during verification.
 
 ## Quick start
 

@@ -18,6 +18,21 @@ api:
   # In-network forwarder (Service target); dsh stays on loopbackPort.
   forwardPort: 3080
   loopbackPort: 13080
+  # Probe the protected loopback API without a user cookie; 401 proves HTTP readiness.
+  healthTimeoutMs: 1000
+  probes:
+    startup:
+      periodSeconds: 5
+      timeoutSeconds: 2
+      failureThreshold: 60
+    readiness:
+      periodSeconds: 5
+      timeoutSeconds: 2
+      failureThreshold: 2
+    liveness:
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 3
 
 dshHome:
   storage: 1Gi

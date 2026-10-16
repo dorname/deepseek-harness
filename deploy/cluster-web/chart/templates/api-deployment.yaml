@@ -48,14 +48,28 @@ spec:
               value: {{ .Values.api.forwardPort | quote }}
             - name: API_LOOPBACK_PORT
               value: {{ .Values.api.loopbackPort | quote }}
+            - name: FORWARD_HEALTH_TIMEOUT_MS
+              value: {{ .Values.api.healthTimeoutMs | quote }}
             - name: DSH_HOME
               value: /dsh-home
           ports:
             - containerPort: {{ .Values.api.forwardPort }}
               name: forward
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthz
               port: forward
+            {{- toYaml .Values.api.probes.readiness | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: forward
+            {{- toYaml .Values.api.probes.liveness | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: forward
+            {{- toYaml .Values.api.probes.startup | nindent 12 }}
           resources:
             {{- toYaml .Values.resources.api | nindent 12 }}
           volumeMounts:

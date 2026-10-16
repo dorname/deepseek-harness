@@ -9,7 +9,7 @@ kind: "reference"
 
 ## 摘要
 
-同域一键部署：**frontend** 容器对外只暴露一个 origin（edge + shell）；**api** 服务每副本一容器（loopback API-only + 内网 forwarder），可用 `--scale api=2` 做容器级多副本。共享 volume `$DSH_HOME` 使 cookie 跨 api 容器互认。Compose 附带 Postgres。验收默认低副本，避免 verify 打爆主机 CPU。
+同域一键部署：**frontend** 容器对外只暴露一个 origin（edge + shell）；**api** 服务每副本一容器（loopback API-only + 内网 forwarder），可用 `--scale api=2` 做容器级多副本。Compose 通过 forwarder 的 `/healthz` 标记 API 副本健康，并在其就绪后才启动 frontend。共享 volume `$DSH_HOME` 使 cookie 跨 api 容器互认。Compose 附带 Postgres。验收默认低副本，避免 verify 打爆主机 CPU。
 
 ## 一键启动
 

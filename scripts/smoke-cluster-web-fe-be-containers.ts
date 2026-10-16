@@ -9,7 +9,7 @@ import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { startCpuMonitor } from './fleet-staging/cpu-monitor.ts'
+import { startCpuMonitor, type CpuMonitor } from './fleet-staging/cpu-monitor.ts'
 import { loadStagingConfig } from './fleet-staging/config.ts'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -114,7 +114,7 @@ async function waitReady(publicUrl: string, timeoutMs: number): Promise<string |
 async function main(): Promise<void> {
   const started = Date.now()
   const config = loadStagingConfig()
-  const monitor = startCpuMonitor()
+  let monitor: CpuMonitor | undefined
   const apiScale = Math.min(2, Math.max(1, Number(process.env.SMOKE_API_SCALE ?? '1')))
   let peak = 0
   let upChild: ChildProcess | undefined
@@ -157,6 +157,8 @@ async function main(): Promise<void> {
       upChild?.on('exit', (code) => { resolve(code) })
     })
     if (upCode !== 0) throw new Error(`compose up failed code=${String(upCode)}; log:\n${upLog.slice(-3000)}`)
+    // The CPU gate measures serving behavior after image build and startup.
+    monitor = startCpuMonitor()
 
     const ps = spawnSync('docker', composeArgs(['ps', '--format', '{{.Name}} {{.Service}}']), {
       cwd: REPO_ROOT,
@@ -245,8 +247,8 @@ async function main(): Promise<void> {
     })
     reportVerifySt('pass', Date.now() - started)
   } catch (error) {
-    peak = monitor.peakPercent()
-    monitor.stop()
+    peak = monitor?.peakPercent() ?? 0
+    monitor?.stop()
     report('SMOKE-core-24', {
       durationMs: Date.now() - started,
       scenario: 'cluster-web frontend/api containers',
