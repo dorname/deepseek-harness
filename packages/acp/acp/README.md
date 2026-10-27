@@ -99,7 +99,8 @@ The decision history lives in the [ACP as an automation-only protocol note](../.
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, `AgentSideConnection` wiring, per-session records, admission and settlement, teardown |
+| [`src/index.ts`](src/index.ts) | Plugin entry: stdio wiring and per-connection bridge lifecycle |
+| [`src/bridge.ts`](src/bridge.ts) | `AcpBridge`: per-connection session registry, ACP request handlers, teardown |
 | [`src/content.ts`](src/content.ts) | Wire-content admission and projection: image validation, route recheck, prompt reconstruction, assistant block conversion |
 | [`src/codec.ts`](src/codec.ts) | Pure turn-ending to ACP `stopReason` mapping |
 

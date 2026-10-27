@@ -25,6 +25,7 @@ The acp group provides one package: a server that lets programs and automation r
 | Package | Role |
 |---|---|
 | [`acp/`](acp/README.md) | Lets programs manage persistent agents over ACP, attach MCP servers, select model options, prompt and cancel work, and receive semantic updates |
+| [`acp-network/`](acp-network/README.md) | Network transport for `dsh-acp`: WebSocket and Streamable HTTP endpoint on the Cordis webserver with HMAC token authentication |
 
 -----
 

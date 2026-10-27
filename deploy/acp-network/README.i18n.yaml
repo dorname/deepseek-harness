@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write deploy/acp-network/README.md
+/acp-over-network-staging-deployment:
+  en: ce94a15e5a25eca3
+  zh: 301ea3db0854e4d1
+/acp-over-network-staging-deployment/files:
+  en: a60cbac404feab8a
+  zh: ab6497f5be1edba2
+/acp-over-network-staging-deployment/build-the-image:
+  en: 797cffb0e0f8cb19
+  zh: 085a5ffe960887b0
+/acp-over-network-staging-deployment/deploy:
+  en: 2f6c7921168c116d
+  zh: bad7dd01d6d11340
+/acp-over-network-staging-deployment/run-the-local-protocol-smoke:
+  en: ca01fef464527365
+  zh: 993ecf86d3ebb46d
+/acp-over-network-staging-deployment/verify-staging-end-to-end:
+  en: 8d45f4bbe9d2df10
+  zh: b8705462b1c23dfe
+/acp-over-network-staging-deployment/persistence:
+  en: 32189dc1a0e661dd
+  zh: a1e199459e6bffb3
+/acp-over-network-staging-deployment/rollback:
+  en: c6b11dc4fa53cb7c
+  zh: a65ebdbbb1946764

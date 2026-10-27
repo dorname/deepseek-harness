@@ -2,71 +2,21 @@
 
 > 变更：20261020-1643-acp-over-network
 
-## 单元测试
+## 单元（UT）
 
-### UT-S01：WebSocket 完整 prompt 闭环
+| ID | 名称 | 对象 | 前置 | 操作 | 期望 |
+|----|------|------|------|------|------|
+| UT-S01 | WebSocket 完整 prompt 闭环 | `packages/acp/acp-network/tests/network.spec.ts` | mock LLM 返回 `hello from network` | initialize → authenticate → session/new → session/prompt → session/close | `sessionId` 有效；`stopReason === end_turn`；文本更新拼接为 `hello from network` |
+| UT-S02 | 认证失败 | `packages/acp/acp-network/tests/network.spec.ts` | 无效或过期 token | initialize → authenticate | `authenticate` 抛错 |
+| UT-S03 | 断连后 resume | `packages/acp/acp-network/tests/network.spec.ts` | 同一 persistence root | session/new → prompt → close → 新 harness session/resume → prompt | resume 成功；prompt 返回 `end_turn` |
+| UT-S04 | bundle 配置声明 | `packages/bundle/acp-network-app/tests/acp-network-app.spec.ts` | `cordis.patch.yml` | 读取 patch | 声明 `acp-network-app-startup` 与 `acp-network`；transport=`websocket`；path=`/acp`；`acp` 与 `session-title-llm` 禁用 |
 
-- **位置**：`packages/acp/acp-network/tests/network.spec.ts`
-- **输入**：mock LLM adapter 返回 `"hello from network"` 文本流。
-- **步骤**：
-  1. `initialize`
-  2. `authenticate`（有效 token）
-  3. `session/new`
-  4. `session/prompt`
-  5. 收集 `session/update`
-  6. `session/close`
-- **期望**：
-  - `session/new` 返回 `sessionId`。
-  - prompt 返回 `stopReason === 'end_turn'`。
-  - `agent_message_chunk` 更新拼接为 `"hello from network"`。
+## 场景（ST）
 
-### UT-S02：认证失败
-
-- **位置**：`packages/acp/acp-network/tests/network.spec.ts`
-- **输入**：无效 token、过期 token。
-- **步骤**：
-  1. `initialize`
-  2. `authenticate`（无效/过期 token）
-- **期望**：`authenticate` 抛出错误。
-
-### UT-S03：断连后 resume
-
-- **位置**：`packages/acp/acp-network/tests/network.spec.ts`
-- **输入**：同一 persistence root，先 `closeSession` 再重建 harness。
-- **步骤**：
-  1. 第一个 harness：`session/new` → `prompt` → `closeSession` → dispose。
-  2. 第二个 harness（同一 persistence root）：`session/resume` → `prompt`。
-- **期望**：`session/resume` 成功，prompt 返回 `stopReason === 'end_turn'`。
-
-### UT-S04：bundle 配置声明
-
-- **位置**：`packages/bundle/acp-network-app/tests/acp-network-app.spec.ts`
-- **输入**：`cordis.patch.yml`。
-- **期望**：
-  - patch 声明 `acp-network-app-startup` 与 `acp-network` 行。
-  - `acp-network` 注入 `acpAppStartup`，默认 transport 为 `websocket`，path 为 `/acp`。
-  - `acp` 与 `session-title-llm` 被禁用。
-
-## 集成 / Smoke 测试
-
-### ST-S01：网络 ACP 端到端 prompt
-
-- **触发**：本地 staging 或 CI smoke runner。
-- **步骤**：
-  1. 启动 `dsh --profile acp-network`。
-  2. 测试 client 用有效 token 连接 `ws://HOST/acp`。
-  3. 执行 `initialize` → `authenticate` → `session/new` → `session/prompt`。
-- **期望**：收到文本更新与 `end_turn` 停止原因。
-
-### ST-S02：断连后 `session/resume` 恢复
-
-- **触发**：本地 staging 或 CI smoke runner。
-- **步骤**：
-  1. 建立连接，创建会话，执行 prompt，`session/close`。
-  2. 断开 WebSocket。
-  3. 新连接，重新 `initialize`/`authenticate`，`session/resume`。
-  4. 继续 prompt。
-- **期望**：`session/resume` 成功，新 prompt 正常返回。
+| ID | 名称 | 关联 AC | 前置 | 操作 | 期望 |
+|----|------|---------|------|------|------|
+| ST-S01 | 网络 ACP 端到端 prompt | SMOKE-acp-network-01 | 本地协议 smoke 或 staging | initialize → authenticate → session/new → session/prompt | 文本更新与 `end_turn` |
+| ST-S02 | 断连后 session/resume | SMOKE-acp-network-02 | 本地协议 smoke 或 staging | close → 新连接 → resume → prompt | resume 成功；新 prompt 正常返回 |
 
 ## 追溯表
 
@@ -75,9 +25,9 @@
 | WebSocket 传输 | `packages/acp/acp-network/src/index.ts` | 已实现 |
 | Streamable HTTP fallback | `packages/acp/acp-network/src/index.ts` | 已实现 |
 | HMAC token 认证 | `packages/acp/acp-network/src/index.ts` | 已实现 |
-| session/new + prompt | `packages/acp/acp-network/tests/network.spec.ts` UT-S01 | 已通过 |
-| 认证失败 | `packages/acp/acp-network/tests/network.spec.ts` UT-S02 | 已通过 |
-| session/resume | `packages/acp/acp-network/tests/network.spec.ts` UT-S03 | 已通过 |
-| bundle 声明 | `packages/bundle/acp-network-app/tests/acp-network-app.spec.ts` UT-S04 | 已通过 |
-| staging smoke prompt | ST-S01 | 待部署验证 |
-| staging smoke resume | ST-S02 | 待部署验证 |
+| session/new + prompt | UT-S01 | 验收接线 |
+| 认证失败 | UT-S02 | 验收接线 |
+| session/resume | UT-S03 | 验收接线 |
+| bundle 声明 | UT-S04 | 验收接线 |
+| staging/local smoke prompt | ST-S01 / SMOKE-acp-network-01 | 验收接线 |
+| staging/local smoke resume | ST-S02 / SMOKE-acp-network-02 | 验收接线 |

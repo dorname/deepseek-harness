@@ -47,8 +47,9 @@ for (const runner of runners) {
   })
   if (result.status !== 0) {
     console.error(`run-smoke: ${runner} exited with ${String(result.status ?? result.signal)}`)
+    // Continue so later runners can still append skip/pass rows; Gate 3.8
+    // scores the full ledger. Aborting early left later SMOKE-* uncovered.
     failed = true
-    break
   }
 }
 process.exit(failed ? 1 : 0)

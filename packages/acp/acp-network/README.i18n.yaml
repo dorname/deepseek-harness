@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/acp/acp-network/README.md
+/:
+  en: f25bd5ea91d0e46b
+  zh: 4573a10154201a3c
+/deepseek-ai-dsh-acp-network:
+  en: 63d2761baa8f9155
+  zh: 42f53d787831ac50
+/deepseek-ai-dsh-acp-network/summary:
+  en: 1954f8e4a46e7966
+  zh: 775c6ebe494e9c85
+/deepseek-ai-dsh-acp-network/table-of-contents:
+  en: 3460b3e585e0c020
+  zh: bb83d3d282b286d8
+/deepseek-ai-dsh-acp-network/use-this-package:
+  en: de2637bf04b1b9f7
+  zh: edfc8d08c15b17f4
+/deepseek-ai-dsh-acp-network/use-this-package/minimal-configuration:
+  en: c5d94bc262f25f74
+  zh: 7f16d60ad855d78e
+/deepseek-ai-dsh-acp-network/use-this-package/token-format:
+  en: d676fad8640f7596
+  zh: 6ab748dbbed48018
+/deepseek-ai-dsh-acp-network/use-this-package/run-the-local-smoke:
+  en: 7b3c88c03cb8c084
+  zh: ca905747299f0cd6
+/deepseek-ai-dsh-acp-network/use-this-package/start-a-server:
+  en: 5fa8001f43177210
+  zh: c8407a65ef8fff41
+/deepseek-ai-dsh-acp-network/understand-the-implementation:
+  en: 250e8cf392e672ce
+  zh: 20a8dc99654968ba
+/deepseek-ai-dsh-acp-network/model-experience:
+  en: 422015b752d2f245
+  zh: 1a97f6b6a7c073b0
+/deepseek-ai-dsh-acp-network/model-experience/kv-cache-effect:
+  en: 13a2cc49bfb53a3a
+  zh: 61f1393ace256a6a
+/deepseek-ai-dsh-acp-network/known-limitations-and-deferred-work:
+  en: a9a515cf4441b387
+  zh: ab6ff169a40d9ad3
+/deepseek-ai-dsh-acp-network/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 8ec3e73528ddb1a6

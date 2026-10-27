@@ -73,6 +73,8 @@ const vitestStatus = run('openlogos vitest suites', 'pnpm', ['exec', 'vitest', '
   'packages/bundle/web-app/tests/web-app.spec.ts', 'packages/bundle/web-app/tests/startup.spec.ts',
   'apps/cli/tests/cluster-web-fe-split.spec.ts',
   'apps/cli/tests/cluster-web-fe-be-containers.spec.ts',
+  'packages/acp/acp-network/tests/network.spec.ts',
+  'packages/bundle/acp-network-app/tests/acp-network-app.spec.ts',
 ], { OPENLOGOS_RESULT_FILE: ledgerPath })
 const acceptanceStatus = run('ST-S33-03 acceptance runner', 'node',
   ['--import', 'tsx/esm', 'scripts/fleet-staging/acceptance-st-s33-03.ts'], { OPENLOGOS_RESULT_FILE: ledgerPath })
@@ -80,6 +82,8 @@ const feSplitStatus = run('ST-S46 fe-split acceptance (SMOKE-core-23 path)', 'no
   ['--import', 'tsx/esm', 'scripts/smoke-cluster-web-fe-split.ts'], { OPENLOGOS_RESULT_FILE: ledgerPath })
 const feBeStatus = run('ST-S47 fe-be-containers acceptance (SMOKE-core-24 path)', 'node',
   ['--import', 'tsx/esm', 'scripts/smoke-cluster-web-fe-be-containers.ts'], { OPENLOGOS_RESULT_FILE: ledgerPath })
+const acpNetworkSmokeStatus = run('ST-S01/S02 acp-network protocol smoke', 'pnpm',
+  ['exec', 'tsx', 'packages/acp/acp-network/tests/smoke/protocol-smoke.ts'], { OPENLOGOS_RESULT_FILE: ledgerPath })
 
 const reported = new Set(readFileSync(ledgerPath, 'utf8')
   .split('\n')
@@ -106,4 +110,4 @@ for (const id of baseline) {
   })}\n`)
 }
 console.log(`run-openlogos-tests: fleet cases ${String(reported.size)}, baseline skips ${String(baseline.length)}`)
-process.exit(vitestStatus !== 0 || acceptanceStatus !== 0 || feSplitStatus !== 0 || feBeStatus !== 0 ? 1 : 0)
+process.exit(vitestStatus !== 0 || acceptanceStatus !== 0 || feSplitStatus !== 0 || feBeStatus !== 0 || acpNetworkSmokeStatus !== 0 ? 1 : 0)

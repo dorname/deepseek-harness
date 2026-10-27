@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dsh-acp-network
+spec:
+  podSelector:
+    matchLabels:
+      app: dsh-acp-network
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: dspm-chat-relay
+      ports:
+        - protocol: TCP
+          port: 3080

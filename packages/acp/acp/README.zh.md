@@ -99,7 +99,8 @@ kind: "package-reference"
 
 | 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | 插件入口：`Config` schema、`AgentSideConnection` 接线、按会话记录、准入与结算、清理 |
+| [`src/index.ts`](src/index.ts) | 插件入口：stdio 接线与每连接 bridge 生命周期 |
+| [`src/bridge.ts`](src/bridge.ts) | `AcpBridge`：每连接会话注册表、ACP 请求处理器、清理 |
 | [`src/content.ts`](src/content.ts) | 协议内容准入与投影：图片校验、路由重查、提示词重建、assistant 块转换 |
 | [`src/codec.ts`](src/codec.ts) | 轮次结束到 ACP `stopReason` 的纯映射 |
 

@@ -1,0 +1,27 @@
+# The automation-only ACP-over-network application over dsh-base.
+# Exposes ACP on Cordis webserver via WebSocket (primary) and Streamable HTTP (fallback).
+
+- id: session-title-llm
+  disabled: true
+
+- id: acp
+  disabled: true
+
+- insert:
+    - id: webserver
+      name: '@deepseek-ai/dsh-host-webserver'
+      config:
+        host: !!js "process.env.DSH_ACP_NETWORK_HOST ?? '127.0.0.1'"
+        port: !!js "Number(process.env.DSH_ACP_NETWORK_PORT ?? 3080)"
+
+    - id: acp-network-app-startup
+      name: '@deepseek-ai/dsh-acp-network-app'
+
+    - id: acp-network
+      name: '@deepseek-ai/dsh-acp-network'
+      inject: [acpAppStartup]
+      config:
+        provider: deepseek-official
+        model: deepseek-v4-flash
+        transport: websocket
+        path: /acp

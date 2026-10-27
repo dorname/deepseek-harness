@@ -26,6 +26,8 @@
     "@deepseek-ai/cordis-plugin-loader": "workspace:~",
     "@deepseek-ai/cordis-plugin-timer": "workspace:~",
     "@deepseek-ai/dsh-acp-app": "workspace:*",
+    "@deepseek-ai/dsh-acp-network": "workspace:*",
+    "@deepseek-ai/dsh-acp-network-app": "workspace:*",
     "@deepseek-ai/dsh-agent-instructions": "workspace:*",
     "@deepseek-ai/dsh-agent-tool-presentation": "workspace:*",
     "@deepseek-ai/dsh-app-boot": "workspace:*",

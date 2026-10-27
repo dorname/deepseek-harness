@@ -25,6 +25,7 @@ acp 组提供一个包：一个服务器，让程序与自动化流程可以通�
 | 包 | 职责 |
 |---|---|
 | [`acp/`](acp/README.zh.md) | 让程序通过 ACP 管理持久 agent、挂载 MCP 服务器、选择模型选项、发送提示词、取消工作并接收语义更新 |
+| [`acp-network/`](acp-network/README.zh.md) | `dsh-acp` 的网络传输：在 Cordis webserver 上提供 WebSocket 与 Streamable HTTP 端点，并支持 HMAC token 认证 |
 
 -----
 

@@ -180,6 +180,9 @@ export const PROFILE_TEMPLATES: Record<string, ProfileTemplate> = {
   acp: {
     bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-acp-app'],
   },
+  'acp-network': {
+    bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-acp-network-app'],
+  },
   web: {
     bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'],
   },

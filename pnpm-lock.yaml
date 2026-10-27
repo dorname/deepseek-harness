@@ -214,6 +214,12 @@ importers:
       '@deepseek-ai/dsh-acp-app':
         specifier: workspace:*
         version: link:../../packages/bundle/acp-app
+      '@deepseek-ai/dsh-acp-network':
+        specifier: workspace:*
+        version: link:../../packages/acp/acp-network
+      '@deepseek-ai/dsh-acp-network-app':
+        specifier: workspace:*
+        version: link:../../packages/bundle/acp-network-app
       '@deepseek-ai/dsh-agent-instructions':
         specifier: workspace:*
         version: link:../../packages/context/agent-instructions
@@ -1096,6 +1102,34 @@ importers:
       '@deepseek-ai/dsh-user-approval':
         specifier: workspace:*
         version: link:../../interaction/user-approval
+
+  packages/acp/acp-network:
+    dependencies:
+      '@agentclientprotocol/sdk':
+        specifier: 1.4.0
+        version: 1.4.0(zod@4.4.3)
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      ws:
+        specifier: ^8.21.0
+        version: 8.21.0
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-acp':
+        specifier: workspace:*
+        version: link:../acp
+      '@deepseek-ai/dsh-host-webserver':
+        specifier: workspace:*
+        version: link:../../host/webserver
+      '@types/ws':
+        specifier: ^8.5.13
+        version: 8.18.1
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
 
   packages/api/account-controller:
     dependencies:
@@ -1985,6 +2019,31 @@ importers:
       '@deepseek-ai/cordis-plugin-include':
         specifier: workspace:~
         version: link:../../../vendor/include
+
+  packages/bundle/acp-network-app:
+    dependencies:
+      '@deepseek-ai/dsh-acp-network':
+        specifier: workspace:*
+        version: link:../../acp/acp-network
+      '@deepseek-ai/dsh-cmdline':
+        specifier: workspace:*
+        version: link:../../boot/cmdline
+      '@deepseek-ai/dsh-host-webserver':
+        specifier: workspace:*
+        version: link:../../host/webserver
+      commander:
+        specifier: ^15.0.0
+        version: 15.0.0
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/cordis-plugin-include':
+        specifier: workspace:~
+        version: link:../../../vendor/include
+      js-yaml:
+        specifier: ^4.1.0
+        version: 4.3.1
 
   packages/bundle/base:
     dependencies:
@@ -16718,10 +16777,12 @@ packages:
 
   '@modelcontextprotocol/server-everything@2026.7.4':
     resolution: {integrity: sha512-ydMW/M6rk9tK23b+U38trsNLHhd5eF+ntiv2Vr+RPMDhbiKY/IKrZU25ukvSXVPUBvy7TxTPWpeV4KcYcXg72w==}
+    deprecated: 'Date-based versions are no longer published. This package has resumed semantic versioning at 1.0.0: install the latest version.'
     hasBin: true
 
   '@modelcontextprotocol/server-filesystem@2026.7.10':
     resolution: {integrity: sha512-Mmjg4anFBD5OzbPnGJOA0jPPN8645ERhQk38HQLpSenx1ox9bfdPkmAzUnNjeQtqQGFLtKe13J20RtLBmUKMZA==}
+    deprecated: 'Date-based versions are no longer published. This package has resumed semantic versioning at 1.0.0: install the latest version.'
     hasBin: true
 
   '@modelcontextprotocol/server@2.0.0':

@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dsh-acp-network
+  labels:
+    app: dsh-acp-network
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dsh-acp-network
+  template:
+    metadata:
+      labels:
+        app: dsh-acp-network
+    spec:
+      containers:
+        - name: dsh
+          image: dsh-acp-network:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DSH_HOME
+              value: /dsh-home
+            - name: DSH_ACP_NETWORK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dsh-acp-network-secret
+                  key: secret
+            - name: DSH_FLEET_USER_ID
+              valueFrom:
+                secretKeyRef:
+                  name: dsh-acp-network-secret
+                  key: subject
+            - name: DSH_ACP_NETWORK_AUDIENCE
+              value: dsh-acp
+            - name: DSH_ACP_NETWORK_HOST
+              value: 0.0.0.0
+            - name: DSH_ACP_NETWORK_PORT
+              value: "3080"
+            - name: DEEPSEEK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dsh-provider-secret
+                  key: DEEPSEEK_API_KEY
+          ports:
+            - name: acp
+              containerPort: 3080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: acp
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: acp
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          volumeMounts:
+            - name: dsh-home
+              mountPath: /dsh-home
+      # SIGTERM ends in-flight turns and flushes sessions; keep the grace
+      # period above one turn's wind-down before SIGKILL.
+      terminationGracePeriodSeconds: 60
+      volumes:
+        - name: dsh-home
+          persistentVolumeClaim:
+            claimName: dsh-acp-network-home

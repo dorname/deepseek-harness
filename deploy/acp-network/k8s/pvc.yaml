@@ -1,0 +1,14 @@
+# Durable $DSH_HOME for the acp-network Pod: session logs, attachments, and
+# KV storage survive Pod replacement. Unset storageClassName uses the
+# cluster's default StorageClass; growing the claim afterwards requires a
+# StorageClass with volume expansion enabled.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dsh-acp-network-home
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
