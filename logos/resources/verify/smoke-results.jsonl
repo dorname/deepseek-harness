@@ -33,3 +33,7 @@
 {"id":"SMOKE-core-24","status":"pass","timestamp":"2026-10-30T16:14:59.227Z","duration_ms":375020,"scenario":"cluster-web frontend/api containers","cpu_peak_percent":11.36934673366834}
 {"id":"SMOKE-core-20","status":"pass","timestamp":"2026-10-30T16:15:38.238Z","duration_ms":5376,"scenario":"cluster-web same-origin one-click","cpu_peak_percent":12.865133623368552}
 {"id":"SMOKE-core-20","status":"pass","timestamp":"2026-10-30T16:16:09.653Z","duration_ms":4215,"scenario":"cluster-web same-origin one-click","cpu_peak_percent":11.887254901960787}
+{"id":"SMOKE-core-23","status":"pass","timestamp":"2026-10-31T11:00:32.404Z","duration_ms":4408,"scenario":"cluster-web same-origin fe-split","cpu_peak_percent":13.5202492211838}
+{"id":"SMOKE-core-24","status":"fail","timestamp":"2026-10-31T11:00:32.535Z","duration_ms":31,"scenario":"cluster-web frontend/api containers","error":"docker compose is required for SMOKE-core-24","cpu_peak_percent":0}
+{"id":"SMOKE-core-23","status":"pass","timestamp":"2026-10-31T11:07:32.178Z","duration_ms":4234,"scenario":"cluster-web same-origin fe-split","cpu_peak_percent":15.723270440251568}
+{"id":"SMOKE-core-24","status":"pass","timestamp":"2026-10-31T11:13:47.209Z","duration_ms":374940,"scenario":"cluster-web frontend/api containers","cpu_peak_percent":20.898315658140987}
