@@ -1,0 +1,38 @@
+# The dsh-cluster-web-app bundle patch: the cluster-web API composition over
+# the dsh-web-app layer (`cluster-web-api` profile: dsh-base → dsh-web-app →
+# this bundle). An API replica serves the browser RPC surface without the SPA
+# and persists sessions and streams through shared Postgres instead of local
+# JSONL, so replicas behind one origin share session state.
+#
+# A patch replaces the targeted row's whole `config`, so the web-runtime row
+# below restates every key it owns with serveFrontend switched off.
+#
+# `DATABASE_URL` must name the shared `postgres://` database; the inserted
+# plugins validate it as a required string at mount, so an unset value fails
+# the boot instead of silently falling back to local persistence.
+
+- id: web-runtime
+  config:
+    openBrowser: !!js ctx.webStartup.openBrowser
+    printUrl: true
+    publicUrl: !!js ctx.webStartup.publicUrl
+    surfaceContext: true
+    trustedHosts: !!js ctx.webStartup.trustedHosts
+    trustLoopbackGateway: !!js ctx.webStartup.trustLoopbackGateway
+    serveFrontend: false
+
+- id: session-persistence-jsonl
+  disabled: true
+
+- insert:
+    - id: session-persistence-postgres
+      name: '@deepseek-ai/dsh-session-persistence-postgres'
+      config:
+        connectionString: !!js process.env.DATABASE_URL
+        max: 2
+
+    - id: stream-relay-postgres
+      name: '@deepseek-ai/dsh-stream-relay-postgres'
+      config:
+        connectionString: !!js process.env.DATABASE_URL
+        max: 2

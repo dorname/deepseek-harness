@@ -183,6 +183,12 @@ export const PROFILE_TEMPLATES: Record<string, ProfileTemplate> = {
   'acp-network': {
     bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-acp-network-app'],
   },
+  'cluster-web-api': {
+    bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-cluster-web-app'],
+  },
+  'cluster-web-runner': {
+    bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-cluster-web-app', '@deepseek-ai/dsh-cluster-web-runner-app'],
+  },
   web: {
     bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'],
   },

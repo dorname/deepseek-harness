@@ -7,6 +7,7 @@
 
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { appendFileSync, existsSync, readFileSync } from 'node:fs'
+import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { startCpuMonitor, type CpuMonitor } from './fleet-staging/cpu-monitor.ts'
@@ -87,6 +88,27 @@ function assertArtifacts(): void {
   }
 }
 
+/** Claim a free loopback port so an unrelated 8080 listener cannot answer the probes. */
+async function freePort(): Promise<number> {
+  return await new Promise((resolve, reject) => {
+    const server = createServer()
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      if (address === null || typeof address === 'string') {
+        server.close()
+        reject(new Error('smoke-cluster-web-fe-be-containers: failed to allocate port'))
+        return
+      }
+      const { port } = address
+      server.close((error) => {
+        if (error) reject(error)
+        else resolve(port)
+      })
+    })
+    server.on('error', reject)
+  })
+}
+
 async function waitReady(publicUrl: string, timeoutMs: number): Promise<string | undefined> {
   const deadline = Date.now() + timeoutMs
   let lastError = ''
@@ -141,12 +163,22 @@ async function main(): Promise<void> {
     const commit = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8' })
     const hash = (commit.stdout || '0000000').trim()
 
+    const edgePort = await freePort()
+    const publicUrl = `http://127.0.0.1:${String(edgePort)}/`
     upChild = spawn(
       'docker',
       composeArgs(['up', '--build', '--scale', `api=${String(apiScale)}`, '-d']),
       {
         cwd: REPO_ROOT,
-        env: { ...process.env, DSH_CLIENT_COMMIT_HASH: hash },
+        // EDGE_PORT moves the host publish and the in-container edge listener
+        // together; PUBLIC_URL/TRUSTED_HOST must carry the same authority.
+        env: {
+          ...process.env,
+          DSH_CLIENT_COMMIT_HASH: hash,
+          EDGE_PORT: String(edgePort),
+          PUBLIC_URL: publicUrl,
+          TRUSTED_HOST: `127.0.0.1:${String(edgePort)}`,
+        },
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     )
@@ -186,7 +218,6 @@ async function main(): Promise<void> {
       }
     }
 
-    const publicUrl = 'http://127.0.0.1:8080/'
     const token = await waitReady(publicUrl, 300_000)
     if (token === undefined) throw new Error('could not find shell launch token in frontend logs')
 

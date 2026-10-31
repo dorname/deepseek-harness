@@ -1,6 +1,6 @@
 # core: 部署后冒烟测试用例
 
-> 最后更新：2026-10-07
+> 最后更新：2026-10-31
 > 来源：`logos/resources/prd/3-technical-plan/3-deployment/core-01-deployment-plan.md` §八。SMOKE-* 结果写入 `logos/resources/verify/smoke-results.jsonl`（`openlogos smoke` 判定）。
 
 ## 一、冒烟测试范围
@@ -13,7 +13,7 @@
 
 # core: 部署后冒烟测试用例
 
-> 最后更新：2026-10-07
+> 最后更新：2026-10-31
 > 来源：`logos/resources/prd/3-technical-plan/3-deployment/core-01-deployment-plan.md` §八。SMOKE-* 结果写入 `logos/resources/verify/smoke-results.jsonl`（`openlogos smoke` 判定）。
 
 ## 一、冒烟测试范围
@@ -48,8 +48,8 @@
 | SMOKE-core-18 | 排空后接管续跑与旧会话可打开 | 部署方案 §七.14 / §八·Host 本地服务 | staging | 同上；双 runner + 排空指令 | A drive 中排空 → turn 边界收尾 → B 接管 | 新工作流向 B；in-flight 会话日志完整可打开；CPU 峰值 ≤ 阈值 |
 | SMOKE-core-19 | SIGTERM 优雅排空退出 | 部署方案 §编排器无关原则 / §八·Host 本地服务 | staging | runner 进程以配置化循环运行 | 向进程发 SIGTERM | 停止接新工作；in-flight 到 turn 边界；exit 0；串行执行，CPU 峰值 ≤ 部署配置阈值 |
 | SMOKE-core-20 | cluster-web 同域一键 | 部署方案 · cluster-web Compose / S43 | staging | deploy/cluster-web 存在；API_REPLICAS=1、RUNNER_REPLICAS=0 | supervise（或 compose）→ GET PUBLIC_URL → SIGTERM | 非 5xx；子树退出；串行；CPU 峰值 ≤ 部署配置阈值 |
-| SMOKE-core-21 | `dsh up` 同域一键 | 部署方案 · cluster-web dsh up / S44 | staging | 已 build 或源码可启动；API=1、RUNNER=0 | `dsh up --skip-overlays --skip-runners` → GET → SIGTERM | 非 5xx；子树退出；串行；CPU 峰值 ≤ 部署配置阈值 |
-| SMOKE-core-22 | cluster-web Helm 清单验收 | 部署方案 · cluster-web k8s / S45、S47 | staging | chart 存在 | 校验 values 默认副本、Compose 同源入口、Postgres overlay 与 Ingress；可选 `helm template`（默认与 api=2） | frontend=1/api=1/runner=0；api 可渲染为 2 副本；会话持久化走共享 Postgres；串行；CPU ≤ 阈值；不强制 live apply |
+| SMOKE-core-21 | `cluster-web:up` 同域一键 | 部署方案 · cluster-web 独立启动 / S44 | staging | 已 build 或源码可启动；API=1、RUNNER=0 | `pnpm run cluster-web:up`（env：`CLUSTER_WEB_SKIP_OVERLAYS=1`、`CLUSTER_WEB_SKIP_RUNNERS=1`）→ GET → SIGTERM | 非 5xx；子树退出；串行；CPU 峰值 ≤ 部署配置阈值 |
+| SMOKE-core-22 | cluster-web Helm 清单验收 | 部署方案 · cluster-web k8s / S45、S47 | staging | chart 存在 | 校验 values 默认副本、Compose 同源入口、`cluster-web-api`/`cluster-web-runner` profile 组合与 Ingress；可选 `helm template`（默认与 api=2） | frontend=1/api=1/runner=0；api 可渲染为 2 副本；会话持久化走共享 Postgres；串行；CPU ≤ 阈值；不强制 live apply |
 | SMOKE-core-23 | cluster-web 同域前后端分离 | 部署方案 · cluster-web fe-split / S46 | staging | deploy/cluster-web 存在；shell=1、API_REPLICAS=1、RUNNER_REPLICAS=0 | supervise（或 compose）→ `/?token=` → cookie GET `/` 与 `/api` → SIGTERM | 303+cookie；HTML 含 boot；无 cookie `/api`→401；子树退出；串行；CPU 峰值 ≤ 部署配置阈值 |
 | SMOKE-core-24 | cluster-web 前后端双容器 | 部署方案 · cluster-web fe-be-containers / S47 | staging | deploy/cluster-web 存在；frontend=1；api 副本=1（诊断可 2） | compose up → 断言 frontend/api 分离（scale=2 时 ≥2 api 容器）→ `/?token=` → cookie GET `/` 与 `/api` → compose down | 服务分离可见；303+cookie；HTML 含 boot；无 cookie `/api`→401；串行；CPU 峰值 ≤ 部署配置阈值 |
 

@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { applicationEntrypointViolations } from './verify-application-entrypoints.ts'
+import { applicationEntrypointViolations, DEPLOY_ENTRY_CLASSIFICATIONS } from './verify-application-entrypoints.ts'
 
 const cleanups: string[] = []
 
@@ -131,5 +131,27 @@ describe('application entrypoints', () => {
     expect(applicationEntrypointViolations(root)).toEqual([
       'package.json scripts.demo:new-app: demo launcher has no explicit dsh or in-process classification',
     ])
+  })
+
+  it('rejects a deploy entry script without an explicit classification', () => {
+    const root = fixture()
+    for (const path of DEPLOY_ENTRY_CLASSIFICATIONS.keys()) write(root, path, 'export {}\n')
+    write(root, 'deploy/example/server.mts', "import { createServer } from 'node:http'\n")
+
+    expect(applicationEntrypointViolations(root)).toEqual([
+      'deploy/example/server.mts: deploy entry script has no explicit classification',
+    ])
+  })
+
+  it('rejects a classified deploy entry whose file is missing', () => {
+    const root = fixture()
+    write(root, 'deploy/cluster-web/edge.mts', 'export {}\n')
+
+    // Only the one classified file exists; every other classified path is
+    // reported as missing so a renamed entry cannot keep its stale class.
+    const violations = applicationEntrypointViolations(root)
+    expect(violations).toContain('deploy/cluster-web/forward.mts: classified deploy entry is missing')
+    expect(violations).toContain('deploy/cluster-web/supervise.mts: classified deploy entry is missing')
+    expect(violations.every(failure => failure.endsWith('classified deploy entry is missing'))).toBe(true)
   })
 })

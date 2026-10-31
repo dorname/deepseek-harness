@@ -1,20 +1,21 @@
 /**
- * API container entry (S47): one loopback API-only dsh + in-network forwarder.
- * Compose scales this service for container-level replicas.
+ * API container entry (S47): one loopback `cluster-web-api` profile dsh plus
+ * in-network forwarder. Compose scales this service for container-level
+ * replicas; the profile bundle owns the composition (SPA off, shared Postgres
+ * persistence when `DATABASE_URL` names one).
  *
  * @module
  */
 
 import type { ChildProcess } from 'node:child_process'
-import { existsSync, mkdtempSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  API_OVERLAY_TEMPLATE,
   dshBin,
   ensureDir,
   FORWARD_SCRIPT,
-  renderOverlay,
+  noPostgresPatchArgs,
   spawnLogged,
   waitForLine,
 } from './process-helpers.mts'
@@ -31,7 +32,6 @@ async function main(): Promise<void> {
   const publicUrl = process.env.PUBLIC_URL ?? `http://127.0.0.1:${String(edgePort)}/`
   const trustedHost = process.env.TRUSTED_HOST ?? `127.0.0.1:${String(edgePort)}`
   const databaseUrl = process.env.DATABASE_URL ?? ''
-  const skipOverlays = process.env.CLUSTER_WEB_SKIP_OVERLAYS === '1' || databaseUrl === ''
 
   if (!Number.isInteger(forwardPort) || forwardPort <= 0) throw new Error('api: FORWARD_PORT invalid')
   if (!Number.isInteger(loopbackPort) || loopbackPort <= 0) throw new Error('api: API_LOOPBACK_PORT invalid')
@@ -71,20 +71,16 @@ async function main(): Promise<void> {
   }
 
   try {
-    const args = ['--import', 'tsx/esm', dshBin(), '--profile', 'web']
-    if (!skipOverlays && existsSync(API_OVERLAY_TEMPLATE)) {
-      const overlayPath = join(workDir, 'api.overlay.yml')
-      renderOverlay(API_OVERLAY_TEMPLATE, { __DATABASE_URL__: databaseUrl }, overlayPath)
-      args.push('--patch', overlayPath)
-    }
-    args.push(
-      '--api-only',
+    const args = [
+      '--import', 'tsx/esm', dshBin(),
+      '--profile', 'cluster-web-api',
+      ...noPostgresPatchArgs(databaseUrl),
       '--no-open',
       '--host', '127.0.0.1',
       '--port', String(loopbackPort),
       '--public-url', publicUrl,
       '--trusted-host', trustedHost,
-    )
+    ]
     const api = spawnLogged('api', process.execPath, args, childEnv())
     children.push({ name: 'api', child: api })
     await waitForLine(api, /dsh web: http/, 120_000)

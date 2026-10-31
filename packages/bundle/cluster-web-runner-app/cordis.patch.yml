@@ -1,0 +1,25 @@
+# The dsh-cluster-web-runner-app bundle patch: the runner composition layered
+# over dsh-cluster-web-app (`cluster-web-runner` profile: dsh-base →
+# dsh-web-app → dsh-cluster-web-app → this bundle). A runner replica keeps the
+# API composition and adds the Postgres session lease plus the agent dispatch
+# loop that claims queued sessions and drives them.
+#
+# `runner: true` starts the dispatch loop at mount; the loop requires
+# `DSH_NODE_ID` (the runner's lease identity), and `agent-dispatch` rejects the
+# mount without it, so a runner booted unnamed fails instead of idling.
+
+- insert:
+    - id: session-lease-postgres
+      name: '@deepseek-ai/dsh-session-lease-postgres'
+      config:
+        connectionString: !!js process.env.DATABASE_URL
+        max: 2
+
+    - id: agent-dispatch
+      name: '@deepseek-ai/dsh-agent-dispatch'
+      config:
+        connectionString: !!js process.env.DATABASE_URL
+        nodeId: !!js process.env.DSH_NODE_ID
+        max: 2
+        pollMs: 250
+        runner: true

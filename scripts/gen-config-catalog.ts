@@ -293,7 +293,11 @@ function schemaAlias(world: World, ctx: FileCtx, name: string): { ctx: FileCtx; 
   if (imported === undefined || imported.typeOnly || imported.imported === '*' || imported.imported === 'default') {
     throw new Error(`schema alias '${name}' must name a const or named value import`)
   }
-  const target = loadWorkspaceSource(world, ctx, imported.specifier)
+  // Package-relative schema imports (one file re-exporting a sibling's const)
+  // resolve directly; cross-package imports must name a workspace package.
+  const target = imported.specifier.startsWith('.')
+    ? loadRelative(world, ctx, imported.specifier)
+    : loadWorkspaceSource(world, ctx, imported.specifier)
   const expr = schemaConst(target, imported.imported, true)
   if (expr === null) throw new Error(`schema import '${imported.specifier}' has no exported const '${imported.imported}'`)
   return { ctx: target, expr }
@@ -625,8 +629,10 @@ function findSchemaExpr(ctx: FileCtx, pluginClass: ts.ClassDeclaration | null): 
 }
 
 /** Read an `inject` service-key list: `export const inject = […]` in the entry
- * file, else `static inject = […]` on the plugin class. */
-function findInject(ctx: FileCtx, pluginClass: ts.ClassDeclaration | null, violations: string[]): string[] {
+ * file — either a direct array literal or a local binding re-exporting a
+ * package-relative import's exported literal — else `static inject = […]` on
+ * the plugin class. */
+function findInject(world: World, ctx: FileCtx, pluginClass: ts.ClassDeclaration | null, violations: string[]): string[] {
   const fromArray = (expr: ts.Expression, where: string): string[] => {
     if (!ts.isArrayLiteralExpression(expr)) {
       violations.push(`${where}: inject is not a plain string-array literal; teach the generator the new declaration form.`)
@@ -634,10 +640,31 @@ function findInject(ctx: FileCtx, pluginClass: ts.ClassDeclaration | null, viola
     }
     return expr.elements.map(el => ts.isStringLiteral(el) ? el.text : el.getText(ctx.sf))
   }
+  // Follow one import hop: `export const inject = bridgeInject` with
+  // `import { inject as bridgeInject } from './bridge.ts'` in the entry file.
+  const fromIdentifier = (id: ts.Identifier): string[] => {
+    const imp = ctx.imports.get(id.text)
+    if (imp === undefined || imp.typeOnly || imp.imported === '*' || imp.imported === 'default') {
+      violations.push(`${ctx.rel}: inject is not a plain string-array literal; teach the generator the new declaration form.`)
+      return []
+    }
+    if (!imp.specifier.startsWith('.') || !imp.specifier.endsWith('.ts')) {
+      violations.push(`${ctx.rel}: inject re-export binding must import '${imp.imported}' from a package-relative .ts file.`)
+      return []
+    }
+    const target = loadRelative(world, ctx, imp.specifier)
+    const literal = schemaConst(target, imp.imported, true)
+    if (literal === null) {
+      violations.push(`${ctx.rel}: inject re-export imports '${imp.imported}', which ${target.rel} does not export as a const array literal.`)
+      return []
+    }
+    return fromArray(literal, ctx.rel)
+  }
   for (const stmt of ctx.sf.statements) {
     if (!ts.isVariableStatement(stmt)) continue
     for (const decl of stmt.declarationList.declarations) {
       if (ts.isIdentifier(decl.name) && decl.name.text === 'inject' && decl.initializer) {
+        if (ts.isIdentifier(decl.initializer)) return fromIdentifier(decl.initializer)
         return fromArray(decl.initializer, ctx.rel)
       }
     }
@@ -756,7 +783,7 @@ export function collectConfigCatalog(scanRoot: string = root): CatalogEntry[] {
       dir,
       entry: entryRel,
       kind,
-      inject: kind === 'library' || kind === 'seam' ? [] : findInject(ctx, pluginClass, violations),
+      inject: kind === 'library' || kind === 'seam' ? [] : findInject(world, ctx, pluginClass, violations),
       ...className !== undefined ? { className } : {},
     }
     entries.push(entry)

@@ -345,6 +345,17 @@ describe('loadProfile', () => {
     expect(PROFILE_TEMPLATES.acp).toEqual({
       bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-acp-app'],
     })
+    expect(PROFILE_TEMPLATES['cluster-web-api']).toEqual({
+      bundles: [
+        '@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-cluster-web-app',
+      ],
+    })
+    expect(PROFILE_TEMPLATES['cluster-web-runner']).toEqual({
+      bundles: [
+        '@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-cluster-web-app',
+        '@deepseek-ai/dsh-cluster-web-runner-app',
+      ],
+    })
     expect(PROFILE_TEMPLATES.sdk).toEqual({
       bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-sdk-app'],
     })

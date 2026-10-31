@@ -15,10 +15,32 @@ Each package entry labels its data with three identifiers: `inject` lists the se
 ## `@deepseek-ai/dsh-acp`
 
 - `inject`: `agents` · `llm` · `sessionPersistence` · `sessions`
-- `refs`: `Stream` (`@agentclientprotocol/sdk`)
-- `source`: [`packages/acp/acp/src/index.ts:75`](../packages/acp/acp/src/index.ts)
+- `refs`: `AuthenticateRequest` (`@agentclientprotocol/sdk`) · `Stream` (`@agentclientprotocol/sdk`)
+- `source`: [`packages/acp/acp/src/index.ts:49`](../packages/acp/acp/src/index.ts)
 
 ```ts config-catalog
+/**
+ * Internal runtime/test-only overrides beyond the public Config schema.
+ * Tests inject an in-memory stream here; network transports use {@link AcpBridge}
+ * directly. Named distinctly from `bridge.ts`'s `AcpConfig` (the schema type)
+ * so one catalog paste closure can carry both.
+ */
+export interface AcpPluginConfig extends AcpBridgeOptions {
+  /** Runtime-only transport override; production uses stdio. */
+  stream?: Stream
+}
+
+/** Options for creating a bridge beyond the public Config schema. */
+export interface AcpBridgeOptions extends AcpConfig {
+  /** Optional authenticator for network transports; stdio omits it. */
+  authenticate?: Authenticator
+  /** Optional capability overrides; defaults advertise resume/list/close. */
+  capabilities?: {
+    /** Whether `session/load` is advertised; stdio defaults to true. */
+    loadSession?: boolean
+  }
+}
+
 /** Plugin config: the provider/model selection used for each ACP-created agent. */
 export interface AcpConfig {
   /** Provider route for created agents. */
@@ -27,11 +49,52 @@ export interface AcpConfig {
   model?: string
   /** Maximum summaries returned by one session/list page. */
   sessionListPageSize?: number
-  /** Runtime-only transport override; production uses stdio. */
-  stream?: Stream
 }
+
+/** Validates credentials presented by a network client. Return void if valid. */
+export type Authenticator = (request: AuthenticateRequest) => Promise<void>
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-acp -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-acp-network -->
+<a id="deepseek-aidsh-acp-network"></a>
+
+## `@deepseek-ai/dsh-acp-network`
+
+- `inject`: `webServer` · `agents` · `llm` · `sessionPersistence` · `sessions`
+- `refs`: [`AcpBridgeOptions`](../packages/acp/acp/src/index.ts)
+- `source`: [`packages/acp/acp-network/src/index.ts:40`](../packages/acp/acp-network/src/index.ts)
+
+```ts config-catalog
+/** Network ACP plugin configuration. */
+export interface AcpNetworkConfig extends AcpBridgeOptions {
+  /** Transport mode. @default 'websocket' */
+  transport?: AcpNetworkTransport
+  /** Absolute path for the ACP route. @default '/acp' */
+  path?: string
+  /** Shared secret for HMAC-SHA256 token validation. */
+  secret?: string
+  /** Expected token audience; defaults to env or hostname-based audience. */
+  audience?: string
+  /** Optional custom token validator; overrides the built-in HMAC validator. */
+  validateToken?: TokenValidator
+}
+
+/** ACP network transport mode. */
+export type AcpNetworkTransport = 'websocket' | 'http' | 'both'
+
+/** Parses and validates an ACP authentication token. */
+export type TokenValidator = (token: string) => ValidatedToken | Promise<ValidatedToken>
+
+/** Token validation result. */
+export interface ValidatedToken {
+  /** Subject that must match the instance's DSH_FLEET_USER_ID. */
+  subject: string
+  /** Unique token id used for replay prevention. */
+  jti: string
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-acp-network -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-agent-default-model -->
 <a id="deepseek-aidsh-agent-default-model"></a>
@@ -4652,6 +4715,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `package` | `inject` | `source` |
 | --- | --- | --- |
 | `@deepseek-ai/dsh-acp-app` | `cmdlineArgs` | [`packages/bundle/acp-app/src/index.ts`](../packages/bundle/acp-app/src/index.ts) |
+| `@deepseek-ai/dsh-acp-network-app` | `cmdlineArgs` | [`packages/bundle/acp-network-app/src/index.ts`](../packages/bundle/acp-network-app/src/index.ts) |
 | `@deepseek-ai/dsh-agent` | — | [`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts) |
 | `@deepseek-ai/dsh-api-account-controller` | `deepseekAccount` · `agents` | [`packages/api/account-controller/src/index.ts`](../packages/api/account-controller/src/index.ts) |
 | `@deepseek-ai/dsh-api-remotes` | `typertGateway` | [`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts) |
@@ -4800,6 +4864,8 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `@deepseek-ai/dsh-client-ui-primitives` | — | [`packages/client/ui-primitives/src/index.ts`](../packages/client/ui-primitives/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-slots` | — | [`packages/client/ui-slots/src/index.ts`](../packages/client/ui-slots/src/index.ts) |
 | `@deepseek-ai/dsh-client-web` | — | [`packages/client/web/src/index.ts`](../packages/client/web/src/index.ts) |
+| `@deepseek-ai/dsh-cluster-web-app` | — | [`packages/bundle/cluster-web-app/src/index.ts`](../packages/bundle/cluster-web-app/src/index.ts) |
+| `@deepseek-ai/dsh-cluster-web-runner-app` | — | [`packages/bundle/cluster-web-runner-app/src/index.ts`](../packages/bundle/cluster-web-runner-app/src/index.ts) |
 | `@deepseek-ai/dsh-cmdline` | — | [`packages/boot/cmdline/src/index.ts`](../packages/boot/cmdline/src/index.ts) |
 | `@deepseek-ai/dsh-deque` | — | [`packages/util/deque/src/index.ts`](../packages/util/deque/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-agent-team-profile` | — | [`packages/experimental/agent-team-profile/src/index.ts`](../packages/experimental/agent-team-profile/src/index.ts) |

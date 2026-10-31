@@ -9,7 +9,7 @@ kind: "reference"
 
 ## 摘要
 
-同域一键部署：**frontend** 容器对外只暴露一个 origin（edge + shell）；**api** 服务每副本一容器（loopback API-only + 内网 forwarder），可用 `--scale api=2` 做容器级多副本。Compose 通过 forwarder 的 `/healthz` 标记 API 副本健康，并在其就绪后才启动 frontend。共享 volume `$DSH_HOME` 使 cookie 跨 api 容器互认。Compose 附带 Postgres。验收默认低副本，避免 verify 打爆主机 CPU。
+同域一键部署：**frontend** 容器对外只暴露一个 origin（edge + shell）；**api** 服务每副本一容器（loopback API-only + 内网 forwarder），可用 `--scale api=2` 做容器级多副本。Compose 通过 forwarder 的 `/healthz` 标记 API 副本健康，并在其就绪后才启动 frontend。共享 volume `$DSH_HOME` 使 cookie 跨 api 容器互认。Compose 附带 Postgres。进程经具名 dsh profile 启动：shell 用 `web`，API 副本用 `cluster-web-api`（Postgres 持久化、`serveFrontend: false`），可选 runner 用 `cluster-web-runner`（会话租约 + agent 派发）。验收默认低副本，避免 verify 打爆主机 CPU。
 
 ## 一键启动
 
@@ -29,11 +29,11 @@ docker compose -f deploy/cluster-web/docker-compose.yml --env-file deploy/cluste
 
 无 Docker 时仍可用进程树（S46 路径）：
 
-`dsh up` 将 SIGINT 与 SIGTERM 转发给 supervisor，并在进程树及其输出流关闭后返回。
-
 ```sh
-pnpm dsh up --edge-port 8080 --api-replicas 1 --runner-replicas 0 --skip-overlays --skip-runners
+EDGE_PORT=8080 API_REPLICAS=1 RUNNER_REPLICAS=0 pnpm run cluster-web:up
 ```
+
+`cluster-web:up` 运行 `supervise.mts`，后者将 SIGINT 与 SIGTERM 转发给进程树，并在其输出流关闭后返回。全部变量见 [`.env.example`](.env.example)；`DATABASE_URL` 未设置或 `CLUSTER_WEB_SKIP_OVERLAYS=1` 时，API 副本附加调用时补丁 [`overlays/no-postgres.patch.yml`](overlays/no-postgres.patch.yml)，保持 JSONL 持久化。
 
 ## 拓扑
 
@@ -42,7 +42,7 @@ pnpm dsh up --edge-port 8080 --api-replicas 1 --runner-replicas 0 --skip-overlay
 | frontend / edge | `0.0.0.0:EDGE_PORT` | 唯一公网监听；`/`+`/plugins`→shell；`/api`→`api:FORWARD` |
 | frontend / shell | `127.0.0.1:SHELL_PORT` | SPA + `/?token=` 换票 |
 | api / forwarder | `0.0.0.0:API_FORWARD_PORT`（仅 compose 网） | 转发到本容器 loopback dsh |
-| api / dsh | `127.0.0.1:API_LOOPBACK_PORT` | `--api-only`；不绑 `0.0.0.0` |
+| api / dsh | `127.0.0.1:API_LOOPBACK_PORT` | `--profile cluster-web-api`（`serveFrontend: false`）；不绑 `0.0.0.0` |
 | postgres | compose 服务 | 设置 `DATABASE_URL` 时供 api 使用 |
 
 ## 外仓前端契约
@@ -63,6 +63,8 @@ pnpm dsh up --edge-port 8080 --api-replicas 1 --runner-replicas 0 --skip-overlay
 | `frontend.mts` / `api.mts` | 容器入口 |
 | `forward.mts` | API 内网转发 |
 | `edge.mts` / `upstream.mts` | 同域反代 |
+| `process-helpers.mts` | 共享 spawn/wait 辅助与无 Postgres 补丁参数 |
+| `overlays/no-postgres.patch.yml` | 调用时补丁：无 Postgres 时回落 JSONL 持久化 |
 | `supervise.mts` | 无 Docker 进程树（S46） |
 
 镜像通过 Docker `CMD` 默认启动 `supervise.mts`；Compose 将其替换为专用的 frontend 或 API 入口。SMOKE-core-24 检查各容器的 PID 1 命令，并验证 shell 签发的 cookie 能通过 API 路由认证。

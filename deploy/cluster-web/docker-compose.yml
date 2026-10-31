@@ -51,12 +51,12 @@ services:
       API_UPSTREAMS: ${API_UPSTREAMS:-api:3080}
       DSH_HOME: /dsh-home
       DSH_CONFIG_READONLY: '1'
-      # Frontend does not need Postgres; keep overlays off unless explicitly set.
-      CLUSTER_WEB_SKIP_OVERLAYS: '1'
     volumes:
       - dsh-home:/dsh-home
     ports:
-      - '${EDGE_PORT:-8080}:8080'
+      # EDGE_PORT moves the host publish and the in-container listener together;
+      # PUBLIC_URL/TRUSTED_HOST above must carry the same host:port.
+      - '${EDGE_PORT:-8080}:${EDGE_PORT:-8080}'
     deploy:
       resources:
         limits:

@@ -138,6 +138,57 @@ export const Shared = Schema.union([MissingSchema])
 `)
     expect(() => collectConfigCatalog(root)).toThrow("schema alias 'MissingSchema' must name a const or named value import")
   })
+
+  it('resolves an inject re-export binding to the imported literal', () => {
+    const { root, write } = fixture()
+    write('packages/test/provider/src/bridge.ts', "export const inject = ['agents', 'llm']\n")
+    write('packages/test/provider/src/index.ts', `
+import type { BrowserConfig } from '@test/runtime/config'
+import { Shared as SharedConfig } from '@test/runtime/config'
+import { inject as bridgeInject } from './bridge.ts'
+export type Config = BrowserConfig
+export const Config = SharedConfig
+export const inject = bridgeInject
+export function apply(ctx: unknown, config: Config): void {}
+`)
+    const provider = collectConfigCatalog(root).find(entry => entry.pkg === '@test/provider')
+    expect(provider?.inject).toEqual(['agents', 'llm'])
+  })
+
+  it('resolves a package-relative schema import to the sibling const', () => {
+    const { root, write } = fixture()
+    write('packages/test/provider/src/schema.ts', `
+import Schema from '@deepseek-ai/schemastery'
+export const Local = Schema.union([
+  Schema.object({ mode: Schema.const('launch'), headless: Schema.boolean() }),
+  Schema.object({ mode: Schema.const('attach'), endpoint: Schema.string() }),
+])
+`)
+    write('packages/test/provider/src/index.ts', `
+import type { BrowserConfig } from '@test/runtime/config'
+import { Local as SharedConfig } from './schema.ts'
+export type Config = BrowserConfig
+export const Config = SharedConfig
+export function apply(ctx: unknown, config: Config): void {}
+`)
+    const provider = collectConfigCatalog(root).find(entry => entry.pkg === '@test/provider')
+    expect(new Set(provider?.schemaKeys)).toEqual(new Set(['mode', 'headless', 'endpoint']))
+  })
+
+  it('rejects an inject re-export whose target exports no array literal', () => {
+    const { root, write } = fixture()
+    write('packages/test/provider/src/bridge.ts', 'export const other = 1\n')
+    write('packages/test/provider/src/index.ts', `
+import type { BrowserConfig } from '@test/runtime/config'
+import { Shared as SharedConfig } from '@test/runtime/config'
+import { inject as bridgeInject } from './bridge.ts'
+export type Config = BrowserConfig
+export const Config = SharedConfig
+export const inject = bridgeInject
+export function apply(ctx: unknown, config: Config): void {}
+`)
+    expect(() => collectConfigCatalog(root)).toThrow('does not export as a const array literal')
+  })
 })
 
 describe('config catalog rendering', () => {

@@ -69,9 +69,12 @@ function assertChartArtifacts(): void {
   if (!ingress.includes('path: /')) throw new Error('ingress must expose path / for same-origin')
   if (!ingress.includes('-frontend')) throw new Error('ingress must target frontend Service (S47)')
   const apiEntry = readFileSync(join(CHART, '..', 'api.mts'), 'utf8')
-  if (!apiEntry.includes('renderOverlay(API_OVERLAY_TEMPLATE')) {
-    throw new Error('api entry must render the shared-Postgres overlay')
+  if (!/--profile', 'cluster-web-api'/.test(apiEntry)) {
+    throw new Error('api entry must boot the cluster-web-api profile (shared-Postgres composition)')
   }
+  const runner = readFileSync(join(CHART, 'templates', 'runner-deployment.yaml'), 'utf8')
+  if (!runner.includes('cluster-web-runner')) throw new Error('runner deployment must boot the cluster-web-runner profile')
+  if (!runner.includes('DSH_NODE_ID')) throw new Error('runner deployment must pass the lease identity')
   void readdirSync(join(CHART, 'templates'))
 }
 

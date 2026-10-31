@@ -1,33 +1,38 @@
 /**
  * Process-tree supervisor for cluster-web: starts a same-origin shell (SPA),
- * loopback API-only replicas, optional runners, and the public edge. Only the
- * edge binds a non-loopback port; dsh stays on 127.0.0.1.
+ * `cluster-web-api` profile replicas, optional `cluster-web-runner` replicas,
+ * and the public edge. Only the edge binds a non-loopback port; dsh stays on
+ * 127.0.0.1. Role compositions live in the profile bundles
+ * (`dsh-cluster-web-app`, `dsh-cluster-web-runner-app`); this supervisor only
+ * passes invocation flags, `DATABASE_URL`, and per-runner `DSH_NODE_ID`.
  *
  * Replica caps: API_REPLICAS and RUNNER_REPLICAS default to 1 / 0 and refuse > 2.
  * Shell and all API replicas share one `$DSH_HOME` so browser-session cookies
  * verify across the API pool (S46).
  *
  * Env: see `.env.example`. `CLUSTER_WEB_SKIP_RUNNERS=1` / `RUNNER_REPLICAS=0`
- * skips runners. `CLUSTER_WEB_SKIP_OVERLAYS=1` or empty `DATABASE_URL` skips
- * Postgres overlays (API still gets `--api-only`).
+ * skips runners. `CLUSTER_WEB_SKIP_OVERLAYS=1` or empty `DATABASE_URL` appends
+ * the invocation-time no-Postgres patch to API replicas (JSONL persistence).
  *
  * @module
  */
 
-import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import type { ChildProcess } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  EDGE_SCRIPT,
+  noPostgresPatchArgs,
+  requirePositiveInt,
+  spawnLogged,
+  waitForLine,
+} from './process-helpers.mts'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-const REPO_ROOT = resolve(HERE, '..', '..')
-const DSH_BIN_BUILT = join(REPO_ROOT, 'apps', 'cli', 'lib', 'bin.js')
-const DSH_BIN_SOURCE = join(REPO_ROOT, 'apps', 'cli', 'src', 'bin.ts')
-const EDGE_SCRIPT = join(HERE, 'edge.mts')
-const API_OVERLAY_TEMPLATE = join(HERE, 'overlays', 'api.overlay.yml')
-const SHELL_OVERLAY_TEMPLATE = join(HERE, 'overlays', 'shell.overlay.yml')
-const RUNNER_OVERLAY_TEMPLATE = join(HERE, 'overlays', 'runner.overlay.yml')
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const DSH_BIN_BUILT = join(REPO_ROOT, 'apps/cli/lib/bin.js')
+const DSH_BIN_SOURCE = join(REPO_ROOT, 'apps/cli/src/bin.ts')
 
 /** Prefer built CLI; fall back to the source-launch entry used by `pnpm dsh`. */
 function dshBin(): string {
@@ -36,16 +41,9 @@ function dshBin(): string {
 
 const MAX_REPLICAS = 2
 
-interface ChildSpec {
-  name: string
-  child: ChildProcess
-}
-
-function requirePositiveInt(name: string, raw: string | undefined, fallback: number): number {
-  const value = raw === undefined || raw === '' ? fallback : Number(raw)
-  if (!Number.isInteger(value) || value < 0) {
-    throw new Error(`cluster-web-supervise: ${name} must be a non-negative integer, got ${String(raw)}`)
-  }
+/** Refuse a replica count above the acceptance CPU cap. */
+function requireCappedReplicas(name: string, raw: string | undefined, fallback: number): number {
+  const value = requirePositiveInt(name, raw, fallback)
   if (value > MAX_REPLICAS) {
     throw new Error(
       `cluster-web-supervise: ${name}=${String(value)} exceeds acceptance cap ${String(MAX_REPLICAS)}; `
@@ -55,56 +53,9 @@ function requirePositiveInt(name: string, raw: string | undefined, fallback: num
   return value
 }
 
-function waitForLine(child: ChildProcess, pattern: RegExp, timeoutMs: number): Promise<string> {
-  return new Promise((resolveWait, reject) => {
-    let buffer = ''
-    const onData = (chunk: Buffer): void => {
-      buffer += chunk.toString('utf8')
-      const match = pattern.exec(buffer)
-      if (match) {
-        cleanup()
-        resolveWait(match[0]!)
-      }
-    }
-    const timer = setTimeout(() => {
-      cleanup()
-      reject(new Error(`cluster-web-supervise: timed out waiting for ${pattern}`))
-    }, timeoutMs)
-    const cleanup = (): void => {
-      clearTimeout(timer)
-      child.stdout?.off('data', onData)
-    }
-    child.stdout?.on('data', onData)
-  })
-}
-
-function renderOverlay(templatePath: string, vars: Record<string, string>, outPath: string): void {
-  let text = readFileSync(templatePath, 'utf8')
-  for (const [key, value] of Object.entries(vars)) {
-    text = text.split(key).join(value)
-  }
-  writeFileSync(outPath, text)
-}
-
-function spawnLogged(name: string, command: string, args: string[], env: NodeJS.ProcessEnv): ChildProcess {
-  const child = spawn(command, args, {
-    cwd: REPO_ROOT,
-    env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-  const prefix = `[${name}] `
-  child.stdout?.on('data', (chunk: Buffer) => {
-    process.stdout.write(prefix + chunk.toString('utf8'))
-  })
-  child.stderr?.on('data', (chunk: Buffer) => {
-    process.stderr.write(prefix + chunk.toString('utf8'))
-  })
-  return child
-}
-
 async function main(): Promise<void> {
-  const apiReplicas = requirePositiveInt('API_REPLICAS', process.env.API_REPLICAS, 1)
-  const runnerReplicas = requirePositiveInt('RUNNER_REPLICAS', process.env.RUNNER_REPLICAS, 0)
+  const apiReplicas = requireCappedReplicas('API_REPLICAS', process.env.API_REPLICAS, 1)
+  const runnerReplicas = requireCappedReplicas('RUNNER_REPLICAS', process.env.RUNNER_REPLICAS, 0)
   if (apiReplicas < 1) throw new Error('cluster-web-supervise: API_REPLICAS must be ≥ 1')
 
   const edgePort = Number(process.env.EDGE_PORT ?? '8080')
@@ -124,13 +75,17 @@ async function main(): Promise<void> {
   const trustedHost = process.env.TRUSTED_HOST ?? `127.0.0.1:${String(edgePort)}`
   const databaseUrl = process.env.DATABASE_URL ?? ''
   const skipRunners = process.env.CLUSTER_WEB_SKIP_RUNNERS === '1' || runnerReplicas === 0
-  const skipOverlays = process.env.CLUSTER_WEB_SKIP_OVERLAYS === '1' || databaseUrl === ''
+  const withPostgres = process.env.CLUSTER_WEB_SKIP_OVERLAYS !== '1' && databaseUrl !== ''
 
   const workDir = mkdtempSync(join(tmpdir(), 'dsh-cluster-web-'))
   mkdirSync(workDir, { recursive: true })
   const dshHome = process.env.DSH_HOME ?? join(workDir, 'home')
   mkdirSync(dshHome, { recursive: true })
 
+  interface ChildSpec {
+    name: string
+    child: ChildProcess
+  }
   const children: ChildSpec[] = []
   const apiPorts: number[] = []
   let stopping = false
@@ -163,24 +118,17 @@ async function main(): Promise<void> {
   }
 
   try {
-    // Shell first: owns SPA + `/?token=` exchange (S46).
+    // Shell first: the plain web profile owns the SPA + `/?token=` exchange (S46).
     {
       const args = [
         '--import', 'tsx/esm', dshBin(),
         '--profile', 'web',
-      ]
-      if (!skipOverlays && existsSync(SHELL_OVERLAY_TEMPLATE)) {
-        const overlayPath = join(workDir, 'shell.overlay.yml')
-        renderOverlay(SHELL_OVERLAY_TEMPLATE, {}, overlayPath)
-        args.push('--patch', overlayPath)
-      }
-      args.push(
         '--no-open',
         '--host', '127.0.0.1',
         '--port', String(shellPort),
         '--public-url', publicUrl,
         '--trusted-host', trustedHost,
-      )
+      ]
       const child = spawnLogged('shell', process.execPath, args, childEnv())
       children.push({ name: 'shell', child })
       await waitForLine(child, /dsh web: http/, 120_000)
@@ -191,45 +139,34 @@ async function main(): Promise<void> {
       apiPorts.push(port)
       const args = [
         '--import', 'tsx/esm', dshBin(),
-        '--profile', 'web',
-      ]
-      if (!skipOverlays) {
-        const overlayPath = join(workDir, `api-${String(i)}.overlay.yml`)
-        renderOverlay(API_OVERLAY_TEMPLATE, { __DATABASE_URL__: databaseUrl }, overlayPath)
-        args.push('--patch', overlayPath)
-      }
-      args.push(
-        '--api-only',
+        '--profile', 'cluster-web-api',
+        ...noPostgresPatchArgs(databaseUrl),
         '--no-open',
         '--host', '127.0.0.1',
         '--port', String(port),
         '--public-url', publicUrl,
         '--trusted-host', trustedHost,
-      )
+      ]
       const child = spawnLogged(`api-${String(i)}`, process.execPath, args, childEnv())
       children.push({ name: `api-${String(i)}`, child })
       await waitForLine(child, /dsh web: http/, 120_000)
     }
 
-    if (!skipRunners && !skipOverlays) {
+    if (!skipRunners && withPostgres) {
       for (let i = 0; i < runnerReplicas; i += 1) {
         const nodeId = `runner-${String(i)}`
-        const overlayPath = join(workDir, `${nodeId}.overlay.yml`)
-        renderOverlay(RUNNER_OVERLAY_TEMPLATE, {
-          __DATABASE_URL__: databaseUrl,
-          __NODE_ID__: nodeId,
-        }, overlayPath)
         const privatePort = runnerBasePort + i
         const args = [
           '--import', 'tsx/esm', dshBin(),
-          '--profile', 'web',
-          '--patch', overlayPath,
-          '--api-only',
+          '--profile', 'cluster-web-runner',
           '--no-open',
           '--host', '127.0.0.1',
           '--port', String(privatePort),
         ]
-        const child = spawnLogged(nodeId, process.execPath, args, childEnv())
+        const child = spawnLogged(nodeId, process.execPath, args, {
+          ...childEnv(),
+          DSH_NODE_ID: nodeId,
+        })
         children.push({ name: nodeId, child })
         await waitForLine(child, /dsh web: http/, 120_000)
       }
@@ -248,8 +185,8 @@ async function main(): Promise<void> {
 
     console.log(
       `cluster-web-supervise: ready ${publicUrl} `
-      + `(shell=1 apis=${String(apiReplicas)} runners=${skipRunners ? '0' : String(runnerReplicas)} `
-      + `overlays=${skipOverlays ? 'off' : 'on'})`,
+      + `(shell=1 apis=${String(apiReplicas)} runners=${skipRunners || !withPostgres ? '0' : String(runnerReplicas)} `
+      + `postgres=${withPostgres ? 'shared' : 'local'})`,
     )
 
     await new Promise<void>(resolveWait => {

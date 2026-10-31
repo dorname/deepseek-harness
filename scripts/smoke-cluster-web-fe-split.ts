@@ -100,16 +100,18 @@ function assertArtifacts(): void {
     'supervise.mts',
     'edge.mts',
     'upstream.mts',
-    'overlays/api.overlay.yml',
-    'overlays/shell.overlay.yml',
+    'overlays/no-postgres.patch.yml',
   ]) {
     if (!existsSync(join(DEPLOY_DIR, relative))) {
       throw new Error(`missing deploy/cluster-web/${relative}`)
     }
   }
-  const apiOverlay = readFileSync(join(DEPLOY_DIR, 'overlays', 'api.overlay.yml'), 'utf8')
-  if (!/serveFrontend:\s*false/.test(apiOverlay)) {
-    throw new Error('api.overlay.yml must set serveFrontend: false')
+  const apiPatch = readFileSync(join(REPO_ROOT, 'packages', 'bundle', 'cluster-web-app', 'cordis.patch.yml'), 'utf8')
+  if (!/serveFrontend:\s*false/.test(apiPatch)) {
+    throw new Error('the cluster-web-api bundle must set serveFrontend: false')
+  }
+  if (!/--profile', 'cluster-web-api'/.test(readFileSync(join(DEPLOY_DIR, 'supervise.mts'), 'utf8'))) {
+    throw new Error('supervise.mts must boot API replicas with the cluster-web-api profile')
   }
   const distIndex = join(REPO_ROOT, 'apps', 'web', 'dist', 'index.html')
   if (!existsSync(distIndex)) {

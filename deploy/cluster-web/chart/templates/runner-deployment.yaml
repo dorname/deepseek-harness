@@ -18,15 +18,17 @@ spec:
         - name: runner
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # Private loopback keep-alive (not Service-published). Mount a dispatch
-          # overlay via --patch when DATABASE_URL is configured (see chart README).
+          # The cluster-web-runner profile owns the composition (Postgres
+          # persistence, session lease, dispatch loop with runner: true); the
+          # Pod name is the lease identity. Requires the shared Postgres
+          # (postgres.enabled); without DATABASE_URL the pod fails at mount.
           command:
             - node
             - --import
             - tsx/esm
             - apps/cli/src/bin.ts
             - --profile
-            - web
+            - cluster-web-runner
             - --no-open
             - --host
             - 127.0.0.1
@@ -38,6 +40,10 @@ spec:
           env:
             - name: DSH_CONFIG_READONLY
               value: {{ .Values.configReadonly | quote }}
+            - name: DSH_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
           resources:
             {{- toYaml .Values.resources.runner | nindent 12 }}
 {{- end }}

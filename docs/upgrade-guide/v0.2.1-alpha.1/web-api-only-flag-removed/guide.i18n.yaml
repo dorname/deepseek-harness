@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-alpha.1/web-api-only-flag-removed/guide.md
+/:
+  en: bca12046b062522e
+  zh: b4c7006e0c83d294
+/api-only-is-removed-use-the-cluster-web-api-profile:
+  en: 12540cc6f5a10ca8
+  zh: 7780683ca91f2d3f
+/api-only-is-removed-use-the-cluster-web-api-profile/change:
+  en: 0dd208f502a6281b
+  zh: 448b8485c540d18e
+/api-only-is-removed-use-the-cluster-web-api-profile/migration:
+  en: fee25b99d1896b20
+  zh: bd6e8124478c18a2

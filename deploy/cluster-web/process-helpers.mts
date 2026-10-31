@@ -5,18 +5,17 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 export const REPO_ROOT = resolve(HERE, '..', '..')
-export const DSH_BIN_BUILT = join(REPO_ROOT, 'apps', 'cli', 'lib', 'bin.js')
-export const DSH_BIN_SOURCE = join(REPO_ROOT, 'apps', 'cli', 'src', 'bin.ts')
+export const DSH_BIN_BUILT = join(REPO_ROOT, 'apps/cli/lib/bin.js')
+export const DSH_BIN_SOURCE = join(REPO_ROOT, 'apps/cli/src/bin.ts')
 export const EDGE_SCRIPT = join(HERE, 'edge.mts')
 export const FORWARD_SCRIPT = join(HERE, 'forward.mts')
-export const API_OVERLAY_TEMPLATE = join(HERE, 'overlays', 'api.overlay.yml')
-export const SHELL_OVERLAY_TEMPLATE = join(HERE, 'overlays', 'shell.overlay.yml')
+export const NO_POSTGRES_PATCH = join(HERE, 'overlays', 'no-postgres.patch.yml')
 
 /** Prefer built CLI; fall back to source-launch entry used by `pnpm dsh`. */
 export function dshBin(): string {
@@ -33,12 +32,20 @@ export function requirePositiveInt(name: string, raw: string | undefined, fallba
   return value
 }
 
-export function renderOverlay(templatePath: string, vars: Record<string, string>, outPath: string): void {
-  let text = readFileSync(templatePath, 'utf8')
-  for (const [key, value] of Object.entries(vars)) {
-    text = text.split(key).join(value)
-  }
-  writeFileSync(outPath, text)
+/**
+ * Launcher-position arguments for the invocation-time no-Postgres override.
+ * The launcher's flags (`--profile`, `--patch`) must precede the app's own
+ * flags: `dsh` hands everything from the first app flag onward to the profile
+ * command, so splice these directly after `--profile`. The profile bundles own
+ * the Postgres composition; this patch is the documented call-site override
+ * that disables those rows and restores local JSONL persistence, so topology
+ * checks run without Postgres.
+ * @param databaseUrl - the resolved `DATABASE_URL`; empty means no database.
+ * @returns the `--patch` arguments, or none when a database is configured.
+ */
+export function noPostgresPatchArgs(databaseUrl: string): string[] {
+  const skip = process.env.CLUSTER_WEB_SKIP_OVERLAYS === '1' || databaseUrl === ''
+  return skip ? ['--patch', NO_POSTGRES_PATCH] : []
 }
 
 export function spawnLogged(name: string, command: string, args: string[], env: NodeJS.ProcessEnv): ChildProcess {

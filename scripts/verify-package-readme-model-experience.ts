@@ -70,6 +70,8 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/ui-settings-account': { kind: 'none', reason: 'Account authorization registers no model context or tools; credentials affect HTTP authentication only.' },
   'packages/acp/acp-network': { kind: 'none', reason: 'Network transport only; ACP frames, tokens, and connection metadata never enter model requests or Session events.' },
   'packages/bundle/acp-network-app': { kind: 'none', reason: 'Profile bundle only mounts the network transport; the underlying ACP bridge owns every model-facing effect.' },
+  'packages/bundle/cluster-web-app': { kind: 'none', reason: 'Profile bundle only re-targets persistence and frontend serving; the web, session, and relay layers own every model-facing effect.' },
+  'packages/bundle/cluster-web-runner-app': { kind: 'none', reason: 'Profile bundle only adds lease polling and agent dispatch; the loop and dispatch plugins own every model-facing effect.' },
 
   'packages/attachment/attachment': { kind: 'indirect', reason: 'The storage seam delegates model request rendering to provider adapters.' },
   'packages/attachment/attachment-local': { kind: 'indirect', reason: 'The local backend delegates model request rendering to provider adapters.' },

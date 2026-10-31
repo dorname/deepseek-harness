@@ -37,7 +37,7 @@ helm upgrade --install dsh deploy/cluster-web/chart -n dsh-cluster-web --reuse-v
 | `frontend` | 1 | loopback `shell`、对外 `edge` | Ingress 与 frontend Service 只到达 `edge` |
 | `api` | `apiReplicas` | loopback API-only `dsh`、网内 `forward` | frontend 到达 api Service，由其选择 forwarder 容器 |
 
-两个 Deployment 挂载同一个 ReadWriteMany PVC。启用 Postgres 时，API 入口应用 `overlays/api.overlay.yml`，会话持久化与流转发状态存入 Postgres 而不是 API Pod。PVC 拥有跨副本浏览器会话密钥。`apiReplicas` 默认为 1；验收冒烟保持不超过 2。
+两个 Deployment 挂载同一个 ReadWriteMany PVC。API 入口启动 `cluster-web-api` profile，其 `dsh-cluster-web-app` bundle 将会话持久化与流转发状态存入 Postgres 而不是 API Pod。PVC 拥有跨副本浏览器会话密钥。`apiReplicas` 默认为 1；验收冒烟保持不超过 2。
 
 存储类必须支持 ReadWriteMany。Frontend 就绪探针检查公网 TCP 监听。API 的启动、就绪和存活探针通过 HTTP 访问 forwarder 的 `/healthz`；仅当受保护的 loopback API 对未认证请求返回 401 时，该端点才返回 200。连接错误、超时或其他状态返回 503。它检查 API 的 HTTP 响应能力，不检查数据库可用性。就绪检查将故障副本移出 Service 流量；存活检查在达到失败阈值后重启副本。启动检查保护冷初始化，完成后才运行其余检查。通过 values.yaml 的 `api.healthTimeoutMs` 和 `api.probes` 调整参数。内置 Postgres Deployment 使用临时存储，适用于本地 staging；替换数据库 Pod 会丢失其中的数据。
 

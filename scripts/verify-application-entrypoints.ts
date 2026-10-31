@@ -58,6 +58,24 @@ const ROOT_LAUNCHER_POLICIES = new Map<string, LauncherPolicy>([
   ['demo:inspector', { kind: 'dsh-direct' }],
   ['start:web', { kind: 'dsh-direct' }],
   ['dev:web', { kind: 'dsh-wrapper', wrapper: 'scripts/dev-web.ts' }],
+  ['cluster-web:up', { kind: 'dsh-wrapper', wrapper: 'deploy/cluster-web/supervise.mts' }],
+])
+
+/**
+ * Every Node entry script under `deploy/` holds one explicit role. Unlike the
+ * `apps/`/`packages/` sources above, these scripts launch through
+ * `node --import tsx/esm <script>` and carry no shebang, so classification is
+ * by path, not by executable marker: a new deploy entry script without a row
+ * here is a violation, whether or not it starts a Harness application.
+ */
+export const DEPLOY_ENTRY_CLASSIFICATIONS = new Map<string, string>([
+  ['deploy/cluster-web/edge.mts', 'same-origin edge proxy (deployment orchestration, not a Harness application)'],
+  ['deploy/cluster-web/forward.mts', 'in-network API forwarder (deployment orchestration, not a Harness application)'],
+  ['deploy/cluster-web/upstream.mts', 'same-origin upstream proxy (deployment orchestration, not a Harness application)'],
+  ['deploy/cluster-web/supervise.mts', 'cluster-web process-tree supervisor wrapping the dsh launcher'],
+  ['deploy/cluster-web/frontend.mts', 'frontend container entry wrapping the dsh launcher and the edge proxy'],
+  ['deploy/cluster-web/api.mts', 'api container entry wrapping the dsh launcher and the forwarder'],
+  ['deploy/cluster-web/process-helpers.mts', 'shared spawn/wait module for the deployment entry scripts'],
 ])
 
 const SOURCE_PATTERNS = [
@@ -129,6 +147,27 @@ function executableSourceViolations(root: string): string[] {
   return failures
 }
 
+function deployEntryViolations(root: string): string[] {
+  const failures: string[] = []
+  const entries = globSync(['deploy/**/*.mts'], { cwd: root, exclude: SOURCE_EXCLUDES }).sort()
+  for (const rawPath of entries) {
+    const path = repositoryPath(rawPath)
+    if (!DEPLOY_ENTRY_CLASSIFICATIONS.has(path)) {
+      failures.push(`${path}: deploy entry script has no explicit classification`)
+    }
+  }
+  // A deploy tree that exists must carry every classified entry, so a renamed
+  // script cannot keep its stale class beside an unclassified new file.
+  if (entries.length > 0) {
+    for (const [path] of DEPLOY_ENTRY_CLASSIFICATIONS) {
+      if (!existsSync(resolve(root, path))) {
+        failures.push(`${path}: classified deploy entry is missing`)
+      }
+    }
+  }
+  return failures
+}
+
 function referencesDshCli(source: string): boolean {
   return source.includes('apps/cli/src/bin.ts')
 }
@@ -182,6 +221,7 @@ export function applicationEntrypointViolations(root: string): string[] {
   return [
     ...manifestBinViolations(root),
     ...executableSourceViolations(root),
+    ...deployEntryViolations(root),
     ...rootLauncherViolations(root),
   ]
 }

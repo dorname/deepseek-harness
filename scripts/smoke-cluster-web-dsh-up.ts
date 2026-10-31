@@ -1,7 +1,9 @@
 /**
- * `dsh up` smoke (`SMOKE-core-21`, change `cluster-web-dsh-up`): launches via
- * the CLI entry with API_REPLICAS=1 / RUNNER_REPLICAS=0, GETs the edge, asserts
- * CPU peak ≤ staging threshold, SIGTERM-drains.
+ * `cluster-web:up` smoke (`SMOKE-core-21`, change `cluster-web-dsh-up`):
+ * launches the deployment supervisor (`deploy/cluster-web/supervise.mts`,
+ * the repository's `cluster-web:up` script) with API_REPLICAS=1 /
+ * RUNNER_REPLICAS=0, GETs the edge, asserts CPU peak ≤ staging threshold,
+ * SIGTERM-drains.
  *
  * @module
  */
@@ -17,7 +19,7 @@ import { loadStagingConfig } from './fleet-staging/config.ts'
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const RESULT_PATH = process.env.OPENLOGOS_SMOKE_RESULT_PATH
   ?? join(REPO_ROOT, 'logos', 'resources', 'verify', 'smoke-results.jsonl')
-const DSH = join(REPO_ROOT, 'apps', 'cli', 'src', 'bin.ts')
+const SUPERVISE = join(REPO_ROOT, 'deploy', 'cluster-web', 'supervise.mts')
 
 function report(id: string, outcome: {
   durationMs: number
@@ -92,19 +94,21 @@ async function main(): Promise<void> {
     const apiPort = await freePort()
     const publicUrl = `http://127.0.0.1:${String(edgePort)}/`
     child = spawn(process.execPath, [
-      '--import', 'tsx/esm', DSH,
-      'up',
-      '--edge-port', String(edgePort),
-      '--api-base-port', String(apiPort),
-      '--api-replicas', '1',
-      '--runner-replicas', '0',
-      '--public-url', publicUrl,
-      '--trusted-host', `127.0.0.1:${String(edgePort)}`,
-      '--skip-overlays',
-      '--skip-runners',
+      '--import', 'tsx/esm', SUPERVISE,
     ], {
       cwd: REPO_ROOT,
-      env: { ...process.env, DSH_CONFIG_READONLY: '1' },
+      env: {
+        ...process.env,
+        DSH_CONFIG_READONLY: '1',
+        EDGE_PORT: String(edgePort),
+        API_BASE_PORT: String(apiPort),
+        API_REPLICAS: '1',
+        RUNNER_REPLICAS: '0',
+        PUBLIC_URL: publicUrl,
+        TRUSTED_HOST: `127.0.0.1:${String(edgePort)}`,
+        CLUSTER_WEB_SKIP_OVERLAYS: '1',
+        CLUSTER_WEB_SKIP_RUNNERS: '1',
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     child.stdout?.on('data', (c: Buffer) => { process.stdout.write(c) })
@@ -119,15 +123,15 @@ async function main(): Promise<void> {
       child?.once('close', (c) => { clearTimeout(timer); resolve(c) })
       child?.kill('SIGTERM')
     })
-    if (code === -1) throw new Error('dsh up did not exit within 30s after SIGTERM')
-    if (code !== 0) throw new Error(`dsh up did not drain cleanly: exit code ${String(code)}`)
+    if (code === -1) throw new Error('cluster-web supervisor did not exit within 30s after SIGTERM')
+    if (code !== 0) throw new Error(`cluster-web supervisor did not drain cleanly: exit code ${String(code)}`)
 
     peak = monitor.peakPercent()
     monitor.stop()
     if (peak > config.cpuThresholdPercent) {
       report('SMOKE-core-21', {
         durationMs: Date.now() - started,
-        scenario: 'dsh up same-origin one-click',
+        scenario: 'cluster-web:up same-origin one-click',
         status: 'fail',
         error: `CPU peak ${peak.toFixed(1)}% exceeded ${String(config.cpuThresholdPercent)}%`,
         cpuPeakPercent: peak,
@@ -137,7 +141,7 @@ async function main(): Promise<void> {
     }
     report('SMOKE-core-21', {
       durationMs: Date.now() - started,
-      scenario: 'dsh up same-origin one-click',
+      scenario: 'cluster-web:up same-origin one-click',
       cpuPeakPercent: peak,
     })
   } catch (error) {
@@ -146,7 +150,7 @@ async function main(): Promise<void> {
     if (child && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
     report('SMOKE-core-21', {
       durationMs: Date.now() - started,
-      scenario: 'dsh up same-origin one-click',
+      scenario: 'cluster-web:up same-origin one-click',
       status: 'fail',
       error: error instanceof Error ? error.message : String(error),
       cpuPeakPercent: peak,

@@ -122,11 +122,11 @@ describe('parseDshArgs', () => {
       .toEqual({ mode: 'plugin', profile: 'tui', args: ['add', '--save-dev', 'x'] })
   })
 
-  it('reserves leading up for cluster-web and forwards later command names', () => {
-    expect(parse(['up', '--edge-port', '8080']))
-      .toEqual({ mode: 'up', args: ['--edge-port', '8080'] })
-    expect(parse(['up']))
-      .toEqual({ mode: 'up', args: [] })
+  it('treats a removed up as an ordinary profile name (dsh up is gone)', () => {
+    // The cluster-web launcher subcommand was removed; `up` now takes the
+    // generic first-argument expansion, so an `up` profile must be created
+    // with `dsh plugin` like any other name.
+    expect(parse(['up'])).toMatchObject({ mode: 'profile', profile: 'up', args: [] })
     expect(parse(['--profile', 'up'])).toMatchObject({ mode: 'profile', profile: 'up' })
     expect(parse(['--profile', 'web', 'up']))
       .toMatchObject({ mode: 'profile', profile: 'web', args: ['up'] })

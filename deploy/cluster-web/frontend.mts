@@ -1,11 +1,12 @@
 /**
- * Frontend container entry (S47): loopback shell + public edge.
- * `API_UPSTREAMS` points at the compose `api` service forwarder (Docker DNS RR).
+ * Frontend container entry (S47): loopback shell (the plain web profile) plus
+ * public edge. `API_UPSTREAMS` points at the compose `api` service forwarder
+ * (Docker DNS RR); the shell needs no Postgres and no profile composition.
  *
  * @module
  */
 
-import { existsSync, mkdtempSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ChildProcess } from 'node:child_process'
@@ -13,8 +14,6 @@ import {
   dshBin,
   EDGE_SCRIPT,
   ensureDir,
-  renderOverlay,
-  SHELL_OVERLAY_TEMPLATE,
   spawnLogged,
   waitForLine,
 } from './process-helpers.mts'
@@ -30,8 +29,6 @@ async function main(): Promise<void> {
   const publicUrl = process.env.PUBLIC_URL ?? `http://127.0.0.1:${String(edgePort)}/`
   const trustedHost = process.env.TRUSTED_HOST ?? `127.0.0.1:${String(edgePort)}`
   const apiUpstreams = (process.env.API_UPSTREAMS ?? 'api:3080').trim()
-  const databaseUrl = process.env.DATABASE_URL ?? ''
-  const skipOverlays = process.env.CLUSTER_WEB_SKIP_OVERLAYS === '1' || databaseUrl === ''
 
   if (!Number.isInteger(edgePort) || edgePort <= 0) throw new Error('frontend: EDGE_PORT invalid')
   if (!Number.isInteger(shellPort) || shellPort <= 0) throw new Error('frontend: SHELL_PORT invalid')
@@ -72,19 +69,15 @@ async function main(): Promise<void> {
   }
 
   try {
-    const args = ['--import', 'tsx/esm', dshBin(), '--profile', 'web']
-    if (!skipOverlays && existsSync(SHELL_OVERLAY_TEMPLATE)) {
-      const overlayPath = join(workDir, 'shell.overlay.yml')
-      renderOverlay(SHELL_OVERLAY_TEMPLATE, {}, overlayPath)
-      args.push('--patch', overlayPath)
-    }
-    args.push(
+    const args = [
+      '--import', 'tsx/esm', dshBin(),
+      '--profile', 'web',
       '--no-open',
       '--host', '127.0.0.1',
       '--port', String(shellPort),
       '--public-url', publicUrl,
       '--trusted-host', trustedHost,
-    )
+    ]
     const shell = spawnLogged('shell', process.execPath, args, childEnv())
     children.push({ name: 'shell', child: shell })
     await waitForLine(shell, /dsh web: http/, 120_000)

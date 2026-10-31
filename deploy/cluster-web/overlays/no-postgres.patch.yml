@@ -1,0 +1,12 @@
+# Invocation-time override for the cluster-web profiles when no shared
+# Postgres is available (local topology checks, CLUSTER_WEB_SKIP_OVERLAYS=1 or
+# an empty DATABASE_URL): disables the Postgres rows the profile bundles
+# compose and restores the base layer's local JSONL persistence. This is a
+# call-site override over the shipped composition, not a composition of its
+# own; supervisors append it with `--patch` only in that mode.
+- id: session-persistence-postgres
+  disabled: true
+- id: stream-relay-postgres
+  disabled: true
+- id: session-persistence-jsonl
+  disabled: false

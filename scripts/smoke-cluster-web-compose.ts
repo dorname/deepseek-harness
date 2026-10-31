@@ -106,9 +106,7 @@ function assertArtifacts(): void {
     '.env.example',
     'supervise.mts',
     'edge.mts',
-    'overlays/api.overlay.yml',
-    'overlays/shell.overlay.yml',
-    'overlays/runner.overlay.yml',
+    'overlays/no-postgres.patch.yml',
     'README.md',
     'README.zh.md',
   ]

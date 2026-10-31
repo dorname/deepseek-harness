@@ -63,7 +63,7 @@ function stagingReady(): boolean {
     encoding: 'utf8',
   })
   if (result.status !== 0) return false
-  const available = Number((result.stdout ?? '').trim() || '0')
+  const available = Number(result.stdout.trim() || '0')
   return available >= 1
 }
 

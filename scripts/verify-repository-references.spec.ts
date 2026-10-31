@@ -15,6 +15,9 @@ describe('historical OpenLogos source snapshots', () => {
       'logos/changes/archive/dated-change/deltas/prd/architecture.md',
       'logos/resources/verify/baseline-seed-runs/seed-1/resolved/architecture.md',
       'logos/resources/verify/baseline-seed-runs/seed-1/staging/architecture.md',
+      'logos/resources/verify/deployment-report.md',
+      'logos/resources/verify/cluster-web-staging-report.md',
+      'logos/resources/verify/agent-runner-pool-staging.md',
     ]) {
       expect(findRepositoryReferences(file, commit, commits)).toEqual([])
     }
@@ -22,6 +25,8 @@ describe('historical OpenLogos source snapshots', () => {
       'logos/resources/prd/architecture.md',
       'logos/changes/current/deltas/prd/architecture.md',
       'logos/resources/verify/baseline-seed-runs/seed-1/report.md',
+      'logos/resources/verify/notes.md',
+      'logos/resources/verify/cluster-verify.mts',
       'logos/changes/archive/dated-change/proposal.md',
     ]) {
       expect(findRepositoryReferences(file, commit, commits)).toEqual([{ file, line: 1, kind: 'commit-hash' }])

@@ -57,15 +57,8 @@ interface PluginInvocation {
   args: string[]
 }
 
-/** Start the cluster-web same-origin process tree (`deploy/cluster-web/supervise`). */
-interface UpInvocation {
-  mode: 'up'
-  /** Tokens after `up`, parsed by {@link parseUpArgs}. */
-  args: string[]
-}
-
 /** The resolved `dsh` invocation. Help, version, and errors exit inside {@link parseDshArgs}. */
-export type DshInvocation = ProfileInvocation | DumpConfigInvocation | DumpConfigSchemaInvocation | PluginInvocation | UpInvocation
+export type DshInvocation = ProfileInvocation | DumpConfigInvocation | DumpConfigSchemaInvocation | PluginInvocation
 
 /** Launcher flags for profile boot and configuration dumps. */
 interface BootOptions {
@@ -192,18 +185,6 @@ export function parseDshArgs(argv: readonly string[], version: string, manageDes
       resolved = resolveBoot(program, profile, options, args)
     })
 
-  if (first === 'up') {
-    program
-      .command('up')
-      .description('start the same-origin cluster-web process tree (edge + loopback API replicas)')
-      .allowUnknownOption()
-      .allowExcessArguments(true)
-      .argument('[args...]', 'up flags; see: dsh up --help')
-      .action((args: string[]) => {
-        resolved = { mode: 'up', args }
-      })
-  }
-
   if (first === 'plugin') {
     const plugin = program.command('plugin').description('manage a profile\'s plugins by forwarding the remaining arguments to pnpm in the profile directory')
     plugin
@@ -219,7 +200,7 @@ export function parseDshArgs(argv: readonly string[], version: string, manageDes
   }
 
   try {
-    const expanded = first !== undefined && !first.startsWith('-') && first !== 'plugin' && first !== 'up'
+    const expanded = first !== undefined && !first.startsWith('-') && first !== 'plugin'
       ? ['--profile', ...argv]
       : argv
     program.parse(expanded, { from: 'user' })

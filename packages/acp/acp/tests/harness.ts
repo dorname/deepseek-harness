@@ -26,7 +26,7 @@ import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-test
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import * as AcpPlugin from '../src/index.ts'
-import type { AcpConfig } from '../src/index.ts'
+import type { AcpPluginConfig } from '../src/index.ts'
 
 /** Scripted adapter for protocol tests. */
 class MockAdapter extends LlmAdapter {
@@ -215,7 +215,7 @@ export interface BridgeHarness {
   dispose: () => Promise<void>
 }
 
-type AcpConfigOverrides = { [K in keyof AcpConfig]?: AcpConfig[K] | undefined }
+type AcpConfigOverrides = { [K in keyof AcpPluginConfig]?: AcpPluginConfig[K] | undefined }
 
 /** Build the bridge and a connected SDK client over cross-wired byte streams. */
 export async function makeBridgeHarness(options: {
@@ -284,7 +284,7 @@ export async function makeBridgeHarness(options: {
       return Promise.resolve(harness.onPermission(params))
     })
 
-  const config = { stream: agentStream, ...options.config } as AcpConfig
+  const config = { stream: agentStream, ...options.config } as AcpPluginConfig
   if (!(options.config && 'provider' in options.config)) config.provider = 'mock'
   if (!(options.config && 'model' in options.config)) config.model = 'mock'
   harness.acpFiber = await ctx.plugin({

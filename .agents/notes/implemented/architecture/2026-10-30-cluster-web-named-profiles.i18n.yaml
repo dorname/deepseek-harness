@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-30-cluster-web-named-profiles.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-30-cluster-web-named-profiles.md
+/agent-note-cluster-web-launches-through-named-profiles:
+  en: 268795bb61ca89a7
+  zh: 0f6fbdff6aac483e
+/agent-note-cluster-web-launches-through-named-profiles/problem:
+  en: 94fc22f7d7c9671b
+  zh: b5e483aabe3fc4ec
+/agent-note-cluster-web-launches-through-named-profiles/decision:
+  en: 743d70d54fdb6eb8
+  zh: 5b49508d0e1e095d
+/agent-note-cluster-web-launches-through-named-profiles/alternatives-considered:
+  en: 49410150e4026fff
+  zh: c4ce94110719a383
+/agent-note-cluster-web-launches-through-named-profiles/consequences:
+  en: 376983939fa8dfa2
+  zh: 22d2186a0a0a694a

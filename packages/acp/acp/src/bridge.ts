@@ -86,6 +86,7 @@ export interface AcpBridgeOptions extends AcpConfig {
   authenticate?: Authenticator
   /** Optional capability overrides; defaults advertise resume/list/close. */
   capabilities?: {
+    /** Whether `session/load` is advertised; stdio defaults to true. */
     loadSession?: boolean
   }
 }
@@ -147,7 +148,11 @@ export class AcpBridge {
     })
   }
 
-  /** Connect this bridge to one transport stream. */
+  /**
+   * Connect this bridge to one transport stream.
+   * @param stream - Framed JSON-RPC byte stream owned by the connection until it closes.
+   * @returns The connection driving session traffic over the stream.
+   */
   connect(stream: Stream): AcpConnection {
     if (this.closed) throw new Error('ACP bridge has been disposed')
 

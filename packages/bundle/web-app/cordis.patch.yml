@@ -206,7 +206,9 @@
         surfaceContext: true
         trustedHosts: !!js ctx.webStartup.trustedHosts
         trustLoopbackGateway: !!js ctx.webStartup.trustLoopbackGateway
-        serveFrontend: !!js ctx.webStartup.serveFrontend
+        # The SPA mounts with the web profile; an API replica without it is the
+        # cluster-web-api profile's bundle overriding this row's whole config.
+        serveFrontend: true
 
     # The client-plugin reload chain, always mounted: it is idle until a
     # rebuild watcher (pnpm run dev:web) actually rewrites client bundles. It

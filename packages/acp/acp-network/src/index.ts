@@ -77,6 +77,10 @@ const DEFAULT_TOKEN_TTL_SECONDS = 300
  * Build an HMAC-SHA256 token validator bound to a shared secret and optional
  * subject audience. The token format is a compact JWT-like `<base64header>.<base64payload>.<base64sig>`
  * where header is `{alg:"HS256",typ:"JWT"}` and payload is `{sub,jti,exp,aud}`.
+ * @param secret - Shared HMAC secret the deployer issued the token with.
+ * @param expectedAudience - Required `aud` claim; omitted when the deployment has one audience.
+ * @returns Validator that throws on malformed, forged, expired, or wrong-audience tokens
+ * and returns the accepted `sub`/`jti` claims.
  */
 export function createHmacTokenValidator(secret: string, expectedAudience?: string): TokenValidator {
   return (token: string): ValidatedToken => {
@@ -124,7 +128,14 @@ export function createHmacTokenValidator(secret: string, expectedAudience?: stri
   }
 }
 
-/** Sign a compact HMAC token for the given subject and audience. */
+/**
+ * Sign a compact HMAC token for the given subject and audience.
+ * @param secret - Shared HMAC secret validators verify against.
+ * @param subject - Identity the token authenticates (for example a fleet user id).
+ * @param audience - `aud` claim the validator requires.
+ * @param ttlSeconds - Lifetime added to the current time for the `exp` claim.
+ * @returns The signed `<base64header>.<base64payload>.<base64sig>` token string.
+ */
 export function signHmacToken(secret: string, subject: string, audience: string, ttlSeconds = DEFAULT_TOKEN_TTL_SECONDS): string {
   const header = base64UrlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
   const payload = base64UrlEncode(JSON.stringify({

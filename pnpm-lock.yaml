@@ -244,6 +244,12 @@ importers:
       '@deepseek-ai/dsh-client-ui-cordis':
         specifier: workspace:*
         version: link:../../packages/extensions/ui-cordis
+      '@deepseek-ai/dsh-cluster-web-app':
+        specifier: workspace:*
+        version: link:../../packages/bundle/cluster-web-app
+      '@deepseek-ai/dsh-cluster-web-runner-app':
+        specifier: workspace:*
+        version: link:../../packages/bundle/cluster-web-runner-app
       '@deepseek-ai/dsh-cmdline':
         specifier: workspace:*
         version: link:../../packages/boot/cmdline
@@ -2330,6 +2336,62 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis
+
+  packages/bundle/cluster-web-app:
+    dependencies:
+      '@deepseek-ai/dsh-session-persistence-postgres':
+        specifier: workspace:*
+        version: link:../../session/session-persistence-postgres
+      '@deepseek-ai/dsh-stream-relay-postgres':
+        specifier: workspace:*
+        version: link:../../core/stream-relay-postgres
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/cordis-plugin-include':
+        specifier: workspace:~
+        version: link:../../../vendor/include
+      '@deepseek-ai/cordis-plugin-loader':
+        specifier: workspace:~
+        version: link:../../../vendor/loader
+      '@deepseek-ai/dsh-app-boot':
+        specifier: workspace:*
+        version: link:../../boot/app-boot
+      '@deepseek-ai/dsh-base':
+        specifier: workspace:*
+        version: link:../base
+      '@deepseek-ai/dsh-web-app':
+        specifier: workspace:*
+        version: link:../web-app
+
+  packages/bundle/cluster-web-runner-app:
+    dependencies:
+      '@deepseek-ai/dsh-agent-dispatch':
+        specifier: workspace:*
+        version: link:../../core/agent-dispatch
+      '@deepseek-ai/dsh-session-lease-postgres':
+        specifier: workspace:*
+        version: link:../../core/session-lease-postgres
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/cordis-plugin-loader':
+        specifier: workspace:~
+        version: link:../../../vendor/loader
+      '@deepseek-ai/dsh-app-boot':
+        specifier: workspace:*
+        version: link:../../boot/app-boot
+      '@deepseek-ai/dsh-base':
+        specifier: workspace:*
+        version: link:../base
+      '@deepseek-ai/dsh-cluster-web-app':
+        specifier: workspace:*
+        version: link:../cluster-web-app
+      '@deepseek-ai/dsh-web-app':
+        specifier: workspace:*
+        version: link:../web-app
 
   packages/bundle/headless:
     dependencies:

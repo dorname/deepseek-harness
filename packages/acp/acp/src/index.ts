@@ -43,9 +43,10 @@ export const name = 'acp'
 /**
  * Internal runtime/test-only overrides beyond the public Config schema.
  * Tests inject an in-memory stream here; network transports use {@link AcpBridge}
- * directly.
+ * directly. Named distinctly from `bridge.ts`'s `AcpConfig` (the schema type)
+ * so one catalog paste closure can carry both.
  */
-export interface AcpConfig extends AcpBridgeOptions {
+export interface AcpPluginConfig extends AcpBridgeOptions {
   /** Runtime-only transport override; production uses stdio. */
   stream?: Stream
 }
@@ -55,7 +56,7 @@ export interface AcpConfig extends AcpBridgeOptions {
  * @param ctx - Cordis context carrying the agent factory and session events.
  * @param config - Initial provider/model selection and optional test transport.
  */
-export function apply(ctx: Context, config: AcpConfig): void {
+export function apply(ctx: Context, config: AcpPluginConfig): void {
   const bridge = new AcpBridge(ctx, config)
   /* v8 ignore next 2 -- production stdio wiring; tests inject config.stream. */
   const stream: Stream = config.stream ?? ndJsonStream(

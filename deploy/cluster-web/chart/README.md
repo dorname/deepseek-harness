@@ -37,7 +37,7 @@ helm upgrade --install dsh deploy/cluster-web/chart -n dsh-cluster-web --reuse-v
 | `frontend` | 1 | `shell` on loopback, public `edge` | Ingress and frontend Service reach only `edge` |
 | `api` | `apiReplicas` | API-only `dsh` on loopback, `forward` in-network | frontend reaches the api Service, which selects forwarder containers |
 
-Both Deployments mount the same ReadWriteMany PVC. The API entry applies `overlays/api.overlay.yml` when Postgres is enabled, so session persistence and stream relay state are stored in Postgres rather than an API pod. The PVC owns the cross-replica browser-session key. `apiReplicas` defaults to 1; acceptance smoke keeps it at 2 or fewer.
+Both Deployments mount the same ReadWriteMany PVC. The API entry boots the `cluster-web-api` profile, whose `dsh-cluster-web-app` bundle persists sessions and stream relay state in Postgres rather than an API pod. The PVC owns the cross-replica browser-session key. `apiReplicas` defaults to 1; acceptance smoke keeps it at 2 or fewer.
 
 The storage class must support ReadWriteMany. Frontend readiness checks its public TCP listener. API startup, readiness, and liveness use HTTP `/healthz` on the forwarder; it returns 200 only when the protected loopback API responds with 401 to an unauthenticated request. A connection error, deadline, or other status returns 503. This checks API HTTP responsiveness, not database availability. Readiness removes failing replicas from Service traffic; liveness restarts them after its failure threshold. Startup protects cold initialization before those checks run. Tune `api.healthTimeoutMs` and `api.probes` in values.yaml. The bundled Postgres Deployment uses ephemeral storage and is intended for local staging; its data does not survive pod replacement.
 

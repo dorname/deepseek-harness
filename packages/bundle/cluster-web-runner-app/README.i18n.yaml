@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/bundle/cluster-web-runner-app/README.md
+/:
+  en: 6c2d5af6d37cff88
+  zh: 6c2d5af6d37cff88
+/deepseek-ai-dsh-cluster-web-runner-app:
+  en: b4f92077660d48cb
+  zh: 9c1c443f71cddefa
+/deepseek-ai-dsh-cluster-web-runner-app/summary:
+  en: 060594c531634b73
+  zh: 49c95d2df6fdb635
+/deepseek-ai-dsh-cluster-web-runner-app/table-of-contents:
+  en: d7fbbba70852c433
+  zh: 18a34239a822a6e1
+/deepseek-ai-dsh-cluster-web-runner-app/use-this-package:
+  en: 44e99f33bf916d27
+  zh: 75cbe748b8d9ac16
+/deepseek-ai-dsh-cluster-web-runner-app/model-experience:
+  en: 53c3fe52d91e42ce
+  zh: 8ae4886a6b03b31a
+/deepseek-ai-dsh-cluster-web-runner-app/model-experience/kv-cache-effect:
+  en: 8e7ec0cde82132bc
+  zh: 21dcaf0da06ed336
+/deepseek-ai-dsh-cluster-web-runner-app/known-limitations-and-deferred-work:
+  en: fe084f17d9e08adf
+  zh: 6aeb82240aa5b2c3
+/deepseek-ai-dsh-cluster-web-runner-app/known-limitations-and-deferred-work/dev-note:
+  en: e0468d356281a2ad
+  zh: 708868feca46607c
