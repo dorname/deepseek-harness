@@ -1,6 +1,6 @@
 # DeepSeek Harness 需求文档（dsh · core 模块）
 
-> 最后更新：2026-10-31
+> 最后更新：2026-11-03
 > 文档性质：存量项目（`bootstrap: adopted`）逆向整理的需求基线，描述 0.2.1-alpha.1 所承载的用户需求；场景事实来源为 `logos/resources/prd/3-technical-plan/2-scenario-implementation/core-scenario-candidates.md`（逆向候选，verified:false）中的可验证事实。
 
 ## 一、产品背景与目标
@@ -102,6 +102,7 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 | S45 | 同域 cluster-web Helm/K8s 一键投影 | 运维执行 `helm upgrade --install` | P03/P08 | P1 |
 | S46 | 同域前后端分离（API-only + shell） | 运维启用 cluster-web 三分流 / 外仓替换 shell | P03/P08 | P0 |
 | S47 | 同域前后端双容器 + API 容器级副本 | 运维 compose up frontend/api（可 scale api） | P03/P08 | P0 |
+| S48 | 按供应商 baseURL 动态发现 DeepSeek 模型目录 | 读取目录、新建 ACP 会话或切换模型 | P04/P07 | P0 |
 
 ## 四、核心场景详述（P0）
 
@@ -569,6 +570,48 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 - **GIVEN** 双服务拓扑就绪
 - **WHEN** compose down 或向各服务发 SIGTERM
 - **THEN** 容器/进程退出；宽限内结束
+
+### S48: 按供应商 baseURL 动态发现 DeepSeek 模型目录
+
+- **触发条件**：DeepSeek API-key 路由未显式配置人工 `models` 覆盖，调用方读取模型目录、创建 ACP 会话或切换模型。
+- **用户价值**：目录、可选项、持久化的 `provider/model` 与最终推理请求使用上游真实模型 ID，不再把内置或预写静态项冒充供应商能力（← P04/P07）。
+- **优先级**：P0
+- **主路径**：按既有优先级解析显式 `baseURL` → 可信 `DEEPSEEK_BASE_URL` → 公共端点 → 复用当前路由凭据请求 Anthropic Messages 兼容模型列表 → 校验、限界、按上游顺序去重并短时缓存成功结果 → `llm.listModels` 与 ACP `configOptions` 发布同一目录 → `session/set_config_option` 只接受当前目录值 → 推理请求原样使用所选模型 ID。
+- **人工覆盖**：显式 `models` 是独立、可见的高级覆盖模式，跳过端点发现；`models: []` 表示明确的空目录。人工配置不得在动态发现失败后自动生效，其他 DeepSeek 路由的既有静态配置语义不因本场景改变。
+
+#### 验收条件
+##### 正常：动态目录完整替代默认目录
+- **GIVEN** 可控 `baseURL` 返回 `deepseek-v4-flash` 与另一个测试模型
+- **WHEN** 调用 `llm.listModels('deepseek-official')` 或创建 ACP 会话
+- **THEN** 目录只含端点返回项，ID 原样保留；不出现端点未返回的 `deepseek-flash` 或其他内置项，也不编造上游未提供的能力元数据
+##### 正常：URL、凭据与有界读取
+- **GIVEN** `/anthropic`、末尾斜杠、已有 `/v1` 或带网关前缀的 baseURL，以及当前路由凭据
+- **WHEN** 发起目录发现
+- **THEN** 分别请求正确的 `/v1/models` 或 `/models` URL，保留网关前缀，发送 `x-api-key` 与 `anthropic-version: 2023-06-01`；密钥不进入 URL、日志、错误或缓存键，响应头和正文读取均有有限超时且正文累计读取不超过 4 MiB
+##### 正常：刷新、缓存与并发
+- **GIVEN** 第一次响应为 A/B，第二次响应为 B/C
+- **WHEN** 在缓存有效期内重复读取，随后等待 TTL 到期或改变端点、凭据代际或发现配置再读取，并并发发起相同发现
+- **THEN** 有效期内复用成功结果；失效后目录为 B/C 且不含 A；相同并发只产生一个上游请求；每个等待者可独立取消，最后一个等待者取消会中止共享传输；失败不缓存，成功空数组可以缓存
+##### 异常：失败与成功空目录不得伪装
+- **GIVEN** 缺失或不可用凭据、连接失败、超时、401/403、404、429、500、响应过大、非法 JSON、缺少顶层 `data` 数组或成功空 `data`
+- **WHEN** 读取目录或构建 ACP options
+- **THEN** 失败按凭据、取消、超时、网络/HTTP、过大、JSON/结构分类显式传播且可重试；成功空目录发布为空；两者均不得回退到静态模型，ACP 不得吞错成正常空组
+##### 正常：移除模型不重新成为可选项
+- **GIVEN** 会话当前模型 A 已被上游目录移除
+- **WHEN** 刷新 ACP `configOptions` 或尝试设置模型
+- **THEN** A 可保留为 `currentValue` 以描述历史状态，但不进入 choices/options；`session/set_config_option` 拒绝不在本次目录中的值
+##### 正常：动态模型切换与精确推理
+- **GIVEN** 动态目录包含 `deepseek-v4-flash`
+- **WHEN** 通过 ACP 选择该值并发送 prompt
+- **THEN** 设置成功，会话继续持久化既有 `provider/model` 字符串，最终上游请求体模型字段原样为 `deepseek-v4-flash`
+##### 正常：真实供应商联调
+- **GIVEN** staging 已配置真实供应商 `baseURL` 与既有 Secret，目录实际包含 `deepseek-v4-flash`
+- **WHEN** 选择该精确 ID 完成推理，再选择目录中另一个实际模型验证
+- **THEN** 第一模型返回正常助手响应且请求 ID 与目录 ID 一致；第二模型记录真实结果，权限失败不得伪报成功；无凭据时明确记为未执行，不得以 Mock 代替 AC-6
+##### 回归：既有会话与推理行为
+- **GIVEN** 既有 S03、S20、S26 会话与模型配置
+- **WHEN** 执行会话默认模型、历史回显、下一轮覆盖、恢复、reasoning options 和取消回归
+- **THEN** 既有行为保持；一次目录刷新失败不强制中断已有会话的纯推理，但客户端显式读取目录必须收到真实结果或错误
 
 ## 五、约束与边界
 
