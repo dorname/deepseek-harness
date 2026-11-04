@@ -17,5 +17,5 @@
 - [x] 单切片：实现 DeepSeek 动态目录、人工覆盖、成功缓存/singleflight/取消/dispose、LLM 信号贯通与 ACP options/原子切换；交付真实 Loader 与 ACP ST、keyless 快照、共享 OpenLogos reporter、实现清单、受影响包中英文 README/JSDoc 和升级指南；实现 `scripts/smoke-deepseek-discovery.ts` 及 `smoke-results.jsonl` 记录并接入统一 smoke dispatcher，完成 smoke 覆盖预检（覆盖 UT-S48-01、UT-S48-02、UT-S48-03、UT-S48-04、UT-S48-05、UT-S48-06、UT-S48-07、ST-S48-01、ST-S48-02、SMOKE-core-25）
 
 ## [deploy] 部署任务
-- [ ] 按合并后的部署方案构建带 commit 标识的 dsh 发布物并部署到 staging。
-- [ ] 使用既有 Secret 配置真实供应商端点，确认服务启动、动态目录可用及上一版发布物回滚路径。
+- [x] 按合并后的部署方案构建带 commit 标识的 dsh 发布物并部署到 staging。—— 用户授权的本地 staging 等效环境：发布物自源码构建（0.2.1-alpha.1，`pnpm run build` 后 `node apps/cli/lib/bin.js --version` 复核）；未部署远端 staging，精确 commit 与范围见部署报告。
+- [x] 使用既有 Secret 配置真实供应商端点，确认服务启动、动态目录可用及上一版发布物回滚路径。—— 根 `.env` 既有 Secret（不入报告/日志/缓存键）；真实 SMOKE-core-25 PASS（官方端点动态目录 `deepseek-flash`、`deepseek-v4-pro`，双模型精确 ID 推理 end_turn，flash 缺席如实记录）；回滚基线为上一版发布物；详见 `logos/resources/verify/deployment-report.md`。
