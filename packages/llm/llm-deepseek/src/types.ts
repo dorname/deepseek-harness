@@ -98,7 +98,7 @@ export interface DeepSeekAdapterOptions<Connection extends DeepSeekConnectionOpt
   /** Provider label for selectors; omission uses the protocol family name. */
   providerName?: string
   /** Provider-owned catalog availability; omission exposes no discovery entries. */
-  discoverModels?: (provider: string) => Promise<LlmModelInfo[]>
+  discoverModels?: (provider: string, signal?: AbortSignal) => Promise<LlmModelInfo[]>
   /** Current validated connection facts; called once per operation. */
   options: () => Connection
   /** Resolve authentication from this request's connection snapshot; never re-read the endpoint. */

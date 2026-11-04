@@ -12,7 +12,8 @@
 - [x] 产出 `deltas/test/smoke/core-smoke-test-cases.md` — 新增真实动态目录与精确模型 ID 推理 smoke。
 
 ## [code] 代码实现
-（本段在 plan 段留空：本提案需要代码实现，但 `[code]` 切片由 merge 后的 `slice-planner` 基于已合并规格和真实 UT/ST ID 统一规划。此处仅保留 `## [code]` 标题，勿提前填写切片项。切片范围必须覆盖 S48 时序指定的实现包、业务代码与对应 UT/ST/reporter、keyless ACP 快照、受影响包的中英文 README/JSDoc，以及 `docs/upgrade-guide/v0.2.1-alpha.1/` 下的配置与 ACP 行为升级指南。）
+> 删后续自检：评分 10（跨模块、异步生命周期、9+ 用例、安全与部署影响）。动态 provider 若缺少 ACP 同步改造会继续吞错并补回失效模型；ACP 若先于真实目录落地则没有端到端动态能力，两种拆法都不能独立通过全量 verify，故保留单切片。
+- [x] 单切片：实现 DeepSeek 动态目录、人工覆盖、成功缓存/singleflight/取消/dispose、LLM 信号贯通与 ACP options/原子切换；交付真实 Loader 与 ACP ST、keyless 快照、共享 OpenLogos reporter、实现清单、受影响包中英文 README/JSDoc 和升级指南；实现 `scripts/smoke-deepseek-discovery.ts` 及 `smoke-results.jsonl` 记录并接入统一 smoke dispatcher，完成 smoke 覆盖预检（覆盖 UT-S48-01、UT-S48-02、UT-S48-03、UT-S48-04、UT-S48-05、UT-S48-06、UT-S48-07、ST-S48-01、ST-S48-02、SMOKE-core-25）
 
 ## [deploy] 部署任务
 - [ ] 按合并后的部署方案构建带 commit 标识的 dsh 发布物并部署到 staging。

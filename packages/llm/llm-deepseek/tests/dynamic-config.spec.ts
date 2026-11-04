@@ -194,9 +194,14 @@ describe('request-level dynamic configuration', () => {
   it('advertises a live settings catalog without re-registration', async () => {
     vi.stubEnv('DEEPSEEK_API_KEY', 'catalog-fixture-key')
     const dir = await home()
-    const { ctx } = await boot(dir, { baseURL: 'http://127.0.0.1:1' })
+    const { ctx } = await boot(dir, {
+      baseURL: 'http://127.0.0.1:1',
+      models: [{ id: 'boot-model', name: 'From Boot', inputModalities: ['text'] }],
+    })
 
-    await expect(ctx.llm.listModels('deepseek-official')).resolves.toHaveLength(2)
+    await expect(ctx.llm.listModels('deepseek-official')).resolves.toEqual([
+      { provider: 'deepseek-official', id: 'boot-model', name: 'From Boot', inputModalities: ['text'] },
+    ])
     await configurations.get(ctx)!.update({
       models: [{ id: 'settings-model', name: 'From Settings', inputModalities: ['text', 'image'] }],
     })

@@ -1,0 +1,7 @@
+version: 1
+scenario: stale-model-options
+profile: acp
+composition: stale-model-options
+recording: authored
+header:
+  class: acp-default

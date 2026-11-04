@@ -105,12 +105,13 @@ export class AcpModelControl {
       if (typeof value !== 'string') throw new AcpModelConfigError(`${configId} requires a select value`)
       const current = this.selected
       if (current === undefined) throw new AcpModelConfigError('this session has no model selection')
+      let candidate: ModelSelection
       if (configId === MODEL_CONFIG_ID) {
         const state = await this.state(signal)
         const selected = state.choices.get(value)
         if (selected === undefined) throw new AcpModelConfigError(`unknown model option: ${value}`)
-        await this.resolveSelection(selected, signal)
-        this.selected = selected
+        candidate = selected
+        await this.resolveSelection(candidate, signal)
       } else if (configId === REASONING_CONFIG_ID) {
         const info = await this.llm.resolveModelInfo(current.provider, current.model, signal)
         const providerDefault = value === PROVIDER_DEFAULT_REASONING_VALUE
@@ -121,7 +122,7 @@ export class AcpModelControl {
         ) {
           throw new AcpModelConfigError(`unknown reasoning effort for ${current.provider}/${current.model}: ${value}`)
         }
-        this.selected = await this.resolveSelection({
+        candidate = await this.resolveSelection({
           provider: current.provider,
           model: current.model,
           ...providerDefault ? {} : { reasoningEffort: ReasoningEffortId(value) },
@@ -129,7 +130,9 @@ export class AcpModelControl {
       } else {
         throw new AcpModelConfigError(`unknown session config option: ${configId}`)
       }
-      return (await this.state(signal)).options
+      const state = await this.state(signal, candidate)
+      this.selected = candidate
+      return state.options
     })
   }
 
@@ -140,9 +143,8 @@ export class AcpModelControl {
     return result
   }
 
-  /** Build detached model choices and the dependent reasoning option. */
-  private async state(signal?: AbortSignal): Promise<ConfigState> {
-    const selected = this.selected
+  /** Build advertised model choices and the candidate's dependent reasoning option. */
+  private async state(signal?: AbortSignal, selected = this.selected): Promise<ConfigState> {
     if (selected === undefined) return { choices: new Map(), options: [] }
     let resolved: ModelSelection
     let routeAvailable = true
@@ -156,35 +158,22 @@ export class AcpModelControl {
     }
     const choices = new Map<SessionConfigValueId, ModelSelection>()
     const groups = await Promise.all(this.llm.listProviders().map(async (provider) => {
-      try {
-        const models = await this.llm.listModels(provider.id)
-        const entries = models.map((model) => {
-          const choice: ModelChoice = {
-            value: modelValue(provider.id, model.id),
-            selection: { provider: provider.id, model: model.id },
-          }
-          choices.set(choice.value, choice.selection)
-          return {
-            value: choice.value,
-            name: model.name,
-            ...model.description === undefined ? {} : { description: model.description },
-          }
-        })
-        return { group: provider.id, name: provider.name, options: entries }
-      } catch (_providerCatalogUnavailable) {
-        return { group: provider.id, name: provider.name, options: [] }
-      }
+      const models = await this.llm.listModels(provider.id, signal)
+      const entries = models.map((model) => {
+        const choice: ModelChoice = {
+          value: modelValue(provider.id, model.id),
+          selection: { provider: provider.id, model: model.id },
+        }
+        choices.set(choice.value, choice.selection)
+        return {
+          value: choice.value,
+          name: model.name,
+          ...model.description === undefined ? {} : { description: model.description },
+        }
+      })
+      return { group: provider.id, name: provider.name, options: entries }
     }))
     const currentValue = modelValue(resolved.provider, resolved.model)
-    if (!choices.has(currentValue)) {
-      choices.set(currentValue, { provider: resolved.provider, model: resolved.model })
-      let group = groups.find(item => item.group === resolved.provider)
-      if (group === undefined) {
-        group = { group: resolved.provider, name: resolved.provider, options: [] }
-        groups.push(group)
-      }
-      group.options.unshift({ value: currentValue, name: resolved.model })
-    }
     const options: SessionConfigOption[] = [{
       id: MODEL_CONFIG_ID,
       name: 'Model',

@@ -366,6 +366,10 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     const catalogProps = {
       models,
       overridden: modelsOverridden,
+      // No schema default means the adapter discovers its catalog from the
+      // endpoint at runtime; the editor must not present that as adapter
+      // defaults or warn about an empty selector.
+      inheritedFromEndpoint: !modelsOverridden && !Array.isArray(inheritedModels()),
       t,
       disabled,
       onChange: (next: Record<string, unknown>[]) => {

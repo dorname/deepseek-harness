@@ -24,6 +24,9 @@
       "path": "../../credentials/credentials"
     },
     {
+      "path": "../../util/timeout"
+    },
+    {
       "path": "../../../vendor/loader"
     },
     {

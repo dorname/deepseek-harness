@@ -6,6 +6,7 @@ import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { registerDeepSeekProvider, catalogModelInfo } from '@deepseek-ai/dsh-llm-deepseek'
 import { Config, plainOptions, resolveAdapterOptions } from './config.ts'
 import type { ResolvedDeepSeekOptions } from './config.ts'
+import { DeepSeekModelDiscovery } from './discovery.ts'
 
 export { Config, plainOptions, resolveAdapterOptions } from './config.ts'
 export type { Options, ResolvedDeepSeekOptions } from './config.ts'
@@ -33,15 +34,20 @@ export function apply(ctx: Context, config: Config): void {
       'MISSING_CREDENTIAL',
     )
   }
+  const discovery = new DeepSeekModelDiscovery()
+  ctx.effect(() => () => discovery.dispose(), 'llm-deepseek-api-key: model discovery teardown')
   ctx.llm.registerConfigurableProviders([
     { provider: PROVIDER, displayName: 'DeepSeek', settingsNs: ctx.fiber.entry?.options.id ?? name, settingsPath: [] },
   ])
   registerDeepSeekProvider(ctx, PROVIDER, {
     options, providerName: 'DeepSeek',
     resolveAuth: async connection => ({ headers: { 'x-api-key': await resolveApiKey(connection) } }),
-    discoverModels: (provider) => {
+    discoverModels: (provider, signal) => {
       const connection = options()
-      return Promise.resolve(connection.models.map(model => catalogModelInfo(provider, model)))
+      if (connection.modelsSource === 'config') {
+        return Promise.resolve(connection.models.map(model => catalogModelInfo(provider, model)))
+      }
+      return discovery.discover(provider, connection, resolveApiKey, signal)
     },
   })
 }

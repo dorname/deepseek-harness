@@ -11,6 +11,7 @@ import type { SessionHeader } from '@deepseek-ai/dsh-session'
 import { SessionPersistenceRevision, type SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
 import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import { makeBridgeHarness, textResponse, type BridgeHarness } from './harness.ts'
+import { reported } from './helpers/reporter.ts'
 import { startHttpMcpFixture } from '../../../mcp/mcp-client/tests/http-fixture.ts'
 
 /** Wrap a bare header as the snapshot shape `SessionPersistence.list` now returns. */
@@ -431,11 +432,12 @@ describe('automation-only ACP bridge', () => {
     await expect(harness.client.listSessions({ cursor: nonCanonical })).rejects.toThrow(/cursor is invalid/)
   })
 
-  it('rolls back new and resume when configuration discovery fails', async () => {
+  it('rolls back new and resume when configuration discovery fails', () => reported('UT-S48-06', async () => {
     harness = await makeBridgeHarness({ script: [textResponse('persisted')] })
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
+    const listModels = vi.spyOn(harness.ctx.llm, 'listModels')
     const resolve = vi.spyOn(harness.ctx.llm, 'resolveCallConfig')
-    resolve.mockRejectedValueOnce(new Error('catalog resolution failed'))
+    listModels.mockRejectedValueOnce(new Error('catalog discovery failed'))
     await expect(harness.client.newSession({ cwd: process.cwd(), mcpServers: [] }))
       .rejects.toThrow(/Internal error/)
     expect(harness.ctx.agents.list()).toHaveLength(0)
@@ -451,7 +453,7 @@ describe('automation-only ACP bridge', () => {
     await expect(harness.client.resumeSession({ sessionId: created.sessionId, cwd: process.cwd() }))
       .rejects.toThrow(/Internal error/)
     expect(harness.ctx.agents.list()).toHaveLength(0)
-  })
+  }))
 
   it('propagates non-MCP Agent factory failures and non-config selection failures', async () => {
     harness = await makeBridgeHarness({ script: [textResponse('persisted')] })
@@ -560,7 +562,7 @@ describe('automation-only ACP bridge', () => {
 
     try {
       harness.registerCatalogProvider('hung')
-      await vi.waitFor(() => { expect(listModels).toHaveBeenCalledWith('hung') })
+      await vi.waitFor(() => { expect(listModels).toHaveBeenCalledWith('hung', undefined) })
       await expect(harness.client.prompt({
         sessionId: created.sessionId,
         prompt: [{ type: 'text', text: 'continue while discovery is pending' }],
@@ -592,7 +594,7 @@ describe('automation-only ACP bridge', () => {
       const model = update.configOptions.find(option => option.id === 'model')
       if (model?.type !== 'select') throw new Error('expected model options')
       const groups = model.options.filter(option => 'group' in option)
-      expect(groups.map(group => group.group)).toEqual(['other', 'mock'])
+      expect(groups.map(group => group.group)).toEqual(['other'])
       expect(model.currentValue).toBe('["mock","mock"]')
     })
     expect(harness.sessionUpdates.at(-1)?.sessionId).toBe(created.sessionId)

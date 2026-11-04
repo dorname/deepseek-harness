@@ -22,6 +22,7 @@ import * as LlmDeepSeek from '@deepseek-ai/dsh-llm-deepseek-api-key'
 import { assemble } from './assemble.ts'
 import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
 import { sourceModuleLoader } from './helpers.ts'
+import { reported } from './helpers/reporter.ts'
 
 const NS = 'llm-deepseek'
 const KEY_REF = credentialRef('DEEPSEEK_API_KEY')
@@ -241,4 +242,34 @@ describe('llm-deepseek real dynamic composition', () => {
     await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
     expect(server.headers[0]?.['x-api-key']).toBe('entry-key')
   })
+
+  it('discovers the endpoint catalog and sends the exact upstream id through real composition', () => reported('UT-S48-07', async () => {
+    vi.stubEnv('DEEPSEEK_API_KEY', '')
+    const server = await mockServer([
+      { kind: 'models', body: JSON.stringify({ data: [
+        { id: 'deepseek-v4-flash', display_name: 'V4 Flash' },
+        { id: 'deepseek-v4-pro' },
+      ] }) },
+      { kind: 'sse', events: textEvents },
+    ])
+    const { ctx } = await loadComposition({ withDynamic: true, baseURL: server.url })
+
+    // The advertised catalog is exactly the endpoint's, with upstream ids
+    // preserved; the built-in defaults never appear.
+    await expect(ctx.llm.listModels('deepseek-official')).resolves.toEqual([
+      { provider: 'deepseek-official', id: 'deepseek-v4-flash', name: 'V4 Flash' },
+      { provider: 'deepseek-official', id: 'deepseek-v4-pro', name: 'deepseek-v4-pro' },
+    ])
+
+    // The discovered id is accepted verbatim by the next real request.
+    await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+    expect(server.headers[0]?.['x-api-key']).toBe('boot-key')
+    expect((server.requests[0] as { model?: string }).model).toBe('deepseek-v4-flash')
+
+    // Caller cancellation reaches the composed runtime.
+    const controller = new AbortController()
+    controller.abort()
+    await expect(ctx.llm.listModels('deepseek-official', controller.signal))
+      .rejects.toMatchObject({ code: 'ABORTED' })
+  }))
 })

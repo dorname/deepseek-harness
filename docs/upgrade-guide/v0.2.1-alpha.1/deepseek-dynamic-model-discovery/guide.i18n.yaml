@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-alpha.1/deepseek-dynamic-model-discovery/guide.md
+/:
+  en: 75d58714290f1d0d
+  zh: 9c8b1d1fd809fd40
+/deepseek-model-catalogs-come-from-the-endpoint-acp-stops-reinserting-removed-models:
+  en: 616155d84050095d
+  zh: 6473b57841847a41
+/deepseek-model-catalogs-come-from-the-endpoint-acp-stops-reinserting-removed-models/change:
+  en: 8489060a64e795cb
+  zh: 01674eca13d4561c
+/deepseek-model-catalogs-come-from-the-endpoint-acp-stops-reinserting-removed-models/migration:
+  en: 9aea110bc16765bf
+  zh: d12f45c717f7ada2

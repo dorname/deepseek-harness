@@ -1,5 +1,5 @@
 /** DeepSeek Messages transport, request configuration, and model capabilities. */
-export { deepSeekConfigFields, Config, plainOptions, resolveAdapterOptions, PUBLIC_BASE_URL } from './config.ts'
+export { deepSeekConfigFields, deepSeekModelsSchema, Config, plainOptions, resolveAdapterOptions, PUBLIC_BASE_URL } from './config.ts'
 export type { Options, ResolvedDeepSeekOptions } from './config.ts'
 export {
   DEFAULT_CONTEXT_WINDOW,
@@ -38,4 +38,5 @@ export type { DeepSeekUploadRecord } from './upload-index.ts'
 export type { RequestDefaults } from './types.ts'
 
 export { catalogModelInfo } from './model-info.ts'
+export { messagesApiRoot } from './messages-api.ts'
 export { registerDeepSeekProvider } from './host.ts'

@@ -852,9 +852,11 @@ declare abstract class LlmAdapter {
    * as the GUI may require membership. Adapters used there must advertise
    * their available models; the base empty catalog offers no GUI selection.
    * @param _provider - one provider route owned by this adapter.
+   * @param _signal - cancellation for this catalog lookup; asynchronous
+   *   implementations must settle promptly after it aborts.
    * @returns discoverable models in adapter-preferred order.
    */
-  listModels(_provider: string): Promise<readonly LlmModelInfo[]>;
+  listModels(_provider: string, _signal?: AbortSignal): Promise<readonly LlmModelInfo[]>;
   /**
    * Resolve all metadata available for one exact model. This query is
    * independent of the advisory catalog and does not validate request routing.
@@ -1029,9 +1031,10 @@ fileRequestText(ref: FileAttachmentRef): string
  * does not constrain core routing. Catalog-driven entry points may restrict
  * selection and submission to the advertised models.
  * @param provider - registered provider route to inspect.
+ * @param signal - optional cancellation for adapter-owned catalog discovery.
  * @returns detached model metadata in adapter-preferred order.
  */
-async listModels(provider: string): Promise<LlmModelInfo[]>
+async listModels(provider: string, signal?: AbortSignal): Promise<LlmModelInfo[]>
 
 /**
  * Resolve and validate all metadata from the adapter that owns one exact

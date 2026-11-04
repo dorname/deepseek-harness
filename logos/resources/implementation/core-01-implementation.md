@@ -1,6 +1,6 @@
 # core 实现清单（implementation）
 
-> 最后更新：2026-10-06
+> 最后更新：2026-11-04
 > 文档性质：存量项目逆向整理的实现基线。0.2.1-alpha.1 的代码已全部实现；本清单把 Phase 1 场景映射到承担实现的主责包与既有验证命令，作为后续变更迭代的定位索引（按 `openlogos change` 流程补充新实现时，在本清单追加条目）。
 
 ## 一、场景 → 实现映射
@@ -39,6 +39,7 @@
 | S31 网关登录 | `packages/fleet/gateway`（OIDC 授权码 + 网关会话）、`packages/bundle/web-app`（`--trust-loopback-gateway`）、`packages/client/connection`（信任转发 authority） | UT/ST-S31（JSONL reporter）+ `SMOKE-core-09` |
 | S32 跨用户隔离 | `packages/fleet/gateway`（按主体严格路由、回环启动令牌 jar） | UT/ST-S32（JSONL reporter）+ `SMOKE-core-10` |
 | S33 fleet 生命周期 | `packages/fleet/fleet-manager`（开通/回收/重启/上限）、`packages/identity/anonymous-user-id`（fleet 审计归属） | UT/ST-S33（JSONL reporter）+ `SMOKE-core-11`、`ST-S33-03` CPU 约束 runner（`scripts/fleet-staging/`） |
+| S48 provider 模型动态发现 | `packages/llm/llm-deepseek-api-key`（`src/discovery.ts`：有界、可取消、成功才缓存的端点目录发现）、`packages/llm/llm-deepseek`（`messagesApiRoot()`、无默认可复用 models schema、可取消 `listModels`）、`packages/acp/acp`（`model-control.ts` 实时目录校验、发现错误传播、移除模型不回填选项）、`packages/client/ui-settings-models`（端点发现展示态） | UT-S48-01..07 + ST-S48-01/02（JSONL reporter）+ keyless 快照 `stale-model-options` + `SMOKE-core-25`（`scripts/smoke-deepseek-discovery.ts`，仅真实 provider 出 AC-6 证据） |
 
 ## 二、横切机制实现
 
@@ -63,4 +64,4 @@
 
 ## 四、OpenLogos reporter 接入现状
 
-按 `logos/spec/test-results.md`，生成的测试代码须将用例 ID + 结果写入 `logos/resources/verify/test-results.jsonl`。fleet 域（S31–S33）的 vitest 套件已通过 `OPENLOGOS_RESULT_FILE` 环境门控的 reporter 按 `UT-*/ST-*` ID 追加 JSONL；`scripts/run-openlogos-tests.js`（`verify.pre_run_command`）负责清空账本、运行 fleet 套件与 `ST-S33-03` 验收 runner，并对 S01–S30 逆向基线用例补写显式 `skip` 记录（其行为由存量包测试承担）。`scripts/run-smoke.js`（`smoke.command`）串行执行 `scripts/smoke-core.ts`，把 `SMOKE-core-*` 结果写入 `logos/resources/verify/smoke-results.jsonl`。存量 S01–S30 域的 reporter 桥接仍属后续变更；本清单为其提供用例 ID 来源（`logos/resources/test/core-S*-test-cases.md`）。
+按 `logos/spec/test-results.md`，生成的测试代码须将用例 ID + 结果写入 `logos/resources/verify/test-results.jsonl`。fleet 域（S31–S33）与 S48 的 vitest 套件已通过 `OPENLOGOS_RESULT_FILE` 环境门控的 reporter 按 `UT-*/ST-*` ID 追加 JSONL（S48 套件：llm-deepseek-api-key `discovery.spec.ts`、acp `model-control.spec.ts`/`bridge.spec.ts`、llm-deepseek `loader-composition.spec.ts`/`scenario-discovery.spec.ts`）；`scripts/run-openlogos-tests.js`（`verify.pre_run_command`）负责清空账本、运行 fleet 套件、S48 套件与 `ST-S33-03` 验收 runner，并对 S01–S30 逆向基线用例补写显式 `skip` 记录（其行为由存量包测试承担）。`scripts/run-smoke.js`（`smoke.command`）串行执行自动发现的 `scripts/smoke-*` runner（含 S48 的 `smoke-deepseek-discovery.ts`），把 `SMOKE-core-*` 结果写入 `logos/resources/verify/smoke-results.jsonl`。存量 S01–S30 域的 reporter 桥接仍属后续变更；本清单为其提供用例 ID 来源（`logos/resources/test/core-S*-test-cases.md`）。

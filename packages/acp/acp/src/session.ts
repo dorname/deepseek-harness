@@ -226,7 +226,7 @@ export class AcpSession {
           })
         /* v8 ignore stop */
       })
-      /* v8 ignore start -- option discovery contains per-provider failure. */
+      /* v8 ignore start -- topology notification logs discovery failure without rejecting session work. */
       .catch((error: unknown) => {
         this.ctx.logger.warn(`acp: config-option update failed: ${errorChain(error)}`)
       })

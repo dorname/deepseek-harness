@@ -26,8 +26,8 @@ export interface Config {
   maxTokens: Volatile<number>
   /** Positive context capacity used when the selected model has no exact value (default 1,000,000). */
   defaultContextWindow: Volatile<number>
-  /** Advisory models shown by discovery consumers; defaults to V41 Flash and V4 Pro. */
-  models: Volatile<DeepSeekCatalogModel[]>
+  /** Advisory models shown by discovery consumers; provider plugins define the omitted-value behavior. */
+  models: Volatile<DeepSeekCatalogModel[] | undefined>
   /** Maximum provider idle time while one stream read is outstanding (default five minutes). */
   streamIdleTimeoutMs: Volatile<number>
   /** Maximum accumulated file-referenced image bytes per chat request (default 128 MiB). */
@@ -78,6 +78,9 @@ const catalogModel: z<DeepSeekCatalogModel> = z.object({
   toolUpdate: z.union(['in-history', 'addition-only'] as const),
 })
 
+/** Model catalog entries without a provider-specific default. */
+export const deepSeekModelsSchema = z.array(catalogModel)
+
 /** Shared schema fields for Messages protocol options. */
 export const deepSeekConfigFields = {
   baseURL: z.string().volatile(),
@@ -85,7 +88,7 @@ export const deepSeekConfigFields = {
   reasoningEffort: z.union(['off', 'low', 'high', 'max']).volatile(),
   maxTokens: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_TOKENS).volatile(),
   defaultContextWindow: z.number().step(1).min(1).default(DEFAULT_CONTEXT_WINDOW).volatile(),
-  models: z.array(catalogModel).default(DEFAULT_MODELS).volatile(),
+  models: deepSeekModelsSchema.default(DEFAULT_MODELS).volatile(),
   streamIdleTimeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_STREAM_IDLE_TIMEOUT_MS).volatile(),
   maxRequestFilesBytes: z.number().step(1).min(1).default(DEFAULT_MAX_REQUEST_FILES_BYTES).volatile(),
   maxInlineRequestImageBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INLINE_REQUEST_IMAGE_BYTES).volatile(),

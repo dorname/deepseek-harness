@@ -20,7 +20,7 @@ afterEach(async () => {
   for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
 })
 
-async function harness() {
+async function harness(options: { officialModels?: NonNullable<DeepSeek.Options['models']> } = {}) {
   const ctx = new Context()
   contexts.push(ctx)
   installAccountTaskCancellation(ctx)
@@ -28,7 +28,7 @@ async function harness() {
     await ctx.plugin(plugin)
   }
   await ctx.plugin(AgentLoop, { agents: [] })
-  await ctx.plugin(DeepSeek, {})
+  await ctx.plugin(DeepSeek, options.officialModels === undefined ? {} : { models: options.officialModels })
   await ctx.plugin(AccountProvider, {})
   return ctx
 }
@@ -220,9 +220,9 @@ it('cancels an account child without stopping its API-key parent', async () => {
   await parent.whenIdle()
 })
 
-it('hides signed-out account models while retaining the official catalog without an API key', async () => {
+it('hides signed-out account models while the official route keeps its configured catalog', async () => {
   vi.stubEnv('DEEPSEEK_API_KEY', '')
-  const ctx = await harness()
+  const ctx = await harness({ officialModels: [{ id: 'deepseek-v4-flash', name: 'V4 Flash' }] })
   let token: string | undefined
   ctx.provide('deepseekAccount', { resolveToken: async (url: string) => new URL(url).origin === 'https://api.deepseek.com' ? token : undefined } as DeepSeekAccount)
   expect(await ctx.llm.listModels('deepseek-account')).toEqual([])

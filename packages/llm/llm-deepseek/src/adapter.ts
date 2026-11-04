@@ -31,8 +31,8 @@ export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapt
 
   override providerInfo(provider: string) { return { id: provider, name: this.dependencies.providerName ?? 'DeepSeek' } }
   override providerRetryPolicy(_provider: string) { return this.dependencies.options().retryPolicy }
-  override async listModels(provider: string) {
-    return this.dependencies.discoverModels?.(provider) ?? []
+  override async listModels(provider: string, signal?: AbortSignal) {
+    return this.dependencies.discoverModels?.(provider, signal) ?? []
   }
   override resolveModel(provider: string, model: string, _signal?: AbortSignal) {
     return Promise.resolve(modelInfo(this.dependencies.options(), provider, model))

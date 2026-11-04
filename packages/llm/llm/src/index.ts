@@ -243,9 +243,11 @@ export abstract class LlmAdapter {
    * as the GUI may require membership. Adapters used there must advertise
    * their available models; the base empty catalog offers no GUI selection.
    * @param _provider - one provider route owned by this adapter.
+   * @param _signal - cancellation for this catalog lookup; asynchronous
+   *   implementations must settle promptly after it aborts.
    * @returns discoverable models in adapter-preferred order.
    */
-  listModels(_provider: string): Promise<readonly LlmModelInfo[]> {
+  listModels(_provider: string, _signal?: AbortSignal): Promise<readonly LlmModelInfo[]> {
     return Promise.resolve([])
   }
 
@@ -690,11 +692,12 @@ export class LlmRuntime extends TypertRemoteService {
    * does not constrain core routing. Catalog-driven entry points may restrict
    * selection and submission to the advertised models.
    * @param provider - registered provider route to inspect.
+   * @param signal - optional cancellation for adapter-owned catalog discovery.
    * @returns detached model metadata in adapter-preferred order.
    */
-  async listModels(provider: string): Promise<LlmModelInfo[]> {
+  async listModels(provider: string, signal?: AbortSignal): Promise<LlmModelInfo[]> {
     const adapter = this.registration(provider).adapter
-    const models = await adapter.listModels(provider)
+    const models = await adapter.listModels(provider, signal)
     const seen = new Set<string>()
     return models.map((model) => {
       if (

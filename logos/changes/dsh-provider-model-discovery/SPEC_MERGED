@@ -1,0 +1,8 @@
+merged: 9/9 deltas applied to logos/resources on 2026-11-03
+requirements: core-01 overview table gained the S48 row and S48 detail section
+feature-design: endpoint discovery interaction appended
+system-maps: core and acp-network maps gained the discovery rows
+scenarios: core-S48-provider-model-discovery.md created
+deployment: core-01 deployment plan gained the discovery staging entry
+test-cases: core-S48-test-cases.md created (UT-S48-01..07, ST-S48-01/02)
+smoke: SMOKE-core-25 appended to core-smoke-test-cases.md

@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用此包
 
-`apiKeyEnv` 默认为 `DEEPSEEK_API_KEY`，在每次请求时解析凭据。已组合 credentials 服务时，按其优先级解析；只有未组合该服务时才直接读取启动环境。请求时凭据缺失以 `MISSING_CREDENTIAL` 失败；格式错误以 `INVALID_CREDENTIAL` 失败。模型发现始终返回配置的目录，不依赖凭据。
+`apiKeyEnv` 默认为 `DEEPSEEK_API_KEY`，在每次请求时解析凭据。已组合 credentials 服务时，按其优先级解析；只有未组合该服务时才直接读取启动环境。请求时凭据缺失以 `MISSING_CREDENTIAL` 失败；格式错误以 `INVALID_CREDENTIAL` 失败。目录发现走同一凭据解析路径，凭据不可用时以相同错误失败。
 
 ```yaml
 - id: llm-deepseek
@@ -37,7 +37,7 @@ kind: "package-reference"
 
 端点和凭据引用来自同一次配置解析；进行中的请求保留该快照，后续配置更新仅影响后续请求。账号登录态不影响该路由使用的凭据。
 
-`models` 是该 provider 独立的可配置目录；默认值和协议能力来自共享传输包。目录判断不探测推理端点。设置命名空间采用 Cordis entry id，没有 entry 时采用插件名。产品保留 official 的 `llm-deepseek` entry id，账号使用 `llm-deepseek-account`。
+省略 `models` 时，从解析出的端点按与推理相同的端点与凭据解析路径发现 Messages 兼容模型列表；发现的 ID 原样保留，不虚构能力元数据。显式 `models` 列表为人工覆盖，不访问网络也不解析凭据（`[]` 表示明确的空目录）。每次发现受 `discoveryTimeoutMs`（默认 10 秒）约束；成功结果（包括空列表）按端点、凭据和发现配置缓存 `discoveryCacheTtlMs`（默认 30 秒；0 禁用复用，并发调用仍合并）。失败永不缓存：错误向目录消费方传播，无静态回退。设置命名空间采用 Cordis entry id，没有 entry 时采用插件名。产品保留 official 的 `llm-deepseek` entry id，账号使用 `llm-deepseek-account`。
 
 <a id="understand-the-implementation"></a>
 ## 理解实现
@@ -60,7 +60,7 @@ kind: "package-reference"
 
 #### Token effect
 
-鉴权和目录过滤不增加输入 token；实际调用的 token 由所选模型与请求内容决定。
+鉴权和目录发现不增加输入 token；实际调用的 token 由所选模型与请求内容决定。
 
 #### KV Cache effect
 
@@ -71,6 +71,7 @@ kind: "package-reference"
 <a id="known-limitations-and-deferred-work"></a>
 
 - 目录是配置元数据，不验证远端是否接受模型；实际调用仍可能失败。
+- 端点发现要求网关实现 Messages 兼容的模型列表；未实现的网关需要显式 `models` 覆盖（[迁移指南](../../../docs/upgrade-guide/v0.2.1-alpha.1/deepseek-dynamic-model-discovery/guide.zh.md)）。
 
 <a id="dev-note"></a>
 ### 开发备注

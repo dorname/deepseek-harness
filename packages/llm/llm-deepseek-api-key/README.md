@@ -25,7 +25,7 @@ Authentication resolution returns the validated API key in `x-api-key` for both 
 <a id="use-this-package"></a>
 ## Use this package
 
-`apiKeyEnv` defaults to `DEEPSEEK_API_KEY` and resolves per request. When the credentials service exists, its precedence applies; only compositions without that service read the launch environment directly. Requests with missing credentials fail with `MISSING_CREDENTIAL`; malformed credentials fail with `INVALID_CREDENTIAL`. Model discovery returns the configured catalog regardless of credentials.
+`apiKeyEnv` defaults to `DEEPSEEK_API_KEY` and resolves per request. When the credentials service exists, its precedence applies; only compositions without that service read the launch environment directly. Requests with missing credentials fail with `MISSING_CREDENTIAL`; malformed credentials fail with `INVALID_CREDENTIAL`. Catalog discovery resolves credentials through the same path, so discovery without usable credentials fails with the same errors.
 
 ```yaml
 - id: llm-deepseek
@@ -37,7 +37,7 @@ Authentication resolution returns the validated API key in `x-api-key` for both 
 
 The endpoint and credential reference come from one configuration resolution. In-flight requests retain that snapshot; subsequent updates affect subsequent calls. Account login state cannot change this route’s credential.
 
-`models` is an independently configurable catalog for this provider; defaults and protocol capabilities come from the shared transport. Discovery does not probe inference endpoints. The settings namespace is the Cordis entry id, or the plugin name without an entry. Product profiles retain the official entry id `llm-deepseek` and use `llm-deepseek-account` for the account route.
+Omitted `models` discovers the catalog from the resolved endpoint's Messages-compatible model listing over the same endpoint and credential resolution as inference; discovered ids pass through verbatim and carry no fabricated capability metadata. An explicit `models` list is a manual override that serves the catalog without network access or credential resolution (`[]` is a deliberate empty catalog). Discovery attempts are bounded by `discoveryTimeoutMs` (default 10 seconds), and successful results — including an empty listing — are cached per endpoint, credential, and discovery settings for `discoveryCacheTtlMs` (default 30 seconds; 0 disables reuse while concurrent calls still merge). Failures are never cached: they propagate to catalog consumers with no static fallback. The settings namespace is the Cordis entry id, or the plugin name without an entry. Product profiles retain the official entry id `llm-deepseek` and use `llm-deepseek-account` for the account route.
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
@@ -71,6 +71,7 @@ Credentials and catalog availability do not enter model input; the protocol tran
 <a id="known-limitations-and-deferred-work"></a>
 
 - The catalog is configuration metadata, not remote validation that a model is accepted; actual calls can still fail.
+- Endpoint discovery requires the gateway to implement the Messages-compatible model listing; gateways without it need an explicit `models` override ([migration guide](../../../docs/upgrade-guide/v0.2.1-alpha.1/deepseek-dynamic-model-discovery/guide.md)).
 
 <a id="dev-note"></a>
 ### Dev Note

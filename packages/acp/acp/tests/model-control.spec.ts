@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ReasoningEffortId, type LlmRuntime } from '@deepseek-ai/dsh-llm'
 import { AcpModelControl } from '../src/model-control.ts'
+import { reported } from './helpers/reporter.ts'
+
+/** Report every case of this suite's OpenLogos id from the wrapping `it`. */
+function c(name: string, fn: () => Promise<void>): void {
+  it(name, () => reported('UT-S48-06', fn))
+}
 
 /** Minimal LLM catalog/runtime double for pure standard-option tests. */
 function llmRuntime(overrides: Partial<LlmRuntime> = {}): LlmRuntime {
@@ -31,7 +37,7 @@ function llmRuntime(overrides: Partial<LlmRuntime> = {}): LlmRuntime {
 }
 
 describe('ACP model configuration control', () => {
-  it('represents an absent route and validates value types before mutation', async () => {
+  c('represents an absent route and validates value types before mutation', async () => {
     const control = new AcpModelControl(llmRuntime(), undefined)
 
     expect(control.snapshot()).toBeUndefined()
@@ -43,7 +49,7 @@ describe('ACP model configuration control', () => {
     expect(control.selection.current).toEqual({ provider: 'mock', model: 'mock' })
   })
 
-  it('synthesizes an unlisted current route and exposes reasoning descriptions', async () => {
+  c('keeps an unlisted current route out of advertised choices and exposes reasoning descriptions', async () => {
     const control = new AcpModelControl(llmRuntime({ listProviders: () => [] }), {
       provider: 'private',
       model: 'unlisted',
@@ -56,7 +62,7 @@ describe('ACP model configuration control', () => {
     expect(model).toMatchObject({
       type: 'select',
       currentValue: '["private","unlisted"]',
-      options: [{ group: 'private', name: 'private', options: [{ name: 'unlisted' }] }],
+      options: [],
     })
     expect(reasoning).toMatchObject({
       type: 'select',
@@ -72,20 +78,87 @@ describe('ACP model configuration control', () => {
     expect(control.selection.current).toEqual({ provider: 'private', model: 'unlisted' })
   })
 
-  it('keeps the selected route when its provider catalog is temporarily unavailable', async () => {
+  c('rejects the complete option state when provider discovery fails', async () => {
     const listModels = vi.fn(() => Promise.reject(new Error('catalog unavailable')))
     const control = new AcpModelControl(llmRuntime({ listModels }), { provider: 'mock', model: 'mock' })
 
+    await expect(control.options()).rejects.toThrow('catalog unavailable')
+
+    expect(listModels).toHaveBeenCalledWith('mock', undefined)
+    expect(control.selection.current).toEqual({ provider: 'mock', model: 'mock' })
+  })
+
+  c('returns an empty model select for a successful empty catalog', async () => {
+    const control = new AcpModelControl(llmRuntime({ listModels: () => Promise.resolve([]) }), {
+      provider: 'mock',
+      model: 'mock',
+    })
+
     const options = await control.options()
 
-    expect(listModels).toHaveBeenCalledWith('mock')
-    expect(options[0]).toMatchObject({
+    expect(options.find(option => option.id === 'model')).toMatchObject({
       type: 'select',
-      options: [{ group: 'mock', options: [{ name: 'mock' }] }],
+      currentValue: '["mock","mock"]',
+      options: [],
     })
   })
 
-  it('rejects an unadvertised reasoning effort and accepts a later valid change', async () => {
+  c('forwards the caller signal to every provider catalog lookup', async () => {
+    const listModels = vi.fn(() => Promise.resolve([]))
+    const control = new AcpModelControl(llmRuntime({
+      listProviders: () => [{ id: 'first', name: 'First' }, { id: 'second', name: 'Second' }],
+      listModels,
+    }), { provider: 'mock', model: 'mock' })
+    const controller = new AbortController()
+
+    await control.options(controller.signal)
+
+    expect(listModels).toHaveBeenNthCalledWith(1, 'first', controller.signal)
+    expect(listModels).toHaveBeenNthCalledWith(2, 'second', controller.signal)
+  })
+
+  c('rejects a stale dynamic model choice without changing selection', async () => {
+    let plainAdvertised = true
+    const control = new AcpModelControl(llmRuntime({
+      listModels: () => Promise.resolve([
+        { provider: 'mock', id: 'mock', name: 'Mock' },
+        ...plainAdvertised ? [{ provider: 'mock', id: 'plain', name: 'Plain' }] : [],
+      ]),
+    }), { provider: 'mock', model: 'mock' })
+    const initial = await control.options()
+    const model = initial.find(option => option.id === 'model')
+    if (model?.type !== 'select') throw new Error('expected model options')
+    const choices = model.options.flatMap(option => 'group' in option ? option.options : [option])
+    expect(choices.map(choice => choice.value)).toContain('["mock","plain"]')
+    plainAdvertised = false
+
+    await expect(control.set('model', '["mock","plain"]')).rejects.toThrow(/unknown model option/)
+
+    expect(control.selection.current).toEqual({ provider: 'mock', model: 'mock' })
+  })
+
+  c('does not commit model or reasoning changes when post-mutation discovery fails', async () => {
+    let catalogCalls = 0
+    const control = new AcpModelControl(llmRuntime({
+      listModels: () => {
+        catalogCalls += 1
+        return catalogCalls > 2
+          ? Promise.reject(new Error('refresh failed'))
+          : Promise.resolve([
+            { provider: 'mock', id: 'mock', name: 'Mock' },
+            { provider: 'mock', id: 'plain', name: 'Plain' },
+          ])
+      },
+    }), { provider: 'mock', model: 'mock' })
+    await control.options()
+
+    await expect(control.set('model', '["mock","plain"]')).rejects.toThrow('refresh failed')
+    expect(control.selection.current).toEqual({ provider: 'mock', model: 'mock' })
+    await expect(control.set('reasoning_effort', 'low')).rejects.toThrow('refresh failed')
+    expect(control.selection.current).toEqual({ provider: 'mock', model: 'mock' })
+  })
+
+  c('rejects an unadvertised reasoning effort and accepts a later valid change', async () => {
     const control = new AcpModelControl(llmRuntime(), { provider: 'mock', model: 'mock' })
 
     await expect(control.set('reasoning_effort', 'extreme')).rejects.toThrow(/unknown reasoning effort/)
@@ -94,7 +167,7 @@ describe('ACP model configuration control', () => {
     expect(options.find(option => option.id === 'reasoning_effort')).toMatchObject({ currentValue: 'low' })
   })
 
-  it('exposes and restores a provider-owned reasoning default', async () => {
+  c('exposes and restores a provider-owned reasoning default', async () => {
     const runtime = llmRuntime({
       resolveCallConfig: (selection: { provider?: string; model?: string; reasoningEffort?: string }) => Promise.resolve({
         provider: selection.provider ?? 'mock',

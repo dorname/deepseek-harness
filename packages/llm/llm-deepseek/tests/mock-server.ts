@@ -6,6 +6,7 @@ export type Behavior =
   | { kind: 'sse'; events: string[]; delayMs?: number }
   | { kind: 'http-error'; status: number; body: string; contentType?: string; headers?: Record<string, string> }
   | { kind: 'close-early'; events: string[] }
+  | { kind: 'models'; body: string }
 
 export interface MockServer {
   url: string
@@ -113,6 +114,20 @@ export async function mockServer(script: Behavior[]): Promise<MockServer> {
           return
         }
 
+        // The model-listing endpoint answers from the scripted queue without
+        // entering the JSON-body path: catalog reads and inference share one
+        // server, each consuming the next behavior in order.
+        if (url.pathname.endsWith('/models') && request.method === 'GET') {
+          headers.push(request.headers)
+          const behavior = script.shift()
+          if (behavior === undefined || behavior.kind !== 'models') {
+            response.writeHead(500).end('mock script has no models behavior at the front')
+            return
+          }
+          response.writeHead(200, { 'content-type': 'application/json' }).end(behavior.body)
+          return
+        }
+
         requests.push(JSON.parse(body.toString('utf8')))
         headers.push(request.headers)
         const behavior = script.shift()
@@ -126,6 +141,10 @@ export async function mockServer(script: Behavior[]): Promise<MockServer> {
             ...behavior.headers,
           })
           response.end(behavior.body)
+          return
+        }
+        if (behavior.kind === 'models') {
+          response.writeHead(500).end('a models behavior reached the inference path')
           return
         }
         response.writeHead(200, { 'content-type': 'text/event-stream' })

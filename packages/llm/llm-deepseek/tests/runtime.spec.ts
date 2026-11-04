@@ -1781,22 +1781,15 @@ describe('plugin registration and config', () => {
     })
   })
 
-  it('owns the deepseek provider and advertises the default models', async () => {
+  it('owns the deepseek provider, refuses to advertise built-ins dynamically, and keeps their capabilities', async () => {
     vi.stubEnv('DEEPSEEK_API_KEY', 'catalog-fixture-key')
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(LlmDeepSeek, { baseURL: 'http://127.0.0.1:1' })
     expect(ctx.llm.listProviders()).toEqual([{ id: 'deepseek-official', name: 'DeepSeek' }])
-    await expect(ctx.llm.listModels('deepseek-official')).resolves.toEqual([
-      { provider: 'deepseek-official', id: 'deepseek-flash', name: 'DeepSeek-V41-Flash', inputModalities: ['text', 'image'] },
-      {
-        provider: 'deepseek-official',
-        id: 'deepseek-v4-pro',
-        name: 'DeepSeek-V4-Pro',
-        description: 'Stronger agentic coding, knowledge, and difficult reasoning; suited to complex or quality-critical tasks at higher cost.',
-        inputModalities: ['text'],
-      },
-    ])
+    // Omitted `models` defers to the endpoint; an unreachable endpoint must
+    // surface the failure, never silently substitute the built-in catalog.
+    await expect(ctx.llm.listModels('deepseek-official')).rejects.toMatchObject({ code: 'DISCOVERY_FAILED' })
     await expect(ctx.llm.resolveModelInfo('deepseek-official', 'deepseek-flash'))
       .resolves.toMatchObject({
         provider: 'deepseek-official',
@@ -1910,21 +1903,16 @@ describe('plugin registration and config', () => {
     })
   })
 
-  it('uses the default model catalog when apply is called directly', async () => {
+  it('keeps built-in capability metadata resolvable when apply is called directly', async () => {
     vi.stubEnv('DEEPSEEK_API_KEY', 'catalog-fixture-key')
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     LlmDeepSeek.apply(ctx, LlmDeepSeek.Config({ baseURL: 'http://127.0.0.1:1' }))
-    await expect(ctx.llm.listModels('deepseek-official')).resolves.toEqual([
-      { provider: 'deepseek-official', id: 'deepseek-flash', name: 'DeepSeek-V41-Flash', inputModalities: ['text', 'image'] },
-      {
-        provider: 'deepseek-official',
-        id: 'deepseek-v4-pro',
-        name: 'DeepSeek-V4-Pro',
-        description: 'Stronger agentic coding, knowledge, and difficult reasoning; suited to complex or quality-critical tasks at higher cost.',
-        inputModalities: ['text'],
-      },
-    ])
+    // Direct apply follows the same dynamic contract: the built-in catalog is
+    // never advertised in place of an endpoint answer.
+    await expect(ctx.llm.listModels('deepseek-official')).rejects.toMatchObject({ code: 'DISCOVERY_FAILED' })
+    await expect(ctx.llm.resolveModelInfo('deepseek-official', 'deepseek-flash'))
+      .resolves.toMatchObject({ name: 'DeepSeek-V41-Flash', inputModalities: ['text', 'image'] })
   })
 
 
@@ -2215,13 +2203,15 @@ describe('plugin registration and config', () => {
     expect(ctx.llm.listProviders()).toEqual([{ id: 'deepseek-official', name: 'DeepSeek' }])
   })
 
-  it('loads keyless with an empty catalog and fails requests actionably', async () => {
+  it('loads keyless without an advertised catalog and fails requests actionably', async () => {
     vi.stubEnv('DEEPSEEK_API_KEY', '')
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(LlmDeepSeek, { baseURL: 'http://127.0.0.1:1' })
     expect(ctx.llm.listProviders()).toEqual([{ id: 'deepseek-official', name: 'DeepSeek' }])
-    await expect(ctx.llm.listModels('deepseek-official')).resolves.toHaveLength(2)
+    // Keyless dynamic discovery names the missing credential; it does not
+    // fall back to a static catalog.
+    await expect(ctx.llm.listModels('deepseek-official')).rejects.toMatchObject({ code: 'MISSING_CREDENTIAL' })
     const first = await assemble(ctx, { model: 'deepseek-flash', messages: [] })
     expect(first.finish).toMatchObject({ kind: 'error', failure: { code: 'MISSING_CREDENTIAL' } })
     // The guidance leads with the managed credential store.

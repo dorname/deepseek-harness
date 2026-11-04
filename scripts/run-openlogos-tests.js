@@ -75,6 +75,11 @@ const vitestStatus = run('openlogos vitest suites', 'pnpm', ['exec', 'vitest', '
   'apps/cli/tests/cluster-web-fe-be-containers.spec.ts',
   'packages/acp/acp-network/tests/network.spec.ts',
   'packages/bundle/acp-network-app/tests/acp-network-app.spec.ts',
+  'packages/llm/llm-deepseek-api-key/tests/discovery.spec.ts',
+  'packages/acp/acp/tests/model-control.spec.ts',
+  'packages/acp/acp/tests/bridge.spec.ts',
+  'packages/llm/llm-deepseek/tests/loader-composition.spec.ts',
+  'packages/llm/llm-deepseek/tests/scenario-discovery.spec.ts',
 ], { OPENLOGOS_RESULT_FILE: ledgerPath })
 const acceptanceStatus = run('ST-S33-03 acceptance runner', 'node',
   ['--import', 'tsx/esm', 'scripts/fleet-staging/acceptance-st-s33-03.ts'], { OPENLOGOS_RESULT_FILE: ledgerPath })

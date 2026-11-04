@@ -206,38 +206,38 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     const deepSeek = settings.getByText('DeepSeek', { exact: true }).first()
     await deepSeek.waitFor({ timeout: 10_000 })
     await deepSeek.locator('xpath=ancestor::li').getByRole('button', { name: '编辑' }).click()
+    // The API-key route has no static default anymore: the customize draft
+    // starts empty, and the meta line names endpoint discovery instead of
+    // adapter defaults.
     await settings.getByText('自定义设置').click()
-    expect(await settings.getByLabel('模型 ID 1').inputValue()).toBe('deepseek-flash')
-    expect(await settings.getByLabel('显示名称 1').inputValue()).toBe('DeepSeek-V41-Flash')
-    expect(await settings.getByLabel('模型 ID 2').inputValue()).toBe('deepseek-v4-pro')
-    expect(await settings.getByRole('button', { name: /删除模型/ }).count()).toBe(2)
-    await settings.getByRole('button', { name: '模型选项 1' }).click()
-    expect(await settings.getByRole('group', { name: '输入类型 1' }).getByRole('checkbox', { name: '图片' }).isChecked()).toBe(true)
-    await assertModelInputLayout(page, settings)
+    expect(await settings.getByRole('button', { name: /删除模型/ }).count()).toBe(0)
     const defaultModels = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DEFAULT_MODELS_EXPECTED, defaultModels, MODE)
+    // A manually added entry configures the route without network access.
+    await settings.getByRole('button', { name: '添加模型', exact: true }).click()
+    await settings.getByLabel('模型 ID 1').fill('deepseek-flash')
     await settings.getByLabel('显示名称 1').fill('Configured Flash')
-    await settings.getByRole('group', { name: '输入类型 1' }).getByRole('checkbox', { name: '图片' }).uncheck()
+    await settings.getByRole('button', { name: '模型选项 1' }).click()
+    expect(await settings.getByRole('group', { name: '输入类型 1' }).getByRole('checkbox', { name: '图片' }).isChecked()).toBe(false)
+    await assertModelInputLayout(page, settings)
     await settings.getByRole('button', { name: '保存', exact: true }).click()
     await settings.getByLabel('模型 ID 1').waitFor({ state: 'detached', timeout: 15_000 })
     // The save notice settles the directory refresh before Edit clears it for the next draft.
     await settings.getByText('已保存 DeepSeek (deepseek-official)。', { exact: true }).waitFor({ timeout: 15_000 })
     const savedDefaults = await readFile(join(scaffold.harnessHome, 'profiles', 'scaffold', 'cordis.patch.yml'), 'utf8')
     expect(savedDefaults).toContain('id: deepseek-flash')
-    expect(savedDefaults).toContain('inputModalities:')
-    expect(savedDefaults).toContain('- text')
-    expect(savedDefaults).toContain('systemPromptUpdate: in-history')
+    expect(savedDefaults).toContain('name: Configured Flash')
     await expect(scaffold.ctx.llm.resolveModelInfo('deepseek-official', 'deepseek-flash')).resolves.toMatchObject({
-      name: 'Configured Flash', inputModalities: ['text'], systemPromptUpdate: 'in-history',
+      name: 'Configured Flash', inputModalities: ['text'],
     })
+    // An id outside the configured catalog stays requestable as a safe
+    // text-only route with no fabricated metadata.
     await expect(scaffold.ctx.llm.resolveModelInfo('deepseek-official', 'deepseek-v4-pro')).resolves.toMatchObject({
-      name: 'DeepSeek-V4-Pro', inputModalities: ['text'],
+      name: 'deepseek-v4-pro', inputModalities: ['text'],
     })
     await deepSeek.locator('xpath=ancestor::li').getByRole('button', { name: '编辑' }).click()
     await settings.getByText('自定义设置').click()
-    for (let index = 0; index < 2; index++) {
-      await settings.getByRole('button', { name: /删除模型/ }).first().click()
-    }
+    await settings.getByRole('button', { name: /删除模型/ }).click()
     await settings.getByRole('button', { name: '添加模型', exact: true }).click()
     const customModelId = settings.getByLabel('模型 ID 1')
     await customModelId.fill('private-preview')

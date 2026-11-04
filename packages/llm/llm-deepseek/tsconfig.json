@@ -21,6 +21,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../../acp/acp"
+    },
+    {
       "path": "../../attachment/attachment"
     },
     {

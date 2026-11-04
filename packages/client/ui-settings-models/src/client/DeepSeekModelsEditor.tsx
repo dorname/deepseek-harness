@@ -127,6 +127,12 @@ export interface DeepSeekModelsEditorProps {
   models: readonly DeepSeekModelDraft[]
   /** Whether the user layer currently owns the whole array. */
   overridden: boolean
+  /**
+   * Whether the unoverridden catalog is discovered from the endpoint at
+   * runtime rather than inherited from adapter defaults; the editor then
+   * shows no rows and no empty-catalog warning, because neither claim holds.
+   */
+  inheritedFromEndpoint?: boolean
   /** Fallback context capacity used when a row omits its exact value. */
   defaultContextWindow: number | undefined
   /** Fallback output cap used when a row omits its exact value. */
@@ -250,7 +256,9 @@ export function DeepSeekModelsEditor(props: DeepSeekModelsEditorProps): ReactNod
         <div className={styles['modelCatalogHeading']}>
           <span className={styles['modelCatalogTitle']}>{props.t('models')}</span>
           <span className={styles['modelCatalogMeta']}>
-            {props.overridden ? props.t('modelsCustomized') : props.t('modelsInherited')}
+            {props.overridden
+              ? props.t('modelsCustomized')
+              : props.inheritedFromEndpoint === true ? props.t('modelsDiscovered') : props.t('modelsInherited')}
           </span>
         </div>
         {props.overridden
@@ -266,7 +274,7 @@ export function DeepSeekModelsEditor(props: DeepSeekModelsEditorProps): ReactNod
           )
           : null}
       </div>
-      {props.models.length === 0
+      {props.models.length === 0 && props.inheritedFromEndpoint !== true
         ? <p className={styles['modelEmpty']}>{props.t('modelsEmpty')}</p>
         : (
           <div className={styles['modelList']}>

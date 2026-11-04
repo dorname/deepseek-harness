@@ -16,7 +16,7 @@ Each package entry labels its data with three identifiers: `inject` lists the se
 
 - `inject`: `agents` · `llm` · `sessionPersistence` · `sessions`
 - `refs`: `AuthenticateRequest` (`@agentclientprotocol/sdk`) · `Stream` (`@agentclientprotocol/sdk`)
-- `source`: [`packages/acp/acp/src/index.ts:49`](../packages/acp/acp/src/index.ts)
+- `source`: [`packages/acp/acp/src/index.ts:51`](../packages/acp/acp/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -1733,13 +1733,17 @@ export type Config = ProtocolConfig
 
 - `inject`: `llm`
 - `refs`: [`ProtocolConfig`](../packages/llm/llm-deepseek/src/index.ts) · `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/llm/llm-deepseek-api-key/src/config.ts:10`](../packages/llm/llm-deepseek-api-key/src/config.ts)
+- `source`: [`packages/llm/llm-deepseek-api-key/src/config.ts:14`](../packages/llm/llm-deepseek-api-key/src/config.ts)
 
 ```ts config-catalog
-/** Messages configuration with a per-request API-key reference. */
+/** Messages configuration with endpoint discovery and a per-request API-key reference. */
 export interface Config extends ProtocolConfig {
   /** Credential reference resolved per request; defaults to DEEPSEEK_API_KEY. */
   apiKeyEnv: Volatile<string>
+  /** Maximum duration of one model-list request (default 10 seconds). */
+  discoveryTimeoutMs: Volatile<number>
+  /** Lifetime of a successful model-list result (default 30 seconds); zero disables result reuse. */
+  discoveryCacheTtlMs: Volatile<number>
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-llm-deepseek-api-key -->

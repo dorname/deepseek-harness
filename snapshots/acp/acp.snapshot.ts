@@ -30,6 +30,7 @@ const controllerCases: readonly {
 }[] = [
   { name: 'handshake', hasModelTurn: false },
   { name: 'reject-extra-dirs', hasModelTurn: false },
+  { name: 'stale-model-options', hasModelTurn: false, configPath: join(corpusDir, 'stale-model-options', 'cordis.yml') },
   { name: 'cancel', hasModelTurn: true },
   { name: 'cancel-tool-calls', hasModelTurn: true },
   { name: 'escalation-approved', hasModelTurn: true },
