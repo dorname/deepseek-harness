@@ -1,8 +1,8 @@
-merged: 9/9 deltas applied to logos/resources on 2026-11-03
-requirements: core-01 overview table gained the S48 row and S48 detail section
-feature-design: endpoint discovery interaction appended
+merged: 9/9 deltas applied to logos/resources on 2026-11-03; round 2 applied on 2026-11-04
+requirements: core-01 overview table gained the S48 row and S48 detail section; round 2 revised the S48 URL acceptance to the 404/405 suffix-strip candidate chain and made AC-6's real-provider target conditional on the live catalog
+feature-design: endpoint discovery interaction appended; round 2 rewrote the discovery URL bullet as the candidate chain with immediate-failure semantics
 system-maps: core and acp-network maps gained the discovery rows
-scenarios: core-S48-provider-model-discovery.md created
-deployment: core-01 deployment plan gained the discovery staging entry
-test-cases: core-S48-test-cases.md created (UT-S48-01..07, ST-S48-01/02)
-smoke: SMOKE-core-25 appended to core-smoke-test-cases.md
+scenarios: core-S48-provider-model-discovery.md created; round 2 revised §2 to the candidate-chain URL rule (official listing is served at the origin root; /anthropic prefix path has none) and §5 to chain failure semantics
+deployment: core-01 deployment plan gained the discovery staging entry; round 2 made the SMOKE-core-25 step target a live-catalog model with the flash absence recorded
+test-cases: core-S48-test-cases.md created (UT-S48-01..07, ST-S48-01/02); round 2 extended UT-S48-02 with candidate order, 404/405-only advance, no-hop on auth/parse errors, and attempted-endpoint error text
+smoke: SMOKE-core-25 appended to core-smoke-test-cases.md; round 2 made the AC-6 target conditional on the live catalog (deepseek-v4-flash preferred, absence recorded honestly) after the real endpoint proved the id does not exist upstream

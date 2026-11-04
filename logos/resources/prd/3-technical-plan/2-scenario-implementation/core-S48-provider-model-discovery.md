@@ -17,8 +17,8 @@
 
 1. 每次目录操作先解析当前配置。省略 `models` 进入动态发现；显式数组（包括空数组）直接进入人工覆盖，不请求网络，也不得在动态失败后自动启用。
 2. 动态模式沿用显式 `baseURL` → 可信 `DEEPSEEK_BASE_URL` → `PUBLIC_BASE_URL`。未显式配置 baseURL 时对公共端点动态发现，不返回内置目录。
-3. baseURL 去除末尾斜杠；URL pathname 已以 `/v1` 结尾时追加 `/models`，否则追加 `/v1/models`。不得用根路径替换方式丢失 `/anthropic` 或网关前缀。
-4. 请求使用当前路由凭据，发送 `x-api-key`、`anthropic-version: 2023-06-01`、accept 与既有 attribution headers，禁止重定向。默认发现超时 10000 ms，成功缓存 TTL 默认 30000 ms；TTL 0 不禁用 singleflight。
+3. 列表 URL 按候选链推导。主候选由 baseURL 去除末尾斜杠构造：pathname 已以 `/v1` 结尾时追加 `/models`，否则追加 `/v1/models`。仅当候选以 404 或 405 回应且 pathname 以已知 Anthropic 兼容网关后缀（固定表，最长优先匹配：`/api/claudecode`、`/api/anthropic`、`/apps/anthropic`、`/api/coding`、`/claudecode`、`/anthropic`、`/step_plan`、`/coding`、`/claude`）结尾时，剥离该后缀并依次尝试 `{root}/v1/models`、`{root}/models`；候选按序去重，同一 URL 不请求两次。官方 `api.deepseek.com` 路由的列表端点即由该回退在 origin 根提供（实测 `/anthropic` 前缀路径无列表端点，主候选必 404）。
+4. 请求使用当前路由凭据，发送 `x-api-key`、`anthropic-version: 2023-06-01`、accept 与既有 attribution headers，禁止重定向；凭据与请求头在全部候选间一致。默认发现超时 10000 ms 覆盖整个候选链，成功缓存 TTL 默认 30000 ms；TTL 0 不禁用 singleflight。
 
 ## 3. 主路径时序
 
@@ -41,7 +41,7 @@ sequenceDiagram
     alt successful unexpired cache entry for current credential generation
       D-->>C: detached exact catalog, including cached empty
     else miss / expired / configuration or credential generation changed
-      D->>P: GET models; timeout + caller cancellation + 4 MiB bound
+      D->>P: GET model listing (candidate chain); timeout + caller cancellation + 4 MiB bound
       alt another waiter shares the same operation
         C->>D: independent waiter joins existing transport
       end
@@ -92,7 +92,8 @@ sequenceDiagram
 
 - 仅接受顶层 `data` 数组；每项读取非空字符串 `id`，名称依次取 `name`、`display_name`、`displayName`，再回退 ID。畸形条目跳过，同 ID 首次出现保留；整个响应缺少数组或 JSON 非法则报错。
 - 成功空 `data` 返回并缓存空目录。不得合并内置模型、上次静态配置或当前模型，不编造 modalities、context window、maxTokens 或描述。
-- 固定 4 MiB 上限覆盖 Content-Length 预检和实际累计读取；超时覆盖响应头与正文。分别保留缺失凭据、调用方取消、发现超时、网络/HTTP 状态、过大、非法 JSON 和非法结构错误。
+- 固定 4 MiB 上限覆盖 Content-Length 预检和实际累计读取；超时覆盖响应头与正文，并覆盖整个候选链。分别保留缺失凭据、调用方取消、发现超时、网络/HTTP 状态、过大、非法 JSON 和非法结构错误。
+- 候选链仅以 404/405 推进；401/403、其他状态、超时、网络、过大、非法 JSON 与非法结构在当前候选立即失败。最终失败保留最后一次失败的分类与状态，并列出尝试过的脱敏端点。缓存键不含候选序号或获胜 URL：URL 推导是确定性的，同一配置每次操作尝试相同候选链，成功候选不单独缓存。
 - 错误可含 provider、脱敏端点、HTTP 状态和分类，不含 API key、认证头、上游响应正文或内部堆栈。日志不得记录原始密钥。
 
 ## 6. 并发取消与插件释放

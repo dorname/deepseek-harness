@@ -585,9 +585,9 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 - **WHEN** 调用 `llm.listModels('deepseek-official')` 或创建 ACP 会话
 - **THEN** 目录只含端点返回项，ID 原样保留；不出现端点未返回的 `deepseek-flash` 或其他内置项，也不编造上游未提供的能力元数据
 ##### 正常：URL、凭据与有界读取
-- **GIVEN** `/anthropic`、末尾斜杠、已有 `/v1` 或带网关前缀的 baseURL，以及当前路由凭据
+- **GIVEN** `/anthropic`、末尾斜杠、已有 `/v1` 或带网关前缀的 baseURL，以及当前路由凭据；个别端点的主候选 URL 以 404/405 回应（如官方路由 `/anthropic` 前缀路径无列表端点）
 - **WHEN** 发起目录发现
-- **THEN** 分别请求正确的 `/v1/models` 或 `/models` URL，保留网关前缀，发送 `x-api-key` 与 `anthropic-version: 2023-06-01`；密钥不进入 URL、日志、错误或缓存键，响应头和正文读取均有有限超时且正文累计读取不超过 4 MiB
+- **THEN** 先请求主规则推导的 `/v1/models` 或 `/models` URL；仅当候选以 404/405 回应且路径以已知 Anthropic 兼容网关后缀结尾时，剥离后缀改试 `{root}/v1/models` 与 `{root}/models`；401/403、其他状态、超时、网络与解析错误立即失败，不换候选。发送 `x-api-key` 与 `anthropic-version: 2023-06-01`；密钥不进入 URL、日志、错误或缓存键，响应头和正文读取均有有限超时且正文累计读取不超过 4 MiB，最终错误保留分类并列出尝试过的脱敏端点
 ##### 正常：刷新、缓存与并发
 - **GIVEN** 第一次响应为 A/B，第二次响应为 B/C
 - **WHEN** 在缓存有效期内重复读取，随后等待 TTL 到期或改变端点、凭据代际或发现配置再读取，并并发发起相同发现
@@ -605,9 +605,9 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 - **WHEN** 通过 ACP 选择该值并发送 prompt
 - **THEN** 设置成功，会话继续持久化既有 `provider/model` 字符串，最终上游请求体模型字段原样为 `deepseek-v4-flash`
 ##### 正常：真实供应商联调
-- **GIVEN** staging 已配置真实供应商 `baseURL` 与既有 Secret，目录实际包含 `deepseek-v4-flash`
-- **WHEN** 选择该精确 ID 完成推理，再选择目录中另一个实际模型验证
-- **THEN** 第一模型返回正常助手响应且请求 ID 与目录 ID 一致；第二模型记录真实结果，权限失败不得伪报成功；无凭据时明确记为未执行，不得以 Mock 代替 AC-6
+- **GIVEN** staging 已配置真实供应商 `baseURL` 与既有 Secret，目录实际返回非空真实模型列表
+- **WHEN** 选择目录中的实际模型完成推理（回归目标 `deepseek-v4-flash` 在目录中时优先选择它；不在目录时如实记录缺席并改选目录中的实际模型），再选择目录中另一个实际模型验证
+- **THEN** 第一模型返回正常助手响应且请求 ID 与目录 ID 一致；第二模型记录真实结果，权限失败不得伪报成功；无凭据或目录为空时明确记为未执行，不得以 Mock 代替 AC-6
 ##### 回归：既有会话与推理行为
 - **GIVEN** 既有 S03、S20、S26 会话与模型配置
 - **WHEN** 执行会话默认模型、历史回显、下一轮覆盖、恢复、reasoning options 和取消回归

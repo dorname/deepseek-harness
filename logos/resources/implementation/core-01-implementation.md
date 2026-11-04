@@ -39,7 +39,7 @@
 | S31 网关登录 | `packages/fleet/gateway`（OIDC 授权码 + 网关会话）、`packages/bundle/web-app`（`--trust-loopback-gateway`）、`packages/client/connection`（信任转发 authority） | UT/ST-S31（JSONL reporter）+ `SMOKE-core-09` |
 | S32 跨用户隔离 | `packages/fleet/gateway`（按主体严格路由、回环启动令牌 jar） | UT/ST-S32（JSONL reporter）+ `SMOKE-core-10` |
 | S33 fleet 生命周期 | `packages/fleet/fleet-manager`（开通/回收/重启/上限）、`packages/identity/anonymous-user-id`（fleet 审计归属） | UT/ST-S33（JSONL reporter）+ `SMOKE-core-11`、`ST-S33-03` CPU 约束 runner（`scripts/fleet-staging/`） |
-| S48 provider 模型动态发现 | `packages/llm/llm-deepseek-api-key`（`src/discovery.ts`：有界、可取消、成功才缓存的端点目录发现）、`packages/llm/llm-deepseek`（`messagesApiRoot()`、无默认可复用 models schema、可取消 `listModels`）、`packages/acp/acp`（`model-control.ts` 实时目录校验、发现错误传播、移除模型不回填选项）、`packages/client/ui-settings-models`（端点发现展示态） | UT-S48-01..07 + ST-S48-01/02（JSONL reporter）+ keyless 快照 `stale-model-options` + `SMOKE-core-25`（`scripts/smoke-deepseek-discovery.ts`，仅真实 provider 出 AC-6 证据） |
+| S48 provider 模型动态发现 | `packages/llm/llm-deepseek-api-key`（`src/discovery.ts`：有界、可取消、成功才缓存的端点目录发现；第二轮修订：列表 URL 候选链——主候选 404/405 且路径命中已知 Anthropic 兼容网关后缀时剥后缀试 `{root}/v1/models`、`{root}/models`，官方 `api.deepseek.com` 路由的列表在 origin 根）、`packages/llm/llm-deepseek`（`messagesApiRoot()`、无默认可复用 models schema、可取消 `listModels`）、`packages/acp/acp`（`model-control.ts` 实时目录校验、发现错误传播、移除模型不回填选项）、`packages/client/ui-settings-models`（端点发现展示态） | UT-S48-01..07 + ST-S48-01/02（JSONL reporter）+ keyless 快照 `stale-model-options` + `SMOKE-core-25`（`scripts/smoke-deepseek-discovery.ts`，仅真实 provider 出 AC-6 证据） |
 
 ## 二、横切机制实现
 

@@ -171,35 +171,43 @@ async function main(): Promise<void> {
     // has no built-in catalog to fall back to.
     const choices = catalogChoices(session.configOptions)
     const flashValue = JSON.stringify(['deepseek-official', TARGET_MODEL])
-    if (!choices.includes(flashValue)) {
-      report('skip', scenario, started,
-        `the live catalog does not list ${TARGET_MODEL}; published choices: ${JSON.stringify(choices)}`)
+    // The regression target is `deepseek-v4-flash`, the id the old static
+    // catalog advertised without existing upstream. When today's catalog does
+    // not list it, the exact-id assertions run against a real listed model
+    // and the absence stays in the ledger record instead of masking a pass.
+    const primaryValue = choices.find(value => value === flashValue) ?? choices[0]
+    if (primaryValue === undefined) {
+      report('skip', scenario, started, `the live catalog published no choices: ${JSON.stringify(choices)}`)
       return
     }
+    const primaryId = (JSON.parse(primaryValue) as [string, string])[1]
+    const effectiveScenario = choices.includes(flashValue)
+      ? scenario
+      : `${scenario}; ${TARGET_MODEL} is not in the live catalog`
 
     // First model: exact upstream id through ACP selection, real prompt.
-    await acp.request('session/set_config_option', { sessionId: session.sessionId, configId: 'model', value: flashValue })
+    await acp.request('session/set_config_option', { sessionId: session.sessionId, configId: 'model', value: primaryValue })
     const first = await acp.request('session/prompt', {
       sessionId: session.sessionId,
       prompt: [{ type: 'text', text: 'Reply with the single word: ready' }],
     })
-    if (first.error !== undefined) throw new Error(`prompt with ${TARGET_MODEL} failed: ${first.error.message}`)
+    if (first.error !== undefined) throw new Error(`prompt with ${primaryId} failed: ${first.error.message}`)
     const firstResult = first.result as { stopReason?: string }
     if (firstResult.stopReason !== 'end_turn') {
-      throw new Error(`prompt with ${TARGET_MODEL} ended with ${String(firstResult.stopReason)}`)
+      throw new Error(`prompt with ${primaryId} ended with ${String(firstResult.stopReason)}`)
     }
 
     // Second model: another real catalog entry, recorded truthfully — a
     // permission failure is noted in the ledger without masking the first
     // model's success.
-    const otherValue = choices.find(value => value !== flashValue)
+    const otherValue = choices.find(value => value !== primaryValue)
     if (otherValue === undefined) {
-      report('pass', `${scenario}; the catalog lists only ${TARGET_MODEL}, so the second-model step had no candidate`, started)
+      report('pass', `${effectiveScenario}; the catalog lists only ${primaryId}, so the second-model step had no candidate`, started)
       return
     }
     const second = await acp.request('session/set_config_option', { sessionId: session.sessionId, configId: 'model', value: otherValue })
     if (second.error !== undefined) {
-      report('pass', `${scenario}; second model ${otherValue} could not be selected: ${second.error.message}`, started)
+      report('pass', `${effectiveScenario}; second model ${otherValue} could not be selected: ${second.error.message}`, started)
       return
     }
     const secondPrompt = await acp.request('session/prompt', {
@@ -208,10 +216,10 @@ async function main(): Promise<void> {
     })
     if (secondPrompt.error !== undefined || (secondPrompt.result as { stopReason?: string }).stopReason !== 'end_turn') {
       const detail = secondPrompt.error?.message ?? `ended with ${String((secondPrompt.result as { stopReason?: string }).stopReason)}`
-      report('pass', `${scenario}; second model ${otherValue} did not complete and is recorded as-is: ${detail}`, started)
+      report('pass', `${effectiveScenario}; second model ${otherValue} did not complete and is recorded as-is: ${detail}`, started)
       return
     }
-    report('pass', `${scenario}; second model ${otherValue} also completed`, started)
+    report('pass', `${effectiveScenario}; second model ${otherValue} also completed`, started)
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     report('fail', scenario, started, stderrTail.length > 0 ? `${message}; stderr tail: ${stderrTail}` : message)

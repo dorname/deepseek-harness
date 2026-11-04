@@ -10,6 +10,7 @@
 - [x] 产出 `deltas/prd/3-technical-plan/3-deployment/core-01-deployment-plan.md` — 更新发布物、凭据、配置迁移、回滚和部署后检查。
 - [x] 产出 `deltas/test/core-S48-test-cases.md` — 新增 S48 UT/ST 用例及 AC 追溯。
 - [x] 产出 `deltas/test/smoke/core-smoke-test-cases.md` — 新增真实动态目录与精确模型 ID 推理 smoke。
+- [x] 第二轮 delta（2026-11-04，真实冒烟证伪首轮 URL 规则后修订）：官方 Anthropic 根 `/anthropic` 前缀路径无列表端点（404），列表在 origin 根提供；按 cc-switch 先例将 URL 规则改为「主候选 404/405 且路径命中已知 Anthropic 兼容网关后缀时剥后缀试 `{root}/v1/models`、`{root}/models`，其他错误立即失败」；同轮证实 `deepseek-v4-flash` 不在上游真实目录，AC-6/SMOKE-core-25 目标改为条件化（flash 在目录时优先，缺席如实记录并改选实际模型）；修订 requirements AC、feature-design §8、S48 场景 §2/§5、UT-S48-02、SMOKE-core-25 并重新合并。
 
 ## [code] 代码实现
 > 删后续自检：评分 10（跨模块、异步生命周期、9+ 用例、安全与部署影响）。动态 provider 若缺少 ACP 同步改造会继续吞错并补回失效模型；ACP 若先于真实目录落地则没有端到端动态能力，两种拆法都不能独立通过全量 verify，故保留单切片。

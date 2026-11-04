@@ -41,6 +41,10 @@ function fetchStub(implementation: (input: string | URL | Request, init?: Reques
   return stub
 }
 
+function requestedUrl(input: string | URL | Request): string {
+  return typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+}
+
 async function expectLlmError(promise: Promise<unknown>, code: string): Promise<LlmError> {
   try {
     await promise
@@ -161,13 +165,95 @@ describe('UT-S48-02 URL, authentication, and credential isolation', () => {
 
       expect(fetch).toHaveBeenCalledTimes(1)
       const [url, init] = fetch.mock.calls[0]!
-      const requested = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url
-      expect(requested).toBe(expected)
+      expect(requestedUrl(url)).toBe(expected)
       const headers = new Headers(init?.headers)
       expect(headers.get('x-api-key')).toBe(key)
       expect(headers.get('anthropic-version')).toBe('2023-06-01')
       expect(headers.get('accept')).toBe('application/json')
       expect(init).toMatchObject({ method: 'GET', redirect: 'error' })
+    })
+  })
+
+  c('falls back to stripped-suffix origin candidates only on a 404 or 405 primary', async () => {
+    await reported('UT-S48-02', async () => {
+      const fetch = fetchStub(async (input) => {
+        const href = requestedUrl(input)
+        return href === 'https://api.example.com/anthropic/v1/models' || href === 'https://api.example.com/v1/models'
+          ? new Response('not found', { status: 404 })
+          : listReply([{ id: 'origin-model' }])
+      })
+      const key = 'sk-chain-secret'
+
+      const catalog = await models(discovery(), connection({ baseURL: 'https://api.example.com/anthropic' }), key)
+
+      expect(catalog).toEqual([{ provider: PROVIDER, id: 'origin-model', name: 'origin-model' }])
+      expect(fetch.mock.calls.map(call => requestedUrl(call[0]))).toEqual([
+        'https://api.example.com/anthropic/v1/models',
+        'https://api.example.com/v1/models',
+        'https://api.example.com/models',
+      ])
+      for (const [, init] of fetch.mock.calls) {
+        const headers = new Headers(init?.headers)
+        expect(headers.get('x-api-key')).toBe(key)
+        expect(headers.get('anthropic-version')).toBe('2023-06-01')
+      }
+    })
+    await reported('UT-S48-02', async () => {
+      const fetch = fetchStub(async input => (requestedUrl(input).endsWith('/v1/models')
+        ? new Response('', { status: 405 })
+        : listReply([{ id: 'after-405' }])))
+
+      const catalog = await models(discovery(), connection())
+
+      expect(catalog).toEqual([{ provider: PROVIDER, id: 'after-405', name: 'after-405' }])
+      expect(fetch).toHaveBeenCalledTimes(3)
+    })
+  })
+
+  c('fails on the first candidate for auth, server, and parse errors without hopping', async () => {
+    await reported('UT-S48-02', async () => {
+      for (const [respond, messagePart] of [
+        [() => new Response('denied', { status: 401 }), 'answered 401; check the API key'],
+        [() => new Response('boom', { status: 500 }), 'answered 500'],
+        [() => new Response('<html>busy</html>', { status: 200 }), 'did not return a JSON model listing'],
+      ] as const) {
+        const fetch = fetchStub(async () => respond())
+
+        const error = await expectLlmError(models(discovery(), connection()), 'DISCOVERY_FAILED')
+
+        expect(fetch).toHaveBeenCalledTimes(1)
+        expect(error.message).toContain(messagePart)
+        expect(error.message).not.toContain('sk-current')
+      }
+    })
+  })
+
+  c('reports every attempted endpoint when the chain exhausts, including the single-candidate case', async () => {
+    await reported('UT-S48-02', async () => {
+      const fetch = fetchStub(async () => new Response('', { status: 404 }))
+
+      const error = await expectLlmError(
+        models(discovery(), connection({ baseURL: 'https://plain.example/v1' })),
+        'DISCOVERY_FAILED',
+      )
+
+      expect(fetch).toHaveBeenCalledTimes(1)
+      expect(error.message).toBe('no model listing endpoint at https://plain.example/v1/models (last status 404)')
+      expect(error.failure.status).toBe(404)
+    })
+    await reported('UT-S48-02', async () => {
+      const fetch = fetchStub(async () => new Response('', { status: 404 }))
+
+      const error = await expectLlmError(
+        models(discovery(), connection({ baseURL: 'https://api.example.com/anthropic' })),
+        'DISCOVERY_FAILED',
+      )
+
+      expect(fetch).toHaveBeenCalledTimes(3)
+      expect(error.message).toBe(
+        'no model listing endpoint at https://api.example.com/anthropic/v1/models, '
+        + 'https://api.example.com/v1/models, https://api.example.com/models (last status 404)',
+      )
     })
   })
 

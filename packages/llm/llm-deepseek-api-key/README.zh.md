@@ -37,7 +37,7 @@ kind: "package-reference"
 
 端点和凭据引用来自同一次配置解析；进行中的请求保留该快照，后续配置更新仅影响后续请求。账号登录态不影响该路由使用的凭据。
 
-省略 `models` 时，从解析出的端点按与推理相同的端点与凭据解析路径发现 Messages 兼容模型列表；发现的 ID 原样保留，不虚构能力元数据。显式 `models` 列表为人工覆盖，不访问网络也不解析凭据（`[]` 表示明确的空目录）。每次发现受 `discoveryTimeoutMs`（默认 10 秒）约束；成功结果（包括空列表）按端点、凭据和发现配置缓存 `discoveryCacheTtlMs`（默认 30 秒；0 禁用复用，并发调用仍合并）。失败永不缓存：错误向目录消费方传播，无静态回退。设置命名空间采用 Cordis entry id，没有 entry 时采用插件名。产品保留 official 的 `llm-deepseek` entry id，账号使用 `llm-deepseek-account`。
+省略 `models` 时，从解析出的端点按与推理相同的端点与凭据解析路径发现 Messages 兼容模型列表；发现的 ID 原样保留，不虚构能力元数据。列表 URL 按候选链推导：主候选 `GET {messagesApiRoot}/models`，仅当候选在网关后缀路径上以 404/405 回应时剥离后缀改试 origin 根候选——官方 `api.deepseek.com` 路由因此能在 origin 根找到列表。显式 `models` 列表为人工覆盖，不访问网络也不解析凭据（`[]` 表示明确的空目录）。每次发现受 `discoveryTimeoutMs`（默认 10 秒）约束；成功结果（包括空列表）按端点、凭据和发现配置缓存 `discoveryCacheTtlMs`（默认 30 秒；0 禁用复用，并发调用仍合并）。失败永不缓存：错误向目录消费方传播，无静态回退。设置命名空间采用 Cordis entry id，没有 entry 时采用插件名。产品保留 official 的 `llm-deepseek` entry id，账号使用 `llm-deepseek-account`。
 
 <a id="understand-the-implementation"></a>
 ## 理解实现

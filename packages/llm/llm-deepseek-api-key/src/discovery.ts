@@ -11,6 +11,43 @@ const ANTHROPIC_VERSION = '2023-06-01'
 const DISCOVERY_TIMEOUT = 'DEEPSEEK_DISCOVERY_TIMEOUT'
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
+/**
+ * Gateway suffixes whose prefixed path hosts Anthropic Messages but not always
+ * a model listing. Longest first so the most specific suffix wins. Members and
+ * order follow the cc-switch model-fetch prior art; the DeepSeek official route
+ * is the motivating case (`/anthropic` prefix path answers 404, the origin root
+ * serves the listing).
+ */
+const LISTING_COMPAT_SUFFIXES: readonly string[] = [
+  '/api/claudecode',
+  '/api/anthropic',
+  '/apps/anthropic',
+  '/api/coding',
+  '/claudecode',
+  '/anthropic',
+  '/step_plan',
+  '/coding',
+  '/claude',
+]
+
+/**
+ * Ordered model-listing candidate URLs for one resolved endpoint. The primary
+ * candidate follows the Messages root; a gateway-suffixed path gains origin
+ * root fallbacks. Derivation is deterministic: the same endpoint always tries
+ * the same chain, so the cache key needs no candidate or winning URL.
+ */
+function listingUrls(baseURL: string): string[] {
+  const urls = [`${messagesApiRoot(baseURL)}/models`]
+  const parsed = new URL(baseURL)
+  const pathname = parsed.pathname.replace(/\/+$/u, '')
+  const suffix = LISTING_COMPAT_SUFFIXES.find(candidate => pathname.endsWith(candidate))
+  if (suffix !== undefined) {
+    const root = `${parsed.origin}${pathname.slice(0, -suffix.length)}`
+    urls.push(`${root}/v1/models`, `${root}/models`)
+  }
+  return [...new Set(urls)]
+}
+
 interface CachedCatalog {
   expiresAt: number
   models: LlmModelInfo[]
@@ -72,6 +109,25 @@ function invalidListing(url: string, detail: string): LlmError {
   return new LlmError(`${url} returned an invalid model listing: ${detail}`, 'DISCOVERY_FAILED')
 }
 
+function httpListingError(url: string, status: number): LlmError {
+  return new LlmError(
+    `${url} answered ${status}${status === 401 || status === 403 ? '; check the API key' : ''}`,
+    'DISCOVERY_FAILED',
+    { status },
+  )
+}
+
+/** A candidate answered 404/405: this URL hosts no model listing, so the chain advances. */
+class NoListingError extends LlmError {
+  /** HTTP status that classified this candidate as listing-less; always present. */
+  readonly listingStatus: 404 | 405
+
+  constructor(url: string, status: 404 | 405) {
+    super(`${url} answered ${status}`, 'DISCOVERY_FAILED', { status })
+    this.listingStatus = status
+  }
+}
+
 function readListing(body: unknown, provider: string, url: string): LlmModelInfo[] {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
     throw invalidListing(url, 'expected an object with a data array')
@@ -131,14 +187,16 @@ async function readBounded(response: Response, url: string): Promise<string> {
   return new TextDecoder().decode(body)
 }
 
-async function discoverOnce(
+/**
+ * One candidate listing request: transport, status, bound, parse, and schema.
+ * Every failure is an `LlmError`; a 404/405 means this URL hosts no listing.
+ */
+async function fetchListing(
   provider: string,
-  connection: ResolvedDeepSeekOptions,
+  url: string,
   apiKey: string,
-  signal: AbortSignal,
+  limitSignal: AbortSignal,
 ): Promise<LlmModelInfo[]> {
-  const url = `${messagesApiRoot(connection.baseURL)}/models`
-  using limit = deadline(signal, connection.discoveryTimeoutMs, DISCOVERY_TIMEOUT)
   try {
     const response = await fetch(url, {
       method: 'GET',
@@ -149,15 +207,11 @@ async function discoverOnce(
         ...attributionHeaders(),
       },
       redirect: 'error',
-      signal: limit.signal,
+      signal: limitSignal,
     })
-    if (!response.ok) {
-      throw new LlmError(
-        `${url} answered ${response.status}${response.status === 401 || response.status === 403 ? '; check the API key' : ''}`,
-        'DISCOVERY_FAILED',
-        { status: response.status },
-      )
-    }
+    if (!response.ok) throw response.status === 404 || response.status === 405
+      ? new NoListingError(url, response.status)
+      : httpListingError(url, response.status)
     const text = await readBounded(response, url)
     let body: unknown
     try {
@@ -165,17 +219,46 @@ async function discoverOnce(
     } catch (_parseError: unknown) {
       throw new LlmError(`${url} did not return a JSON model listing`, 'DISCOVERY_FAILED')
     }
-    const models = readListing(body, provider, url)
-    throwIfAborted(signal)
-    return models
+    return readListing(body, provider, url)
   } catch (error: unknown) {
-    if (timeoutOf(limit.signal, DISCOVERY_TIMEOUT) !== undefined) {
-      throw new LlmError(`DeepSeek model discovery timed out after ${connection.discoveryTimeoutMs}ms`, 'TIMEOUT')
-    }
-    if (signal.aborted) throw aborted()
     if (error instanceof LlmError) throw error
     throw new LlmError(`could not reach ${url} for DeepSeek model discovery`, 'DISCOVERY_FAILED')
   }
+}
+
+async function discoverOnce(
+  provider: string,
+  connection: ResolvedDeepSeekOptions,
+  apiKey: string,
+  signal: AbortSignal,
+): Promise<LlmModelInfo[]> {
+  using limit = deadline(signal, connection.discoveryTimeoutMs, DISCOVERY_TIMEOUT)
+  const urls = listingUrls(connection.baseURL)
+  let lastStatus = 0
+  for (const url of urls) {
+    try {
+      const models = await fetchListing(provider, url, apiKey, limit.signal)
+      throwIfAborted(signal)
+      return models
+    } catch (error: unknown) {
+      if (timeoutOf(limit.signal, DISCOVERY_TIMEOUT) !== undefined) {
+        throw new LlmError(`DeepSeek model discovery timed out after ${connection.discoveryTimeoutMs}ms`, 'TIMEOUT')
+      }
+      if (signal.aborted) throw aborted()
+      // NoListingError means "no listing endpoint here" and advances the chain;
+      // every other failure belongs to a live endpoint and must surface as-is.
+      if (error instanceof NoListingError) {
+        lastStatus = error.listingStatus
+        continue
+      }
+      throw error
+    }
+  }
+  throw new LlmError(
+    `no model listing endpoint at ${urls.join(', ')} (last status ${lastStatus})`,
+    'DISCOVERY_FAILED',
+    { status: lastStatus },
+  )
 }
 
 /** Per-plugin successful-catalog cache with cancellable concurrent discovery. */

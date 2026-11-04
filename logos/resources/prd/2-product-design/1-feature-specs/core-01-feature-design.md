@@ -595,7 +595,7 @@ Host 本地服务分布式化是部署形态能力：在执行池（S37–S39）
 
 ### 发现与解析
 
-- 列表 URL 由 baseURL 去除末尾斜杠后构造：路径已以 `/v1` 结尾时追加 `/models`，否则追加 `/v1/models`；保留网关路径前缀，推理 baseURL 不变。
+- 列表 URL 按候选链推导：主候选由 baseURL 去除末尾斜杠后构造，路径已以 `/v1` 结尾时追加 `/models`，否则追加 `/v1/models`；保留网关路径前缀。仅当候选以 404/405 回应且路径以已知 Anthropic 兼容网关后缀（固定表，最长优先匹配）结尾时，剥离该后缀继续尝试 `{root}/v1/models` 与 `{root}/models`，按序去重。回退只表示「该 URL 不提供列表」；401/403、其他状态、超时、网络与解析错误在当前候选立即失败。推理 baseURL 不变，凭据与请求头在全部候选间一致，发现超时覆盖整个候选链。
 - 请求为 `GET`，使用当前路由 credentials-first 凭据解析结果，发送 `x-api-key`、`anthropic-version: 2023-06-01` 与既有 attribution headers；禁止凭据重定向，不把密钥写入 URL、日志、错误或缓存键。
 - 超时覆盖响应头与正文读取；固定 4 MiB 安全上限同时检查声明长度和实际累计字节。响应只接受顶层 `data` 数组；条目须有非空字符串 `id`，名称依次取非空 `name`、`display_name`、`displayName`，否则用 ID。跳过畸形条目，按 ID 首次出现去重并保持上游顺序。
 - 返回 `provider/id/name` 所需目录信息，不编造 modalities、context window、token limits 或描述。成功空数组是空目录，不是错误，也不是静态回退条件。

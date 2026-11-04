@@ -266,7 +266,7 @@ smoke 输入（具体 `SMOKE-*` 用例见 `logos/resources/test/smoke/core-smoke
 1. 记录上一版可回滚发布物与 commit，构建并标识新版本或镜像。
 2. 在 staging 使用既有 Secret 与目标 `baseURL` 启动 dsh ACP/headless 组合，不启用 dspm 静态 `profile_patch` 模型清单作为替代实现。
 3. 检查启动日志无密钥和阻断性错误；读取动态目录，确认只包含上游真实 ID，失败和成功空目录不被静态项伪装。
-4. 执行 SMOKE-core-25：目录包含 `deepseek-v4-flash` 时选择该精确 ID 完成真实推理，再验证另一个实际目录模型；第二模型权限失败须如实记录。
+4. 执行 SMOKE-core-25：选择目录中的实际模型完成真实推理（`deepseek-v4-flash` 在目录时优先选择该精确 ID，缺席时如实记录缺席并改选实际模型），再验证另一个实际目录模型；第二模型权限失败须如实记录。
 5. 写入部署报告与结果后才标记部署完成；若真实凭据、端点或模型权限不可用，不得把相应真实验收标为 PASS。
 
 ### 回滚与部署后检查
