@@ -17,6 +17,7 @@ import { AcpContentError, admitAcpPrompt } from './content.ts'
 import { turnEndToStopReason } from './codec.ts'
 import { mountAcpMcpServers } from './mcp.ts'
 import { AcpModelControl } from './model-control.ts'
+import { AcpPermissionControl } from './permission-control.ts'
 import { assistantUpdates, toolCallUpdate, toolResultUpdate } from './updates.ts'
 
 /** The continuable-subagent teardown used without depending on the subagent package. */
@@ -99,7 +100,9 @@ export class AcpSession {
   /** The exact top-level Agent owned by this ACP session. */
   readonly agent: Agent
   private readonly modelControl: AcpModelControl
+  private readonly permissionControl: AcpPermissionControl
   private outputTail = Promise.resolve()
+  private configTail = Promise.resolve()
   private inflight: InflightPrompt | undefined
   private closing: Promise<void> | undefined
   private readonly pendingSelections = new Map<string, ModelSelection>()
@@ -112,6 +115,7 @@ export class AcpSession {
   ) {
     this.agent = handle.agent
     this.modelControl = modelControl
+    this.permissionControl = new AcpPermissionControl(ctx, this.agent)
     this.disposeAgent = () => handle.dispose()
   }
 
@@ -187,17 +191,21 @@ export class AcpSession {
   }
 
   /**
-   * Return the complete standard model configuration state.
+   * Return the complete standard configuration state: model, reasoning, and
+   * permission options.
    * @param signal - optional request cancellation.
-   * @returns provider-grouped model and exact-model reasoning options.
+   * @returns all current standard configuration options.
    */
   configOptions(signal?: AbortSignal): Promise<SessionConfigOption[]> {
     this.assertActive()
-    return this.modelControl.options(signal)
+    return this.assembleOptions(signal)
   }
 
   /**
-   * Apply one standard configuration option to later ACP turns.
+   * Apply one standard configuration option to later ACP turns. Permission
+   * ids route to the permission control; the remaining ids keep the model
+   * selection path. Mutations serialize in receive order, and every response
+   * carries the complete resulting option state.
    * @param configId - advertised standard option id.
    * @param value - selected standard option value.
    * @param signal - optional request cancellation.
@@ -205,13 +213,32 @@ export class AcpSession {
    */
   setConfig(configId: string, value: unknown, signal?: AbortSignal): Promise<SessionConfigOption[]> {
     this.assertActive()
-    return this.modelControl.set(configId, value, signal)
+    return this.serializeConfig(async () => {
+      if (this.permissionControl.owns(configId)) {
+        const permissionOptions = this.permissionControl.set(configId, value)
+        return [...await this.modelControl.options(signal), ...permissionOptions]
+      }
+      const modelOptions = await this.modelControl.set(configId, value, signal)
+      return [...modelOptions, ...this.permissionControl.options()]
+    })
+  }
+
+  /** Keep concurrent client mutations in receive order without wedging after rejection. */
+  private serializeConfig<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.configTail.then(operation)
+    this.configTail = result.then(() => undefined, () => undefined)
+    return result
+  }
+
+  /** Merge the model and permission option states, model options first. */
+  private async assembleOptions(signal?: AbortSignal): Promise<SessionConfigOption[]> {
+    return [...await this.modelControl.options(signal), ...this.permissionControl.options()]
   }
 
   /** Resolve topology state off-chain, then serialize its notification without blocking execution updates. */
   topologyChanged(): void {
     if (this.closing !== undefined) return
-    void this.modelControl.options()
+    void this.assembleOptions()
       .then((configOptions) => {
         if (this.closing !== undefined) return
         const previous = this.outputTail

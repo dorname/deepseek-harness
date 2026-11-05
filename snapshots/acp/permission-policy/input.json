@@ -1,0 +1,15 @@
+{
+  "steps": [
+    { "op": "initialize" },
+    { "op": "newSession" },
+    { "op": "setConfigOption", "configId": "permission_policy", "value": "always" },
+    {
+      "op": "prompt",
+      "text": "Run exactly two bash commands in order: first printf 'probe-one\\n', and only after it finishes printf 'probe-two\\n'. I will approve the first permission prompt and reject the second one. Do not retry a denied command; if the second command is denied, reply with just DONE and stop."
+    }
+  ],
+  "permissionAnswers": [
+    { "kind": "allow_once" },
+    { "kind": "reject_once" }
+  ]
+}

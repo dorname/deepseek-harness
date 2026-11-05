@@ -117,7 +117,13 @@ const permissionStateSchema: zod.ZodType<PermissionProjectionState> = zod.object
     zod.literal('workspace-write'),
     zod.literal('danger-full-access'),
   ]).nullable(),
-  approval: zod.union([zod.literal('ask'), zod.literal('never')]).nullable(),
+  // The approval knob fold admits every ApprovalPolicy value: `always` is a
+  // session-switched tier that matches no configured preset (`custom`).
+  approval: zod.union([
+    zod.literal('ask'),
+    zod.literal('never'),
+    zod.literal('always'),
+  ]).nullable(),
   seeded: zod.boolean(),
 }).strict()
 

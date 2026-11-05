@@ -60,19 +60,26 @@ const OUTCOMES: readonly ApprovalOutcome[] = ['allowed-once', 'rejected', 'cance
  *
  * - `'ask'` (the default) — delegate to the composed answerers; with none
  *   composed the chain falls through to the fail-closed `'unavailable'`.
+ *   Ordinary tool calls that no ask source covers still run without asking.
  * - `'never'` — never prompt anyone: every ask resolves `'rejected'`
  *   deterministically. The strict headless stance (CI, unattended runs) and
  *   the policy whose outcome is knowable without asking.
+ * - `'always'` — every tool call asks before it runs: a pre-execute listener
+ *   turns each call into an ask that dispatches to the composed answerers.
+ *   The external-client stance (ACP `permission_policy=always`) where every
+ *   action needs an explicit one-shot grant.
  */
-export type ApprovalPolicy = 'ask' | 'never'
+export type ApprovalPolicy = 'ask' | 'never' | 'always'
 
 /** Every {@link ApprovalPolicy}, for option advertisement and runtime validation of untrusted policy strings. */
-export const APPROVAL_POLICIES: readonly ApprovalPolicy[] = ['ask', 'never']
+export const APPROVAL_POLICIES: readonly ApprovalPolicy[] = ['ask', 'never', 'always']
 
 /** Model-facing statement for the deterministic `'never'` policy. */
 const NEVER_SENTENCE = 'Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).'
 /** Model-facing statement for an interactive policy that may still fail closed. */
 const ASK_SENTENCE = 'Approval policy: ask. Operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed.'
+/** Model-facing statement for the per-call `'always'` policy. */
+const ALWAYS_SENTENCE = 'Approval policy: always. Every tool call is submitted for user approval before it executes; only explicitly approved calls run.'
 
 /**
  * Whether the log currently sits inside an open turn (a `turn/start` not yet
@@ -99,10 +106,16 @@ function hasOpenTurn(session: Session): boolean {
  */
 export function setApprovalPolicy(session: Session, policy: ApprovalPolicy): void {
   if (!APPROVAL_POLICIES.includes(policy)) {
-    throw new TypeError('approval policy must be one of "ask" or "never"')
+    throw new TypeError('approval policy must be one of "ask", "never", or "always"')
   }
   session.append('approval/policy', { policy })
 }
+
+/**
+ * The audited ask reason for the `always` per-call gate. Exported for the tool
+ * runtime, which routes the upgraded ask through the approval seam.
+ */
+export const ALWAYS_TOOL_REASON = 'the approval policy requires approval for every tool call'
 
 /**
  * Readonly same-process permission question. `callId` links to an already
@@ -134,12 +147,15 @@ export interface ApprovalRequest extends ApprovalRequestEvent {
 /** Plugin config. All optional — `static Config` supplies the defaults. */
 export interface Config {
   /**
-   * The deployment's default {@link ApprovalPolicy} for sessions without an
+   * The deployment's default approval stance for sessions without an
    * `approval/policy` override — `'ask'` delegates to the composed answerers
    * (fail-closed with none); `'never'` auto-rejects every ask without
-   * prompting (the deterministic CI/unattended stance).
+   * prompting (the deterministic CI/unattended stance). `'always'` is not a
+   * deployable default: it is a per-session interactive stance switched by
+   * the user (or an ACP client) after the session exists, so the config
+   * schema accepts only `'ask' | 'never'`.
    */
-  readonly policy?: ApprovalPolicy
+  readonly policy?: 'ask' | 'never'
 }
 
 /**
@@ -168,10 +184,16 @@ export class ApprovalService extends Service {
           // A bare assemble() (tests, diagnostics) has no session to state.
           if (agent === undefined) return ''
           const policy = effective(agent)
-          return policy === 'never' ? NEVER_SENTENCE : ASK_SENTENCE
+          return policy === 'never' ? NEVER_SENTENCE : policy === 'always' ? ALWAYS_SENTENCE : ASK_SENTENCE
         },
       })
     })
+
+    // The `always` floor is enforced by the tool runtime's pre-execute gate
+    // (see `@deepseek-ai/dsh-tools`), which reads {@link ApprovalService.effectivePolicy}
+    // and routes the upgraded ask through the same serviceAsk path; registering
+    // it here would need the tools event types and close a project-reference
+    // cycle with `@deepseek-ai/dsh-tools`.
   }
 
   /**
@@ -236,11 +258,12 @@ export class ApprovalService extends Service {
   /**
    * The session's effective policy: its own `approval/policy` fold, else the
    * configured default (the schema already defaulted an omitted policy to
-   * `'ask'`; the `??` only narrows the optional-input TYPE).
+   * `'ask'`; the `??` only narrows the optional-input TYPE). Read by the ACP
+   * config advertisement to publish the current policy value.
    * @param session - the exact accepted session whose policy applies.
    * @returns the policy every ask for this session resolves under right now.
    */
-  private effectivePolicy(session: Session): ApprovalPolicy {
+  effectivePolicy(session: Session): ApprovalPolicy {
     return this.overrideOf(session) ?? this.config.policy ?? 'ask'
   }
 

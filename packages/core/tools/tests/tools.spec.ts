@@ -2,12 +2,12 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import LlmRuntime, { createUserMessage, ToolCallId, HarnessError, type ContentBlock  } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
-import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
-import ApprovalService, { type ApprovalOutcome, type ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
+import ApprovalService, { ALWAYS_TOOL_REASON, setApprovalPolicy, type ApprovalOutcome, type ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
 import ToolRuntime, {
   defineContentToolFixture, defineTool, JsonSchemaError, parameterSchemaSpecToJsonSchema, validateArgs, ToolArgsError, ToolNotFoundError,
   TOOL_ABORTED, TOOL_ABORTED_BEFORE_DISPATCH,
@@ -933,6 +933,107 @@ describe('ToolRuntime', () => {
       expect(result.isError).toBe(true)
       const text = result.content[0]?.type === 'text' ? result.content[0].text : ''
       expect(text).toContain('unreachable')
+    })
+
+    it('the always policy upgrades a bare allow into a per-call ask routed through the seam', async () => {
+      const ctx = await approvalSetup()
+      const agent = fakeAgent()
+      const executed: string[] = []
+      ctx.tools.register({
+        ...echoTool,
+        name: 'always-probe',
+        parameters: {},
+        execute: async () => {
+          executed.push('ran')
+          return 'ran'
+        },
+      })
+      const seen: ApprovalRequest[] = []
+      ctx.on('approval/request', (req) => {
+        seen.push(req)
+        return Promise.resolve<ApprovalOutcome>('allowed-once')
+      })
+      setApprovalPolicy(agent.session, 'always')
+
+      const result = await ctx.tools.execute({
+        signal: testToolSignal, callId: ToolCallId('always-1'), name: 'always-probe', arguments: {}, agent,
+      })
+
+      // The floor routed the upgraded ask through serviceAsk: one audited
+      // pair, the exported reason, and the granted call executed.
+      expect(result.isError).toBe(false)
+      expect(executed).toEqual(['ran'])
+      expect(seen).toHaveLength(1)
+      expect(seen[0]).toMatchObject({ agent, toolName: 'always-probe', callId: 'always-1', reason: ALWAYS_TOOL_REASON })
+      const decided = agent.session.snapshotEvents()
+        .filter((event): event is SessionEvent<'approval/decided'> => event.type === 'approval/decided')
+      expect(decided.map(event => event.data.outcome)).toEqual(['allowed-once'])
+    })
+
+    it('the always floor keeps stronger decisions and silent policies intact', async () => {
+      const ctx = await approvalSetup()
+      const agent = fakeAgent()
+      let hookDecision: PreToolDecision = { kind: 'deny', reason: 'hook deny' }
+      ctx.on('tools/pre-execute', async (): Promise<PreToolDecision> => hookDecision)
+      ctx.on('approval/request', () => {
+        throw new Error('the seam must not be consulted for a deny, an ask, or under ask/never')
+      })
+      setApprovalPolicy(agent.session, 'always')
+
+      const execute = (callId: string, target: Agent | undefined) => ctx.tools.execute({
+        signal: testToolSignal, callId: ToolCallId(callId), name: 'echo', arguments: {}, ...(target === undefined ? {} : { agent: target }),
+      })
+
+      // A deny or an ask from another source passes through unchanged, and an
+      // agent-less execution has no session to read.
+      await expect(execute('floor-deny', agent)).resolves.toMatchObject({ isError: true, content: [{ text: 'Error: hook deny' }] })
+      hookDecision = { kind: 'ask', reason: 'hook ask' }
+      await expect(execute('floor-ask', agent)).resolves.toMatchObject({ isError: true, content: [{ text: 'Error: tool "echo" requires approval, but no approval channel is available' }] })
+      await expect(execute('floor-agentless', undefined)).resolves.toMatchObject({ isError: true })
+
+      // Under ask and never the floor stays silent: the hook's bare allow
+      // dispatches the tool.
+      hookDecision = { kind: 'allow' }
+      setApprovalPolicy(agent.session, 'ask')
+      await expect(execute('floor-ask-policy', agent)).resolves.toMatchObject({ isError: false })
+      setApprovalPolicy(agent.session, 'never')
+      await expect(execute('floor-never-policy', agent)).resolves.toMatchObject({ isError: false })
+    })
+
+    it('the always floor tracks the approval service lifecycle: absent, live, then disposed', async () => {
+      const agent = fakeAgent()
+      setApprovalPolicy(agent.session, 'always')
+      const mount = async (withApproval: boolean) => {
+        const ctx = new Context()
+        await ctx.plugin(LlmRuntime)
+        await ctx.plugin(SessionStore)
+        await ctx.plugin(SessionProjectionRegistry)
+        await ctx.plugin(SystemPrompt)
+        await ctx.plugin(ToolRuntime)
+        await ctx.plugin(AgentRegistry)
+        await ctx.plugin(AgentLoop, { agents: [] })
+        const approvalFiber = withApproval ? await ctx.plugin(ApprovalService) : undefined
+        ctx.tools.register(echoTool)
+        return { ctx, approvalFiber }
+      }
+      // Without the service the policy is unreadable, so the bare allow dispatches.
+      const absent = await mount(false)
+      await expect(absent.ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('floor-absent'), name: 'echo', arguments: {}, agent }))
+        .resolves.toMatchObject({ isError: false })
+      await absent.ctx.fiber.dispose()
+
+      // With the service live the floor upgrades the allow into a per-call
+      // ask, which fails closed with no answerer composed.
+      const live = await mount(true)
+      await expect(live.ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('floor-live'), name: 'echo', arguments: {}, agent }))
+        .resolves.toMatchObject({ isError: true, content: [{ text: 'Error: tool "echo" requires approval, but no approval channel is available' }] })
+
+      // Disposing the service fiber removes the floor's readability, so the
+      // same call dispatches again.
+      await live.approvalFiber?.dispose()
+      await expect(live.ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('floor-disposed'), name: 'echo', arguments: {}, agent }))
+        .resolves.toMatchObject({ isError: false })
+      await live.ctx.fiber.dispose()
     })
   })
 

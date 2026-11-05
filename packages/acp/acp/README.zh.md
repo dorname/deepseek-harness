@@ -67,13 +67,13 @@ kind: "package-reference"
 | `session/list` | 按确定的新到旧顺序分页返回已持久化、可恢复的根会话；可选绝对 `cwd` 筛选会尽可能使用物理目录标识。 |
 | `session/resume` | 恢复一个已持久化且非活跃的会话；组合前校验其规范工作区，并恢复日志但不回放旧更新。 |
 | `session/close` | 停稳式取消、更新 drain、后代释放、持久化 flush，并且只释放指定 Agent 作用域。 |
-| `session/set_config_option` | 串行更新公布的 `model` 或 `reasoning_effort`，按实时目录校验，并返回完整结果状态。 |
+| `session/set_config_option` | 串行更新公布的 `model`、`reasoning_effort`、`permission_policy` 或 `permission_preset`，按实时目录与部署预设表校验，并返回完整结果状态。 |
 | `session/prompt` | 有序文本、资源链接与受支持图片，每个会话一次一个提示词；Agent 空闲且有序更新交付后才结算。 |
 | `session/cancel` / `$/cancel_request` | 提示词所拥有的取消路径；没有进行中的 ACP 提示词时取消自主工作，未知会话 id 则为空操作。 |
 | `session/update` | 已提交 assistant 消息与 thought、通用工具生命周期、配置变化与上下文用量，按会话串行交付。 |
 | `session/request_permission` | 带一次性允许／拒绝选项的权限提示；你的客户端可以自动回答。 |
 
-会话配置从实时 LLM（大语言模型）服务目录提供不透明的提供方／模型选项，并在确切模型声明推理选项时提供 `reasoning_effort`。选项跟随实时目录：被移除的当前模型仍作为 `currentValue` 报告，但不会重新插入选项列表；`session/set_config_option` 拒绝未列出的值；目录发现失败会向客户端传播，而不是回退到过期选项。提示词会在异步图片准入前快照该选择，并在该轮次的每个模型步骤中固定它；并发选项变更从下一轮次开始生效。ACP 客户端是受信控制器：stdio MCP 条目授权其绝对命令与环境，HTTP 条目授权其绝对 HTTP(S) URL 与 header；初始连接或发现失败会回滚尚未发布的 Agent。不支持的界面会被省略或拒绝：`session/load`、删除、fork、附加目录、SSE（Server-Sent Events）或 ACP 传输 MCP、mode、命令、计划、终端、客户端文件系统操作与 elicitation。
+会话配置从实时 LLM（大语言模型）服务目录提供不透明的提供方／模型选项，在确切模型声明推理选项时提供 `reasoning_effort`，并在审批与权限预设服务已组合时提供 `permission_policy` 单选（`ask`、`never`、`always`；`always` 对该会话的每次工具调用执行前询问，且跨 resume 保留）与部署预设目录上的 `permission_preset` 单选。未知值、以及缺少后端服务时的变更，都以 `Invalid params` 显式失败并给出可接受词汇。选项跟随实时目录：被移除的当前模型仍作为 `currentValue` 报告，但不会重新插入选项列表；`session/set_config_option` 拒绝未列出的值；目录发现失败会向客户端传播，而不是回退到过期选项。提示词会在异步图片准入前快照该选择，并在该轮次的每个模型步骤中固定它；并发选项变更从下一轮次开始生效。ACP 客户端是受信控制器：stdio MCP 条目授权其绝对命令与环境，HTTP 条目授权其绝对 HTTP(S) URL 与 header；初始连接或发现失败会回滚尚未发布的 Agent。不支持的界面会被省略或拒绝：`session/load`、删除、fork、附加目录、SSE（Server-Sent Events）或 ACP 传输 MCP、mode、命令、计划、终端、客户端文件系统操作与 elicitation。
 
 -----
 
@@ -103,6 +103,7 @@ kind: "package-reference"
 | [`src/bridge.ts`](src/bridge.ts) | `AcpBridge`：每连接会话注册表、ACP 请求处理器、清理 |
 | [`src/content.ts`](src/content.ts) | 协议内容准入与投影：图片校验、路由重查、提示词重建、assistant 块转换 |
 | [`src/codec.ts`](src/codec.ts) | 轮次结束到 ACP `stopReason` 的纯映射 |
+| [`src/permission-control.ts`](src/permission-control.ts) | `AcpPermissionControl`：`permission_policy`／`permission_preset` 的公布、校验与应用 |
 
 ### 准入与提示词结算
 

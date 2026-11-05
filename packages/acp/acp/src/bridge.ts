@@ -53,6 +53,7 @@ import type {} from '@deepseek-ai/dsh-user-approval'
 import { supportsAcpImagePrompts } from './content.ts'
 import { AcpMcpConfigError } from './mcp.ts'
 import { AcpModelConfigError } from './model-control.ts'
+import { AcpPermissionConfigError } from './permission-control.ts'
 import { AcpSession } from './session.ts'
 
 const DEFAULT_SESSION_LIST_PAGE_SIZE = 100
@@ -349,6 +350,7 @@ export class AcpBridge {
           return { configOptions: await record.setConfig(params.configId, params.value, signal) }
         } catch (error: unknown) {
           if (error instanceof AcpModelConfigError) throw invalidParams(error.message)
+          if (error instanceof AcpPermissionConfigError) throw invalidParams(error.message)
           throw error
         }
       },

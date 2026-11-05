@@ -80,6 +80,9 @@ const vitestStatus = run('openlogos vitest suites', 'pnpm', ['exec', 'vitest', '
   'packages/acp/acp/tests/bridge.spec.ts',
   'packages/llm/llm-deepseek/tests/loader-composition.spec.ts',
   'packages/llm/llm-deepseek/tests/scenario-discovery.spec.ts',
+  'packages/interaction/user-approval/tests/approval.spec.ts',
+  'packages/acp/acp/tests/permission-control.spec.ts',
+  'packages/acp/acp/tests/permission-roundtrip.spec.ts',
 ], { OPENLOGOS_RESULT_FILE: ledgerPath })
 const acceptanceStatus = run('ST-S33-03 acceptance runner', 'node',
   ['--import', 'tsx/esm', 'scripts/fleet-staging/acceptance-st-s33-03.ts'], { OPENLOGOS_RESULT_FILE: ledgerPath })
@@ -89,6 +92,12 @@ const feBeStatus = run('ST-S47 fe-be-containers acceptance (SMOKE-core-24 path)'
   ['--import', 'tsx/esm', 'scripts/smoke-cluster-web-fe-be-containers.ts'], { OPENLOGOS_RESULT_FILE: ledgerPath })
 const acpNetworkSmokeStatus = run('ST-S01/S02 acp-network protocol smoke', 'pnpm',
   ['exec', 'tsx', 'packages/acp/acp-network/tests/smoke/protocol-smoke.ts'], { OPENLOGOS_RESULT_FILE: ledgerPath })
+// UT-S49-07 / ST-S49-01 ride the keyless permission-policy snapshot scenario:
+// the recorded fixture pins the live approval round-trip, replay re-executes
+// it through the shipped profile without a key.
+const snapshotStatus = run('UT-S49-07/ST-S49-01 permission-policy snapshot replay', 'pnpm',
+  ['exec', 'vitest', 'run', '--config', 'vitest.snapshot.config.ts', '-t', 'snapshot: permission-policy'],
+  { DSH_SNAPSHOT: 'replay' })
 
 const reported = new Set(readFileSync(ledgerPath, 'utf8')
   .split('\n')
@@ -115,4 +124,19 @@ for (const id of baseline) {
   })}\n`)
 }
 console.log(`run-openlogos-tests: fleet cases ${String(reported.size)}, baseline skips ${String(baseline.length)}`)
-process.exit(vitestStatus !== 0 || acceptanceStatus !== 0 || feSplitStatus !== 0 || feBeStatus !== 0 || acpNetworkSmokeStatus !== 0 ? 1 : 0)
+if (!reported.has('UT-S49-07') || !reported.has('ST-S49-01')) {
+  // The snapshot suite does not write the ledger itself; attribute the two
+  // ids to this replay run so a failure cannot masquerade as baseline skip.
+  for (const id of ['UT-S49-07', 'ST-S49-01']) {
+    if (reported.has(id)) continue
+    appendFileSync(ledgerPath, `${JSON.stringify({
+      id,
+      status: snapshotStatus === 0 ? 'pass' : 'fail',
+      timestamp: new Date().toISOString(),
+      scenario: 'permission-policy snapshot replay',
+      ...(snapshotStatus === 0 ? {} : { error: 'snapshot scenario replay failed' }),
+    })}\n`)
+  }
+}
+process.exit(vitestStatus !== 0 || acceptanceStatus !== 0 || feSplitStatus !== 0 || feBeStatus !== 0
+  || acpNetworkSmokeStatus !== 0 || snapshotStatus !== 0 ? 1 : 0)

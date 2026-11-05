@@ -1,10 +1,14 @@
 /**
- * ACP-over-network smoke (`SMOKE-acp-network-01/02`, change
- * `20261020-1643-acp-over-network`).
+ * ACP-over-network smoke (`SMOKE-acp-network-01/02/03`, changes
+ * `20261020-1643-acp-over-network` and `dsh-acp-permission-policy`).
  *
  * - SMOKE-acp-network-01: WebSocket auth + session/new + prompt end-to-end
  *   (local mock LLM via `packages/acp/acp-network/tests/smoke/protocol-smoke.ts`).
  * - SMOKE-acp-network-02: session/close + reconnect + session/resume.
+ * - SMOKE-acp-network-03: `always` permission round-trip over the network
+ *   transport (two asks, allow-once executes, reject-once denies, unknown
+ *   policy values fail loud). Staging targets skip it — the round-trip needs
+ *   the local approval/preset/tool composition — and never report PASS for it.
  *
  * When namespace `dsh-acp-network-staging` is Ready and
  * `/tmp/dsh-acp-network-staging-creds.env` exists, also runs the staging
@@ -72,7 +76,15 @@ function runLocalProtocolSmoke(): { ok: boolean; durationMs: number; error?: str
   const result = spawnSync('pnpm', ['exec', 'tsx', 'packages/acp/acp-network/tests/smoke/protocol-smoke.ts'], {
     cwd: REPO_ROOT,
     stdio: 'inherit',
-    env: { ...process.env },
+    // The ledger's local lane must always run the full local suite including
+    // the SMOKE-03 round-trip, so an ambient staging target in the caller's
+    // environment must not silently downgrade it to a skip.
+    env: {
+      ...process.env,
+      ACP_SMOKE_URL: '',
+      ACP_SMOKE_NO_PROMPT: '',
+      ACP_SMOKE_PHASE: '',
+    },
   })
   const durationMs = Date.now() - started
   if (result.status !== 0) {
@@ -131,22 +143,20 @@ function runStagingHandshakeSmoke(): { ok: boolean; durationMs: number; error?: 
 function main(): void {
   const local = runLocalProtocolSmoke()
   if (!local.ok) {
-    const fail01: Parameters<typeof report>[1] = {
-      durationMs: local.durationMs,
-      scenario: 'local protocol prompt',
-      status: 'fail',
+    const failedLanes = [
+      { id: 'SMOKE-acp-network-01', scenario: 'local protocol prompt' },
+      { id: 'SMOKE-acp-network-02', scenario: 'local protocol resume' },
+      { id: 'SMOKE-acp-network-03', scenario: 'local permission round-trip' },
+    ] as const
+    for (const lane of failedLanes) {
+      const outcome: Parameters<typeof report>[1] = {
+        durationMs: local.durationMs,
+        scenario: lane.scenario,
+        status: 'fail',
+      }
+      if (local.error !== undefined) outcome.error = local.error
+      report(lane.id, outcome)
     }
-    const fail02: Parameters<typeof report>[1] = {
-      durationMs: local.durationMs,
-      scenario: 'local protocol resume',
-      status: 'fail',
-    }
-    if (local.error !== undefined) {
-      fail01.error = local.error
-      fail02.error = local.error
-    }
-    report('SMOKE-acp-network-01', fail01)
-    report('SMOKE-acp-network-02', fail02)
     process.exit(1)
   }
 
@@ -157,6 +167,10 @@ function main(): void {
   report('SMOKE-acp-network-02', {
     durationMs: local.durationMs,
     scenario: 'local protocol resume',
+  })
+  report('SMOKE-acp-network-03', {
+    durationMs: local.durationMs,
+    scenario: 'local permission round-trip',
   })
 
   // Staging handshake is advisory here: ledger coverage for 01/02 already

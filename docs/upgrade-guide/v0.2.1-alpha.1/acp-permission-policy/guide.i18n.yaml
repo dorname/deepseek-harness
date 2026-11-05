@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-alpha.1/acp-permission-policy/guide.md
+/:
+  en: cf462763da94200f
+  zh: 8a38382ae22d1f99
+/acp-session-permission-options-and-the-always-approval-tier:
+  en: 2ce1032718fed5ee
+  zh: 2562f1698f10cec7
+/acp-session-permission-options-and-the-always-approval-tier/change:
+  en: 9664c671cd44a205
+  zh: 8162ff85a71a4be0
+/acp-session-permission-options-and-the-always-approval-tier/migration:
+  en: eea5b78f33c75678
+  zh: db14ba276acdfb09

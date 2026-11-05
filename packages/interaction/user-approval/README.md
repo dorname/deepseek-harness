@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Use this package to require a one-shot decision before a sensitive tool action proceeds. The `ask` policy sends each request to the deployment's human or machine answerers; `never` rejects it without prompting. Missing or failed answerers return `unavailable`, so the action fails closed, and an approval applies only to that request. Every request and outcome is recorded in the requesting session's audit log. The model sees the resulting tool outcome and current policy, but not the human permission UI or audit events.
+Use this package to require a one-shot decision before a sensitive tool action proceeds. The `ask` policy sends each request to the deployment's human or machine answerers; `never` rejects it without prompting; `always` submits every tool call for approval right before it executes. Missing or failed answerers return `unavailable`, so the action fails closed, and an approval applies only to that request. Every request and outcome is recorded in the requesting session's audit log. The model sees the resulting tool outcome and current policy, but not the human permission UI or audit events.
 
 ## Table of Contents
 
@@ -33,7 +33,7 @@ Answerers are `approval/request` waterfall listeners: return an outcome to answe
 
 ### Setting the policy
 
-The effective policy is the one set for the session, falling back to the configured default. `ask` (the default) delegates to the composed answerers; `never` rejects every request deterministically before interactive dispatch — the strict headless stance for CI and unattended runs.
+The effective policy is the one set for the session, falling back to the configured default. `ask` (the default) delegates to the composed answerers; `never` rejects every request deterministically before interactive dispatch — the strict headless stance for CI and unattended runs; `always` upgrades every otherwise-allowed tool call into an ask right before it executes, so a permissive deployment can still gate each call for one session.
 
 ```yaml
 - name: '@deepseek-ai/dsh-user-approval'
@@ -53,7 +53,7 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 ### What the model and user see
 
-The model sees only the asking consumer's eventual tool outcome — allowed, rejected, cancelled, or unavailable — plus the current policy in the runtime-context snapshot; the audit events and the human permission UI are not model context. A `never` switch is announced to the model by a sourced user message, and both policies contribute their complete current meaning to the snapshot.
+The model sees only the asking consumer's eventual tool outcome — allowed, rejected, cancelled, or unavailable — plus the current policy in the runtime-context snapshot; the audit events and the human permission UI are not model context. A `never` switch is announced to the model by a sourced user message, and all three policies contribute their complete current meaning to the snapshot.
 
 -----
 
@@ -74,11 +74,11 @@ The observable behavior is covered in [Use this package](#use-this-package); thi
 
 ### Dispatch
 
-`decide()` races the answerer waterfall against the request signal and contains every answerer failure: a throwing listener fails the question closed to `unavailable`, and a rogue non-vocabulary return is normalized to `unavailable`. The `never` policy is enforced inside the service before waterfall dispatch, so a listener registered later with `prepend` cannot bypass the deterministic rejection. The request must be turn-enclosed because the turn is the durable log's commit/replay boundary — a bare event between turns is indistinguishable from a crash tail.
+`decide()` races the answerer waterfall against the request signal and contains every answerer failure: a throwing listener fails the question closed to `unavailable`, and a rogue non-vocabulary return is normalized to `unavailable`. The `never` policy is enforced inside the service before waterfall dispatch, so a listener registered later with `prepend` cannot bypass the deterministic rejection. The `always` policy is enforced by the tool runtime's pre-execute stage (see `@deepseek-ai/dsh-tools`): it reads `effectivePolicy()` after the extensible gate, keeps any deny or ask another source produced, and upgrades a bare allow into an ask with an audited reason routed back through this service. The request must be turn-enclosed because the turn is the durable log's commit/replay boundary — a bare event between turns is indistinguishable from a crash tail.
 
 ### Policy and the runtime-context snapshot
 
-The system-prompt contribution `approval:policy` states the complete current meaning of the effective policy — `ask` with its fail-closed consequence, or `never` with its non-escalation consequence — after retained history, so switching policy appends a new full snapshot instead of rewriting the stable request header. `setPolicy()` also injects a sourced user message announcing the change for the next step.
+The system-prompt contribution `approval:policy` states the complete current meaning of the effective policy — `ask` with its fail-closed consequence, `never` with its non-escalation consequence, or `always` with its every-call-asks consequence — after retained history, so switching policy appends a new full snapshot instead of rewriting the stable request header. `setPolicy()` also injects a sourced user message announcing the change for the next step.
 
 ### Audit
 
@@ -107,7 +107,7 @@ Read these pages when the package-level contract is not enough. They move from t
 
 #### What the model sees
 
-The first request and each effective policy change append a full runtime-context snapshot after retained history. Under `ask`, the approval contribution states that configured answerers may be consulted and absence fails closed. Under `never`, it states the deterministic rejection and non-escalation consequence. Unchanged requests retain the earlier snapshot without adding another message.
+The first request and each effective policy change append a full runtime-context snapshot after retained history. Under `ask`, the approval contribution states that configured answerers may be consulted and absence fails closed. Under `never`, it states the deterministic rejection and non-escalation consequence. Under `always`, it states that every tool call is submitted for approval before it executes. Unchanged requests retain the earlier snapshot without adding another message.
 
 ##### Ask-policy contribution
 
@@ -121,13 +121,19 @@ Approval policy: ask. Operations that require approval may ask through the confi
 Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).
 ```
 
+##### Always-policy contribution
+
+```markdown
+Approval policy: always. Every tool call is submitted for user approval before it executes; only explicitly approved calls run.
+```
+
 #### Token effect
 
 One concise context message on the first request and on an effective change; unchanged requests add no duplicate policy tokens.
 
 #### KV Cache effect
 
-Append-only after retained history. An `ask`/`never` switch preserves the stable system and conversation prefix instead of rewriting the first wire message.
+Append-only after retained history. An `ask`/`never`/`always` switch preserves the stable system and conversation prefix instead of rewriting the first wire message.
 
 ### Tool outcome
 
@@ -151,7 +157,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 These limits define when the seam is a poor fit or needs special composition care. They are current package constraints, not a general permission comparison.
 
 - **Requests are valid only inside an open turn** — an idle or between-turn caller throws before auditing; a durable out-of-turn approval workflow is deferred.
-- **Only one-shot grants exist** — the outcome vocabulary has `allowed-once` but no `allow-always`, remembered rule, revocation, or grant store; session policy is only `ask` / `never`.
+- **Only one-shot grants exist** — the outcome vocabulary has `allowed-once` but no `allow-always`, remembered rule, revocation, or grant store; the `always` policy asks per call rather than remembering an approval.
 - **The request carries no tool arguments** — an answerer sees the tool name, reason, and optional call id; the ACP machine channel requires a call id and delegates requests without one.
 - **No built-in answerer** — headless or incompletely composed deployments resolve `unavailable` and fail closed; the service itself never prompts a human.
 

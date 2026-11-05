@@ -23,7 +23,9 @@ import type { ImageAttachmentLimits, ImageAttachmentRef, SaveImageAttachment, St
 import { type GenerateOptions, LlmAdapter, ReasoningEffortId, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { PermissionPresetService } from '@deepseek-ai/dsh-permission-presets'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import ApprovalService from '@deepseek-ai/dsh-user-approval'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import * as AcpPlugin from '../src/index.ts'
 import type { AcpPluginConfig } from '../src/index.ts'
@@ -225,6 +227,10 @@ export async function makeBridgeHarness(options: {
   imageCapable?: boolean
   attachments?: boolean
   persistenceRoot?: string
+  /** Compose the real ApprovalService (the `approval/request` answerer stays the bridge's). */
+  approval?: boolean
+  /** Compose the permission-preset service over a non-executing shell double (implies `approval`). */
+  presets?: boolean
 } = {}): Promise<BridgeHarness> {
   const adapter = new MockAdapter(options.script ?? [], options.imageCapable === true)
   const ctx = new Context()
@@ -236,6 +242,23 @@ export async function makeBridgeHarness(options: {
   if (options.attachments !== false) await ctx.plugin(MemoryAttachmentStore)
   const loopFiber = await ctx.plugin(AgentLoop, { agents: [] })
   const primaryAdapter = ctx.llm.registerAdapter(['mock'], adapter)
+  if (options.presets === true || options.approval === true) await ctx.plugin(ApprovalService)
+  if (options.presets === true) {
+    ctx.provide('shell', {
+      sandboxMode: 'workspace-write',
+      resolve() { throw new Error('acp harness does not execute bash') },
+      run() { throw new Error('acp harness does not execute bash') },
+      start() { throw new Error('acp harness does not execute bash') },
+    })
+    // The shipped base-bundle preset table, so the advertised catalog matches production.
+    await ctx.plugin(PermissionPresetService, {
+      presets: {
+        'read-only': { sandbox: 'read-only', approval: 'ask' },
+        'workspace-write': { sandbox: 'workspace-write', approval: 'ask' },
+        'danger-full-access': { sandbox: 'danger-full-access', approval: 'never' },
+      },
+    })
+  }
 
   const agentToClient = new TransformStream<Uint8Array, Uint8Array>()
   const clientToAgent = new TransformStream<Uint8Array, Uint8Array>()

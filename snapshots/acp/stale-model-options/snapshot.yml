@@ -1,7 +1,7 @@
 version: 1
 scenario: stale-model-options
 profile: acp
-composition: stale-model-options
+composition: acp-default
 recording: authored
 header:
   class: acp-default

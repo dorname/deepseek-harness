@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { reported } from './helpers/reporter.ts'
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -41,6 +42,27 @@ async function mounted(): Promise<Context> {
 
 function requestOf(agent: Agent, overrides: Partial<ApprovalRequest> = {}): ApprovalRequest {
   return { agent, toolName: 'echo', ...overrides }
+}
+
+const NEVER_SENTENCE = 'Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).'
+const ASK_SENTENCE = 'Approval policy: ask. Operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed.'
+
+/**
+ * An agent stand-in over a REAL Session — gate and context fold real events;
+ * the opened turn satisfies request()'s enclosure precondition. `injected`
+ * captures the text of every model-visible message queued on the agent.
+ */
+function sessionAgent(rawId: string): { agent: Agent; session: Session; injected: string[] } {
+  const id = SessionId(rawId)
+  const session = Session.create(id)
+  session.append('turn/start', { turn: 1 })
+  const injected: string[] = []
+  const agent = Object.assign({ id, session } as unknown as Agent, {
+    inject: (message: { content: ReadonlyArray<{ type: string; text?: string }> }) => {
+      injected.push(message.content.map(block => block.type === 'text' ? block.text ?? '' : '').join(''))
+    },
+  })
+  return { agent, session, injected }
 }
 
 describe('ApprovalService.request', () => {
@@ -355,19 +377,6 @@ describe('ApprovalService.request', () => {
 })
 
 describe('approval policy (the approval/policy fold)', () => {
-  const NEVER_SENTENCE = 'Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).'
-  const ASK_SENTENCE = 'Approval policy: ask. Operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed.'
-
-  /**
-   * An agent stand-in over a REAL Session — gate and context fold real events;
-   * the opened turn satisfies request()'s enclosure precondition.
-   */
-  function sessionAgent(id: string): { agent: Agent; session: Session } {
-    const session = Session.create(SessionId(id))
-    session.append('turn/start', { turn: 1 })
-    const agent = { id, session } as unknown as Agent
-    return { agent, session }
-  }
 
   it('folds to the last event, or undefined without one', () => {
     const service = new ApprovalService(new Context(), {})
@@ -384,7 +393,7 @@ describe('approval policy (the approval/policy fold)', () => {
     const session = { append } as unknown as Session
 
     expect(() => { setApprovalPolicy(session, 'sometimes' as Parameters<typeof setApprovalPolicy>[1]) })
-      .toThrow('approval policy must be one of "ask" or "never"')
+      .toThrow('approval policy must be one of "ask", "never", or "always"')
     expect(append).not.toHaveBeenCalled()
   })
 
@@ -517,4 +526,67 @@ describe('approval policy (the approval/policy fold)', () => {
     await fiber.dispose()
     expect(await contextFor()).toBeUndefined()
   })
+})
+
+describe('S49 approval policy tiers (always ask source, never auto-reject, persistence)', () => {
+  const ALWAYS_SENTENCE = 'Approval policy: always. Every tool call is submitted for user approval before it executes; only explicitly approved calls run.'
+
+  it('UT-S49-04: persists ask→always→never switches with LAST-wins folding and model-visible notices', () => reported('UT-S49-04', async () => {
+    const ctx = new Context()
+    await ctx.plugin(ApprovalService)
+    const { agent, session, injected } = sessionAgent('sess-s49-policy-persist')
+
+    ctx.approval.setPolicy(agent, 'always')
+    expect(ctx.approval.effectivePolicy(session)).toBe('always')
+    ctx.approval.setPolicy(agent, 'never')
+    expect(ctx.approval.effectivePolicy(session)).toBe('never')
+    ctx.approval.setPolicy(agent, 'ask')
+    expect(ctx.approval.effectivePolicy(session)).toBe('ask')
+
+    // Every switch lands one durable approval/policy event (LAST-wins fold)
+    // and one model-visible switch notice; no new event type appears.
+    const policies = session.snapshotEvents()
+      .filter((event): event is SessionEvent<'approval/policy'> => event.type === 'approval/policy')
+    expect(policies.map(event => event.data.policy)).toEqual(['always', 'never', 'ask'])
+    expect(injected).toEqual([
+      'The approval policy changed from "ask" to "always" (changed by the user).',
+      'The approval policy changed from "always" to "never" (changed by the user).',
+      'The approval policy changed from "never" to "ask" (changed by the user).',
+    ])
+    expect(new Set(session.snapshotEvents().map(event => event.type))).toEqual(new Set(['turn/start', 'approval/policy']))
+  }))
+
+  it('reports the effective tier through the runtime-context snapshot for every policy', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ApprovalService)
+    const { agent: alwaysAgent, session: alwaysSession } = sessionAgent('sess-s49-context-always')
+    setApprovalPolicy(alwaysSession, 'always')
+    const { agent: neverAgent, session: neverSession } = sessionAgent('sess-s49-context-never')
+    setApprovalPolicy(neverSession, 'never')
+    const contextFor = async (agent: Agent) =>
+      (await ctx.systemPrompt.assemble({ agent })).contexts.find(entry => entry.name === 'approval:policy')?.text
+    expect(await contextFor(alwaysAgent)).toBe(ALWAYS_SENTENCE)
+    expect(await contextFor(neverAgent)).toBe('Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).')
+    expect(await contextFor(sessionAgent('sess-s49-context-ask').agent)).toBe('Approval policy: ask. Operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed.')
+  })
+
+  it('UT-S49-03: never auto-rejects an escalation-shaped ask without consulting answerers', () => reported('UT-S49-03', async () => {
+    const ctx = new Context()
+    await ctx.plugin(ApprovalService)
+    const { agent, session } = sessionAgent('sess-s49-never')
+    setApprovalPolicy(session, 'never')
+    const consulted = vi.fn()
+    ctx.on('approval/request', () => {
+      consulted()
+      return Promise.resolve<ApprovalOutcome>('allowed-once')
+    })
+    // The always floor (enforced by the tool runtime) stays silent under
+    // never; the ask auto-rejects before any answerer sees it.
+    const escalation = { agent, toolName: 'bash' } satisfies ApprovalRequest
+    await expect(ctx.approval.request(escalation)).resolves.toBe('rejected')
+    expect(consulted).not.toHaveBeenCalled()
+    const decided = session.snapshotEvents().filter((event): event is SessionEvent<'approval/decided'> => event.type === 'approval/decided')
+    expect(decided.map(event => event.data.outcome)).toEqual(['rejected'])
+  }))
 })

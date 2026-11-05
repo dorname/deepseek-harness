@@ -31,6 +31,7 @@ export {
   type Authenticator,
 } from './bridge.ts'
 export { AcpModelConfigError, AcpModelControl } from './model-control.ts'
+export { AcpPermissionConfigError, AcpPermissionControl } from './permission-control.ts'
 export type { ModelSelection, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 
 /** Public Config schema exposed by this plugin. */

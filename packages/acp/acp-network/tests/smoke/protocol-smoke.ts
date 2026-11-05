@@ -5,7 +5,11 @@
  *
  * 1. Local (default): boots a real dsh-acp-network server on a random loopback
  *    port with a mocked LLM, then drives it through the ACP SDK over WebSocket.
- * 2. Staging: connect to an existing server URL via `ACP_SMOKE_URL`.
+ *    The local composition also mounts the approval and permission-preset
+ *    services and one probe tool for the `always` permission round-trip.
+ * 2. Staging: connect to an existing server URL via `ACP_SMOKE_URL`. That
+ *    target's composition is unknown, so the permission round-trip is skipped
+ *    (reported by the caller, never as a pass).
  *
  * Environment variables:
  * - `ACP_SMOKE_URL`        — staging WebSocket URL (e.g. wss://dsh-acp-network.example/acp)
@@ -35,19 +39,25 @@ import {
   type AgentContext,
   type PromptRequest,
   type PromptResponse,
+  type RequestPermissionRequest,
+  type RequestPermissionResponse,
   type SendRequestOptions,
 } from '@agentclientprotocol/sdk'
 import { createWebSocketStream } from '@agentclientprotocol/sdk/experimental/ws-client'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import PermissionPresetService from '@deepseek-ai/dsh-permission-presets'
 import {
   LlmAdapter,
+  ToolCallId,
   type GenerateOptions,
   type LlmResolvedModelInfo,
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
+import ApprovalService from '@deepseek-ai/dsh-user-approval'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
 import * as AcpNetworkPlugin from '../../src/index.ts'
 import { reportResult } from '../helpers/reporter.ts'
@@ -66,6 +76,11 @@ const RESUME_SESSION_ID = process.env.ACP_SMOKE_SESSION_ID
 class SmokeAdapter extends LlmAdapter {
   constructor(
     private readonly responses: Map<string, StreamChunk[]>,
+    /**
+     * Per-key FIFO of full responses consumed ahead of the static map, so one
+     * key can drive a multi-step turn (tool call, tool call, final text).
+     */
+    private readonly scripted: Map<string, StreamChunk[][]> = new Map(),
     private readonly provider = 'mock-smoke',
   ) {
     super()
@@ -100,7 +115,8 @@ class SmokeAdapter extends LlmAdapter {
     const userMessages = options.messages.filter(m => m.source?.kind === 'user')
     const last = userMessages.at(-1)
     const key = last?.content.map(c => c.type === 'text' ? c.text : '').join('').trim() ?? ''
-    const entry = this.responses.get(key)
+    const queued = this.scripted.get(key)?.shift()
+    const entry = queued ?? this.responses.get(key)
     if (entry === undefined) throw new Error(`SmokeAdapter: no script for "${key}"`)
     for (const chunk of entry) {
       if (options.signal?.aborted) throw new Error('aborted')
@@ -119,6 +135,15 @@ function textResponse(text: string): StreamChunk[] {
   ]
 }
 
+function toolCallResponse(name: string, callId: string): StreamChunk[] {
+  return [
+    { type: 'block-start', index: 0, blockType: 'tool-call' },
+    { type: 'tool-call-delta', index: 0, id: ToolCallId(callId), name, argumentsDelta: '{}' },
+    { type: 'block-end', index: 0, block: { type: 'tool-call', id: ToolCallId(callId), name, arguments: '{}' } },
+    { type: 'finish', reason: { kind: 'tool-calls' } },
+  ]
+}
+
 interface SmokeClient {
   initialize: (params: { protocolVersion: number }) => Promise<unknown>
   authenticate: (params: { methodId: string; _meta: { token: string } }) => Promise<unknown>
@@ -126,12 +151,19 @@ interface SmokeClient {
   listSessions: (params: { cwd: string }) => Promise<{ sessions: Array<{ sessionId: string; cwd: string }> }>
   resumeSession: (params: { sessionId: string; cwd: string; mcpServers: [] }) => Promise<unknown>
   closeSession: (params: { sessionId: string }) => Promise<unknown>
+  setSessionConfigOption: (params: { sessionId: string; configId: string; value: string }) => Promise<unknown>
   prompt: (params: PromptRequest, options?: SendRequestOptions) => Promise<PromptResponse>
 }
 
-async function makeClient(url: string): Promise<{ client: SmokeClient; dispose: () => Promise<void> }> {
+async function makeClient(
+  url: string,
+  options: { answerPermission?: (request: RequestPermissionRequest) => Promise<RequestPermissionResponse> } = {},
+): Promise<{ client: SmokeClient; dispose: () => Promise<void> }> {
   const token = AcpNetworkPlugin.signHmacToken(SECRET, SUBJECT, AUDIENCE)
   const clientApp = createAcpClientApp({ name: 'dsh-acp-network-smoke-client' })
+  if (options.answerPermission !== undefined) {
+    clientApp.onRequest(methods.client.session.requestPermission, ({ params }) => options.answerPermission!(params))
+  }
   const stream = createWebSocketStream(url, { WebSocket })
   const connection = clientApp.connect(stream)
   const agent = connection.agent as AgentContext
@@ -143,6 +175,7 @@ async function makeClient(url: string): Promise<{ client: SmokeClient; dispose: 
     listSessions: params => agent.request(methods.agent.session.list, params),
     resumeSession: params => agent.request(methods.agent.session.resume, params),
     closeSession: params => agent.request(methods.agent.session.close, params),
+    setSessionConfigOption: params => agent.request(methods.agent.session.setConfigOption, params),
     prompt: (params, options) => agent.request(methods.agent.session.prompt, params, options),
   }
 
@@ -240,20 +273,54 @@ async function runSmoke02ResumeLifecycle(
   return sessionId
 }
 
-async function startLocalServer(): Promise<{ url: string; dispose: () => Promise<void>; persistenceRoot: string }> {
+async function startLocalServer(): Promise<{
+  url: string
+  dispose: () => Promise<void>
+  persistenceRoot: string
+  executed: string[]
+}> {
   const persistenceRoot = await mkdtemp(join(tmpdir(), 'dsh-acp-network-smoke-'))
   const responses = new Map<string, StreamChunk[]>([
     ['hello', textResponse('hello from smoke')],
     ['resume', textResponse('resumed successfully')],
   ])
-  const adapter = new SmokeAdapter(responses)
+  const scripted = new Map<string, StreamChunk[][]>([
+    ['probe', [toolCallResponse('smoke_probe', 'call-allow'), toolCallResponse('smoke_probe', 'call-reject'), textResponse('second call was denied, stopping')]],
+  ])
+  const executed: string[] = []
+  const adapter = new SmokeAdapter(responses, scripted)
 
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx, { systemPrompt: { personaPrefix: '' } })
   await ctx.plugin(JsonlSessionPersistence, { root: persistenceRoot, compression: 'none' })
   await ctx.plugin(TokenMeter)
   await ctx.plugin(AgentLoop, { agents: [] })
+  await ctx.plugin(ApprovalService)
+  ctx.provide('shell', {
+    sandboxMode: 'workspace-write',
+    resolve() { throw new Error('acp-network smoke does not execute bash') },
+    run() { throw new Error('acp-network smoke does not execute bash') },
+    start() { throw new Error('acp-network smoke does not execute bash') },
+  })
+  // The shipped base-bundle preset table, so the advertised catalog matches production.
+  await ctx.plugin(PermissionPresetService, {
+    presets: {
+      'read-only': { sandbox: 'read-only', approval: 'ask' },
+      'workspace-write': { sandbox: 'workspace-write', approval: 'ask' },
+      'danger-full-access': { sandbox: 'danger-full-access', approval: 'never' },
+    },
+  })
   ctx.llm.registerAdapter(['mock-smoke'], adapter)
+  ctx.tools.register(defineContentToolFixture({
+    name: 'smoke_probe',
+    description: 'Probe tool for the permission round-trip smoke.',
+    parameters: {},
+    execute: async (_args, exec) => {
+      if (exec.agent === undefined) throw new Error('smoke_probe requires an agent scope')
+      executed.push('ran')
+      return [{ type: 'text', text: 'probed' }]
+    },
+  }))
 
   await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 })
   await ctx.plugin({
@@ -278,10 +345,67 @@ async function startLocalServer(): Promise<{ url: string; dispose: () => Promise
   return {
     url,
     persistenceRoot,
+    executed,
     dispose: async () => {
       await ctx.fiber.dispose()
       await rm(persistenceRoot, { recursive: true, force: true })
     },
+  }
+}
+
+/**
+ * SMOKE-acp-network-03: the `always` permission round-trip on the network
+ * transport. One turn, two tool calls, two one-shot answers: the first call
+ * executes, the second is denied, and every ask carries exactly the two
+ * one-shot options.
+ */
+async function runSmoke03(url: string, persistenceRoot: string, executed: string[]): Promise<void> {
+  const requests: RequestPermissionRequest[] = []
+  const answers = ['allow-once', 'reject-once']
+  const { client, dispose } = await makeClient(url, {
+    answerPermission: (request) => {
+      requests.push(request)
+      for (const option of request.options) {
+        if (option.kind === 'allow_always') throw new Error('SMOKE-03: offered a durable grant under the always policy')
+      }
+      const optionId = answers.shift()
+      if (optionId === undefined) throw new Error('SMOKE-03: unexpected third permission request')
+      return Promise.resolve({ outcome: { outcome: 'selected', optionId } })
+    },
+  })
+  try {
+    const { sessionId } = await client.newSession({ cwd: persistenceRoot, mcpServers: [] })
+    await client.setSessionConfigOption({ sessionId, configId: 'permission_policy', value: 'always' })
+
+    // Unknown vocabulary fails loud over the wire.
+    await client.setSessionConfigOption({ sessionId, configId: 'permission_policy', value: 'paranoid' })
+      .then(
+        () => { throw new Error('SMOKE-03: unknown policy value was accepted') },
+        (error: unknown) => {
+          if (!(error instanceof Error) || !error.message.includes('unknown permission policy value')) {
+            throw new Error(`SMOKE-03: wrong unknown-policy error: ${String(error)}`)
+          }
+        },
+      )
+
+    const result = await client.prompt({ sessionId, prompt: [{ type: 'text', text: 'probe' }] })
+    assertStopReason('SMOKE-03', result)
+    if (requests.length !== 2) {
+      throw new Error(`SMOKE-03: expected exactly 2 permission requests, saw ${String(requests.length)}`)
+    }
+    if (executed.length !== 1) {
+      throw new Error(`SMOKE-03: expected exactly the first call to execute, saw ${String(executed.length)} executions`)
+    }
+    for (const request of requests) {
+      const kinds = request.options.map(option => option.kind).sort()
+      if (!(kinds.length === 2 && kinds[0] === 'allow_once' && kinds[1] === 'reject_once')) {
+        throw new Error(`SMOKE-03: request offered ${JSON.stringify(kinds)} instead of the two one-shot options`)
+      }
+    }
+    await client.closeSession({ sessionId })
+    console.log('SMOKE-03 always round-trip: ok (2 asks, allow-once ran, reject-once denied)')
+  } finally {
+    await dispose()
   }
 }
 
@@ -323,14 +447,15 @@ async function runResumePhase(client: SmokeClient): Promise<void> {
 
 async function main(): Promise<void> {
   const persistenceRoot = await mkdtemp(join(tmpdir(), 'dsh-acp-network-smoke-'))
-  let localServer: { url: string; dispose: () => Promise<void> } | undefined
+  let localServer: Awaited<ReturnType<typeof startLocalServer>> | undefined
   try {
-    const { url } = STAGING_URL
-      ? { url: STAGING_URL }
-      : await startLocalServer().then((server) => {
-        localServer = server
-        return server
+    const server = STAGING_URL
+      ? { url: STAGING_URL, executed: [] as string[] }
+      : await startLocalServer().then((started) => {
+        localServer = started
+        return started
       })
+    const { url } = server
 
     if (PHASE === 'persist' || PHASE === 'resume') {
       // Orchestrated half-runs: smoke-staging.sh restarts the staging server
@@ -395,6 +520,15 @@ async function main(): Promise<void> {
           await dispose2()
         }
       }
+    }
+
+    // SMOKE-03 needs the local composition (approval, presets, probe tool);
+    // a staging target or the handshake-only mode cannot reproduce it, and
+    // that is reported as a skip rather than a pass.
+    if (STAGING_URL || NO_PROMPT) {
+      console.log('\nSMOKE-03 skipped: the permission round-trip needs the local smoke composition.')
+    } else {
+      await runSmoke03(url, persistenceRoot, server.executed)
     }
 
     console.log('\nAll ACP-over-network smoke checks passed.')

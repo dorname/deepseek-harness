@@ -19,6 +19,8 @@ import type {} from '@deepseek-ai/dsh-sandbox-policy'
 // Type-only: makes `ctx.get('approval')` resolve to the ApprovalService
 // augmentation. The seam stays optional at runtime — see `serviceAsk`.
 import type {} from '@deepseek-ai/dsh-user-approval'
+// The audited reason the `always` approval floor upgrades a bare allow with.
+import { ALWAYS_TOOL_REASON } from '@deepseek-ai/dsh-user-approval'
 import type { ToolCallView, ToolResultView } from './presentation.ts'
 import { assertSupportedJsonSchema, validateJsonSchemaValue } from './json-schema.ts'
 import type { JsonSchemaNode } from './json-schema.ts'
@@ -1506,9 +1508,18 @@ export class ToolRuntime extends Service {
         carrier, 'tools/pre-execute', exec,
         () => Promise.resolve<PreToolDecision>({ kind: 'allow' }),
       )
-      const askResolution = gate.kind === 'ask'
-        ? await this.serviceAsk(exec, gate)
-        : { decision: gate, approvalCancelled: false }
+      // The `always` approval floor: under that per-session policy every
+      // otherwise-allowed call asks before it runs. The check sits after the
+      // extensible waterfall, so a deny or an ask from another source (hooks,
+      // auto-review, escalation) passes through unchanged, and listener
+      // registration order cannot weaken the floor.
+      const floored: PreToolDecision = gate.kind === 'allow' && exec.agent !== undefined
+        && this.ctx.get('approval')?.effectivePolicy(exec.agent.session) === 'always'
+        ? { kind: 'ask', reason: ALWAYS_TOOL_REASON }
+        : gate
+      const askResolution = floored.kind === 'ask'
+        ? await this.serviceAsk(exec, floored)
+        : { decision: floored, approvalCancelled: false }
       const { decision } = askResolution
       if (this.callerCancelled(exec) && askResolution.approvalCancelled) {
         return await next({ kind: 'post-result', exec, result: toolAbortedBeforeDispatchResult() })

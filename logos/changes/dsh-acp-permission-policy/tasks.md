@@ -12,6 +12,10 @@
 - [x] 产出 `deltas/test/core-S49-test-cases.md` — 新增 S49 UT/ST 用例及 AC 追溯。
 - [x] 产出 `deltas/test/smoke/acp-network-smoke-test-cases.md` — 新增真实审批往返冒烟 SMOKE-acp-network-03。
 
+## [code] 代码实现
+> 删后续自检：评分 11（跨模块、三档状态分发、ACP 兼容契约、9+ 用例、安全与部署影响、required-on-read 待验证假设），达大任务线。尝试垂直拆分均被删后续门证伪：「ask/never 策略面」片删后续后 UT-S49-02/06 与 SMOKE-acp-network-03 飘红（已合并测试规格将三档+预设+smoke 定义为 S49 验收整体）；「always 档」片与「preset 面」片共享 bridge option 分支与词表扩展，互为前向依赖；(b) 单独可观察但 (a) 全量 verify 无法独立通过。各部分咬死，不可安全垂直拆分，故单片。
+- [x] 单切片：实现 ACP 审批策略配置入口——bridge `permission_policy`（ask/never/always）与 `permission_preset` option 分支、fail-loud 校验、configOptions 广告；`ApprovalPolicy` 新增 `always` 档及 required-on-read 读兼容评估；pre-execute always 询问源路由进 serviceAsk；交付 UT-S49-01..07、ST-S49-01/02 与 keyless 快照、共享 OpenLogos reporter、受影响包中英文 README/JSDoc 与 `docs/upgrade-guide/<发布版本>/acp-permission-policy/` 升级指南；实现 SMOKE-acp-network-03（扩展 `packages/acp/acp-network/tests/smoke/protocol-smoke.ts`）、写 `smoke-results.jsonl` reporter 并接入统一 smoke dispatcher，完成 smoke 覆盖预检（覆盖 UT-S49-01、UT-S49-02、UT-S49-03、UT-S49-04、UT-S49-05、UT-S49-06、UT-S49-07、ST-S49-01、ST-S49-02、SMOKE-acp-network-03）
+
 ## [deploy] 部署任务
 - [ ] 按合并后的部署方案构建带 commit 标识的 dsh 发布物并部署到 staging。
 - [ ] 验证 ACP 会话审批策略配置、`always` 审批往返与 reject-once 分支，并回归 `permission_preset` 预设应用，确认服务启动、既有会话回归及上一版发布物回滚路径。
