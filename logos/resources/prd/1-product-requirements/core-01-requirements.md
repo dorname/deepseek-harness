@@ -1,6 +1,6 @@
 # DeepSeek Harness 需求文档（dsh · core 模块）
 
-> 最后更新：2026-11-03
+> 最后更新：2026-11-05
 > 文档性质：存量项目（`bootstrap: adopted`）逆向整理的需求基线，描述 0.2.1-alpha.1 所承载的用户需求；场景事实来源为 `logos/resources/prd/3-technical-plan/2-scenario-implementation/core-scenario-candidates.md`（逆向候选，verified:false）中的可验证事实。
 
 ## 一、产品背景与目标
@@ -103,6 +103,7 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 | S46 | 同域前后端分离（API-only + shell） | 运维启用 cluster-web 三分流 / 外仓替换 shell | P03/P08 | P0 |
 | S47 | 同域前后端双容器 + API 容器级副本 | 运维 compose up frontend/api（可 scale api） | P03/P08 | P0 |
 | S48 | 按供应商 baseURL 动态发现 DeepSeek 模型目录 | 读取目录、新建 ACP 会话或切换模型 | P04/P07 | P0 |
+| S49 | 外部客户端配置会话审批策略与预设 | 外部 ACP 客户端设置会话审批策略或应用权限预设 | P01/P08 | P0 |
 
 ## 四、核心场景详述（P0）
 
@@ -612,6 +613,44 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 - **GIVEN** 既有 S03、S20、S26 会话与模型配置
 - **WHEN** 执行会话默认模型、历史回显、下一轮覆盖、恢复、reasoning options 和取消回归
 - **THEN** 既有行为保持；一次目录刷新失败不强制中断已有会话的纯推理，但客户端显式读取目录必须收到真实结果或错误
+
+### S49: 外部客户端配置会话审批策略与预设
+
+- **触发条件**：外部 ACP 客户端（如 dspm）对会话设置审批策略 `permission_policy` 或应用权限预设 `permission_preset`，以及策略生效后的工具调用审批交互。
+- **用户价值**：外部客户端可以令 agent 按会话发起审批，审批回调从「通道存在但默认不可达」变为端到端可用；人对外部自动化中的代理行为恢复控制与可见性（← P01/P08）。
+- **优先级**：P0
+- **主路径**：客户端 `session/set_config_option { permission_policy }` → bridge 校验词表 `ask`/`never`/`always` → 既有 `ApprovalService.setPolicy` 落 `approval/policy` 会话事件并注入模型可见切换通知 → configOptions 回显当前值 → 后续工具调用按档分发：`always` 对每次工具调用产生询问并路由进既有 serviceAsk 管线；`never` 自动拒绝询问；`ask`（默认）放行既有触发源产生的询问 → 询问经既有 `session/request_permission` 回环送达客户端 → allow-once / reject-once 一次性应答结算。
+- **边界**：`permission_preset` 应用 permission-presets 既有 `{sandbox, approval}` 打包预设（read-only / workspace-write / danger-full-access，目录动态枚举，各档 approval 值沿用现行定义）；类别级询问（ask-writes / ask-network）不在范围；不提供 `allow_always` 持久授权选项；`/permission` 命令与 profile 会话种子行为不因本场景改变。
+
+#### 验收条件
+##### 正常：always 档全量询问
+- **GIVEN** 会话策略设置为 `always`
+- **WHEN** agent 发起文件写等工具调用
+- **THEN** 每次调用先经 `session/request_permission` 询问客户端；allow-once 应答后工具执行，reject-once 应答后该调用被拒且会话与回合继续
+##### 正常：never 档自动拒绝询问
+- **GIVEN** 会话策略设置为 `never`
+- **WHEN** 既有触发源（如 sandbox 升权、PreToolUse hook ask）产生询问
+- **THEN** 询问被自动拒绝，不发起 `session/request_permission`，会话不中断
+##### 正常：ask 档维持放行语义
+- **GIVEN** 会话策略为 `ask`（默认）
+- **WHEN** 无触发源的普通调用与 sandbox 升权混合执行
+- **THEN** 普通调用不询问照常执行；升权询问正常送达客户端应答
+##### 正常：预设应用与目录枚举
+- **GIVEN** 客户端读取会话 configOptions
+- **WHEN** 应用 `permission_preset=read-only` 并再次读取
+- **THEN** 预设按 permission-presets 现行定义生效（sandbox 与 approval 打包变更落会话日志），configOptions 回显当前预设与策略值
+##### 正常：resume 恢复策略状态
+- **GIVEN** 会话已设置策略或预设并 `session/close`
+- **WHEN** 新连接 `session/resume` 同一会话
+- **THEN** 策略与预设状态经会话日志折叠恢复，configOptions 广告恢复后的当前值
+##### 异常：未知值 fail-loud
+- **GIVEN** 客户端设置 `permission_policy=paranoid` 或未知预设名
+- **WHEN** `session/set_config_option`
+- **THEN** 返回 JSON-RPC invalid params 类错误，策略与预设状态保持不变，不静默忽略
+##### 回归：既有审批与会话行为
+- **GIVEN** S03、S21、S22 既有会话与审批路径
+- **WHEN** 执行 ACP 主链路、人工审批、沙箱升权回归
+- **THEN** 既有行为保持；未配置策略的会话默认行为与升级前一致
 
 ## 五、约束与边界
 

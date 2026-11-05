@@ -1,0 +1,9 @@
+merged: 10/10 deltas applied to logos/resources on 2026-11-05
+requirements: core-01 overview table gained the S49 row; S49 detail section appended with seven GIVEN/WHEN/THEN acceptance conditions (always/never/ask dispatch, preset apply, resume restore, unknown-value fail-loud, regression); 最后更新 bumped to 2026-11-05
+feature-design: §1.4 ACP bullet extended with the two new option ids; §9 会话审批策略交互规格（S49） appended (config, internal seam, approval interaction rules, interaction-level acceptance)
+system-maps: core map gained §14 (component table, config data flow, failure/boundary invariants); acp-network map gained 会话审批策略配置面（S49） sequence and invariants
+scenarios: core-S49-acp-permission-policy.md created; acp-S02-network-permission-prompt.md gained 审批策略档衔接（S49）
+deployment: core-01 plan gained 十一、ACP 审批策略配置发布（S49）; acp-network plan gained 会话审批策略配置发布（S49） staging verification steps
+test-cases: core-S49-test-cases.md created (UT-S49-01..07, ST-S49-01/02, AC traceability, coverage checks)
+smoke: SMOKE-acp-network-03 appended with steps/expectations; 失败判定 extended with two S49 criteria; 执行方式 annotated
+conservation: all 48 pre-existing scenario rows, section IDs (0-8, §13, 一-十), smoke failure criteria retained; counter scenario_counter.next_id 49→50
