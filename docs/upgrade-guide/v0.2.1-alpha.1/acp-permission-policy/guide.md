@@ -16,7 +16,7 @@ ACP sessions previously exposed no permission controls: the approval policy was 
 
 Unknown values for either option and mutations when the backing service is not composed fail with `Invalid params` instead of being ignored. Clients listing config options will see the two new ids.
 
-Read compatibility: builds older than this release still open session logs that contain `approval/policy` events with the value `always`, but they dispatch that value like `ask` — no per-call floor. The `always` guarantee holds only on upgraded readers, so upgrade all readers of a shared session store before relying on `always`. The deployment `approval` config continues to accept only `ask` and `never`; `always` is a per-session, client-driven choice.
+Read compatibility: `always` switches persist as a new ordinary session event type, `approval/policy-always` (`ask`/`never` switches keep the existing `approval/policy` event). Builds older than this release do not know the new event type and refuse to open a session log that contains one, naming the unknown type — the required-on-read rule; sessions that only used `ask`/`never` remain fully readable. The `always` guarantee holds only on upgraded readers, so upgrade all readers of a shared session store before relying on `always`. The deployment `approval` config continues to accept only `ask` and `never`; `always` is a per-session, client-driven choice.
 
 ## Migration
 

@@ -16,7 +16,7 @@
 | UT-S49-01 | 词表校验与 fail-loud | bridge `setSessionConfigOption` | 测试会话；审批/预设插件已组装 | 依次设置 `permission_policy` ∈ ask/never/always、未知值、未知预设名 | 合法值接受；未知值与未知预设返回 invalid params 类错误且策略/预设状态不变；错误不吞、不回退默认 |
 | UT-S49-02 | always 档全量询问与一次性应答 | pre-execute 询问源 + serviceAsk | 会话策略 `always`；可控 answerer | 执行文件写与终端等多次工具调用，分别应答 allow-once / reject-once | 每次调用执行前恰一次询问；allow-once 后执行；reject-once 后该调用被拒且回合继续；无 `allow_always` 选项；一次性语义成立 |
 | UT-S49-03 | never 档自动拒绝 | ApprovalService never 分发 | 会话策略 `never`；注入 hook ask 与 sandbox 升权触发源 | 触发两类询问 | 询问被自动拒绝，不经 answerer、不发起 `session/request_permission`，会话与回合不中断 |
-| UT-S49-04 | 事件落库与模型可见通知 | `ApprovalService.setPolicy` 持久化 | 测试会话 | 依次设置 ask→always→never 并检查日志与投影 | `approval/policy` 事件逐次落库、LAST-wins 折叠生效；模型可见切换通知落日志；无新增 Session 事件类型 |
+| UT-S49-04 | 事件落库与模型可见通知 | `ApprovalService.setPolicy` 持久化 | 测试会话 | 依次设置 ask→always→never 并检查日志与投影 | 事件逐次落库（always 落 `approval/policy-always`、ask/never 落 `approval/policy`）、按 seq 跨类型 LAST-wins 折叠生效；模型可见切换通知落日志 |
 | UT-S49-05 | resume 恢复与 configOptions 广告 | new/resume configOptions 构建 | 会话已设置策略与预设并 close | 新会话读取、resume 后读取 configOptions；resume 后触发一次询问 | new/resume 广告 `permission_policy` 当前值与 `permission_preset` 预设目录；resume 后策略生效（如 never 吞询问） |
 | UT-S49-06 | 预设应用与目录枚举 | permission-presets ACP 入口 | 预设插件已组装 | 设置 `permission_preset=read-only`，读取目录，依次应用各档 | 预设目录动态枚举 read-only/workspace-write/danger-full-access；应用按现行 `{sandbox, approval}` 定义生效并落日志；read-only 越界写行为与 ST-S22-02 一致 |
 | UT-S49-07 | 真实 Loader 组合与快照 | LLM + tools + approval + ACP 真实组合、keyless 快照 | 真实 Loader 启动测试 cordis.yml | always 会话工具调用审批往返；configOptions 与策略切换通知快照 | 产品组合下审批往返与 UT-S49-02 一致；快照固定新 option id 广告与切换通知的模型可见行为；无新增 Session/SDK 表面 |

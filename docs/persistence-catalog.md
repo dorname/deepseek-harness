@@ -25,6 +25,7 @@ The [format references](persistence-changes/historical-formats/README.md) cover 
 | `event:approval/asked` | event | `3bfeb47b58606f4661904bc723da612782214c463d01e6d61cd6d6193d7374e1` | [`{ type: "approval/asked" }`](#persistence-type-sha256-3bfeb47b58606f4661904bc723da612782214c463d01e6d61cd6d6193d7374e1) |
 | `event:approval/decided` | event | `bb1ab3d08f49a9f3b265f844cd78d5c49813062a7b34b54904b426f85d0ff6e3` | [`{ type: "approval/decided" }`](#persistence-type-sha256-bb1ab3d08f49a9f3b265f844cd78d5c49813062a7b34b54904b426f85d0ff6e3) |
 | `event:approval/policy` | event | `26718e15e7e395bce9642dba5bbe09b3b1a4ce2213d20d566cd9207d7fc5fb78` | [`{ type: "approval/policy" }`](#persistence-type-sha256-26718e15e7e395bce9642dba5bbe09b3b1a4ce2213d20d566cd9207d7fc5fb78) |
+| `event:approval/policy-always` | event | `185b1eaaf2c894cd6293c92773f43eeff133b1cd3f875393d5970948f0b9baa0` | [`{ type: "approval/policy-always" }`](#persistence-type-sha256-185b1eaaf2c894cd6293c92773f43eeff133b1cd3f875393d5970948f0b9baa0) |
 | `event:assistant/attempt` | event | `15d5dfdd822aa35e115afd74a8982825a493880457774e6850bc1520b50875e4` | [`{ type: "assistant/attempt" }`](#persistence-type-sha256-15d5dfdd822aa35e115afd74a8982825a493880457774e6850bc1520b50875e4) |
 | `event:assistant/message` | event | `1033093edd0db80ff410e00830b523405e00bb0c7684948e531ff65095799625` | [`{ type: "assistant/message" }`](#persistence-type-sha256-1033093edd0db80ff410e00830b523405e00bb0c7684948e531ff65095799625) |
 | `event:command/done` | event | `15196447222782e773eb943c92b18316ce96b9af0f0cfddb6e57ba8274ecc5ff` | [`{ type: "command/done" }`](#persistence-type-sha256-15196447222782e773eb943c92b18316ce96b9af0f0cfddb6e57ba8274ecc5ff) |
@@ -251,21 +252,51 @@ Source: [`packages/interaction/user-approval/src/types.ts:55`](../packages/inter
 
 ```ts persistence-catalog
 /**
- * The session's approval policy was switched — log-only, durable,
- * replayable, never in the model transcript (the model learns the policy
- * from the runtime-context snapshot and live switch notices). The LAST
- * such event is the session's override.
+ * The session's approval policy was switched to `'ask'` or `'never'` —
+ * log-only, durable, replayable, never in the model transcript (the model
+ * learns the policy from the runtime-context snapshot and live switch
+ * notices). The LAST policy event across this type and
+ * `approval/policy-always` (by seq) is the session's override. The payload
+ * is frozen at the format-4 vocabulary: widening it would be a breaking
+ * persistence change, so later tiers switch through their own event type.
  * `source: 'delegation'` marks an override seeded into a child; an absent
  * source is a runtime switch.
  */
 'approval/policy': {
-  policy: ApprovalPolicy
+  policy: 'ask' | 'never'
   /** Marks an override seeded into a child at delegation. */
   source?: 'delegation'
 }
 ```
 
-Source: [`packages/interaction/user-approval/src/index.ts:40`](../packages/interaction/user-approval/src/index.ts)
+Source: [`packages/interaction/user-approval/src/index.ts:43`](../packages/interaction/user-approval/src/index.ts)
+
+<a id="approvalpolicy-always--log-only"></a>
+
+#### `approval/policy-always` — log-only
+
+```ts persistence-catalog
+/**
+ * The session's approval policy was switched to `'always'` — the same
+ * durable record as `approval/policy` for the tier added after format 4.
+ * A separate ordinary event type keeps `approval/policy`'s payload frozen
+ * at the accepted format-4 union (adding an event type is a same-version
+ * persistence change; widening an existing payload union is not). Born
+ * versioned (the `subagent/catalog` pattern) so future payload growth
+ * lands as higher-`version` alternatives without a format bump. The LAST
+ * policy event across `approval/policy` and this type (by seq) is the
+ * session's override. `source: 'delegation'` marks an override seeded
+ * into a child; an absent source is a runtime switch.
+ */
+'approval/policy-always': {
+  version: 0
+  policy: 'always'
+  /** Marks an override seeded into a child at delegation. */
+  source?: 'delegation'
+}
+```
+
+Source: [`packages/interaction/user-approval/src/index.ts:60`](../packages/interaction/user-approval/src/index.ts)
 
 ### `assistant/*`
 
@@ -1396,6 +1427,14 @@ SHA-256: `378f90f9f6022a0991928a1eaf7991094ea1920fe89a9248358a1da106e1a970`
 SHA-256: `36d6a9a871d949ea4f3edd919d81d66aa69218bebef38899d2a1282c39420a1f`
 
 `"approval/policy"`
+
+<a id="persistence-type-sha256-98646cfe708c7a6883ddcd726e1fc47119d0b30fcfdfa8d26734398c6b32b39f"></a>
+
+### `"approval/policy-always"`
+
+SHA-256: `98646cfe708c7a6883ddcd726e1fc47119d0b30fcfdfa8d26734398c6b32b39f`
+
+`"approval/policy-always"`
 
 <a id="persistence-type-sha256-9e07693fd7cd9babe0688c22c986e4d519ae1c0e40eeea13b2dc583bed2abc86"></a>
 
@@ -3006,23 +3045,6 @@ One of:
 - `"cancelled"`
 - `"rejected"`
 - `"unavailable"`
-
-<a id="persistence-type-sha256-05d2ae1e0c7f8770f83f9a09047afb39a335d8ac986df3193659aa1e581472cf"></a>
-
-<a id="persistence-type-approvalpolicy"></a>
-
-<a id="persistence-type-packagesinteractionuser-approvalsrcindextsapprovalpolicy"></a>
-
-### `ApprovalPolicy`
-
-SHA-256: `05d2ae1e0c7f8770f83f9a09047afb39a335d8ac986df3193659aa1e581472cf`
-
-Sources: [`packages/interaction/user-approval/src/index.ts:67`](../packages/interaction/user-approval/src/index.ts)
-
-One of:
-
-- `"ask"`
-- `"never"`
 
 <a id="persistence-type-sha256-fa87537f4a9c1e25602990a8bf686b383e9e00352ec8946e16ae24ba7c1625be"></a>
 
@@ -4949,7 +4971,7 @@ Sources: [`packages/llm/llm/src/types.ts:127`](../packages/llm/llm/src/types.ts)
 
 SHA-256: `3cfc3a56502da1f8c6153c2c56657bab4b749056968634dd0991d325ec1c919f`
 
-Sources: [`packages/core/tools/src/index.ts:700`](../packages/core/tools/src/index.ts)
+Sources: [`packages/core/tools/src/index.ts:702`](../packages/core/tools/src/index.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -5384,6 +5406,17 @@ SHA-256: `b993441f8ce7d27b80e619e113e232ae8e62d3d5a8340f6bfe12d8c4c018e62f`
 | Position | Presence | Type |
 |---|---|---|
 | 0 | required | [`{ role: "user" }`](#persistence-type-sha256-9a2a9029f8d7ede05336980d8342737557f487b913bfd28853d0ab5214600ab5) |
+
+<a id="persistence-type-sha256-05d2ae1e0c7f8770f83f9a09047afb39a335d8ac986df3193659aa1e581472cf"></a>
+
+### `union (2 variants)`
+
+SHA-256: `05d2ae1e0c7f8770f83f9a09047afb39a335d8ac986df3193659aa1e581472cf`
+
+One of:
+
+- `"ask"`
+- `"never"`
 
 <a id="persistence-type-sha256-1ab2ef1296f157ba96998f179bb5daa9d21a82480da2901127aeab2730797c92"></a>
 
@@ -7256,7 +7289,7 @@ SHA-256: `c5228b7a55498d84f529591744a0ab26e0b93ade18a70a26db1377a1ecfa6b49`
 
 SHA-256: `8fcb0b44a575e998665c053643d1ab04c82f39253ebd190ac0c975b78e40b543`
 
-Sources: [`packages/core/tools/src/index.ts:34`](../packages/core/tools/src/index.ts)
+Sources: [`packages/core/tools/src/index.ts:36`](../packages/core/tools/src/index.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7477,12 +7510,26 @@ Sources: [`packages/sandbox/sandbox-policy/src/session-mode.ts:33`](../packages/
 
 SHA-256: `11f70b595aa76897fc4e25a352bfa718c659f44b799e5aa14e84e5a38fe72912`
 
-Sources: [`packages/interaction/user-approval/src/index.ts:40`](../packages/interaction/user-approval/src/index.ts)
+Sources: [`packages/interaction/user-approval/src/index.ts:43`](../packages/interaction/user-approval/src/index.ts)
 
 | Property | Presence | Type |
 |---|---|---|
-| `policy` | required | [`ApprovalPolicy`](#persistence-type-sha256-05d2ae1e0c7f8770f83f9a09047afb39a335d8ac986df3193659aa1e581472cf) |
+| `policy` | required | [`union (2 variants)`](#persistence-type-sha256-05d2ae1e0c7f8770f83f9a09047afb39a335d8ac986df3193659aa1e581472cf) |
 | `source` | optional | `"delegation"` |
+
+<a id="persistence-type-sha256-c5df02d85d4c122f8c1196b9d61703d5ba1147fb6cff7f3bd4aeb404f0f4deb8"></a>
+
+### `{ policy, source?, version }`
+
+SHA-256: `c5df02d85d4c122f8c1196b9d61703d5ba1147fb6cff7f3bd4aeb404f0f4deb8`
+
+Sources: [`packages/interaction/user-approval/src/index.ts:60`](../packages/interaction/user-approval/src/index.ts)
+
+| Property | Presence | Type |
+|---|---|---|
+| `policy` | required | `"always"` |
+| `source` | optional | `"delegation"` |
+| `version` | required | `0` |
 
 <a id="persistence-type-sha256-8a9c990773f798eac10ca8878e6bcc531ee080bc589cac956730e462cc6a09ad"></a>
 
@@ -7706,6 +7753,22 @@ SHA-256: `26718e15e7e395bce9642dba5bbe09b3b1a4ce2213d20d566cd9207d7fc5fb78`
 | `seq` | required | `number` |
 | `time` | required | `number` |
 | `type` | required | `"approval/policy"` |
+
+<a id="persistence-type-sha256-185b1eaaf2c894cd6293c92773f43eeff133b1cd3f875393d5970948f0b9baa0"></a>
+
+<a id="persistence-type-eventapprovalpolicy-always"></a>
+
+### `{ type: "approval/policy-always" }`
+
+SHA-256: `185b1eaaf2c894cd6293c92773f43eeff133b1cd3f875393d5970948f0b9baa0`
+
+| Property | Presence | Type |
+|---|---|---|
+| `data` | required | [`{ policy, source?, version }`](#persistence-type-sha256-c5df02d85d4c122f8c1196b9d61703d5ba1147fb6cff7f3bd4aeb404f0f4deb8) |
+| `ignorable` | optional | `true` |
+| `seq` | required | `number` |
+| `time` | required | `number` |
+| `type` | required | `"approval/policy-always"` |
 
 <a id="persistence-type-sha256-15d5dfdd822aa35e115afd74a8982825a493880457774e6850bc1520b50875e4"></a>
 

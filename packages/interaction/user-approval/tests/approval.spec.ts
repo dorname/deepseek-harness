@@ -543,17 +543,20 @@ describe('S49 approval policy tiers (always ask source, never auto-reject, persi
     ctx.approval.setPolicy(agent, 'ask')
     expect(ctx.approval.effectivePolicy(session)).toBe('ask')
 
-    // Every switch lands one durable approval/policy event (LAST-wins fold)
-    // and one model-visible switch notice; no new event type appears.
+    // Each switch lands one durable policy event (LAST-wins fold across
+    // `approval/policy` and `approval/policy-always`) and one model-visible
+    // switch notice; `always` switches land on the dedicated event type.
     const policies = session.snapshotEvents()
-      .filter((event): event is SessionEvent<'approval/policy'> => event.type === 'approval/policy')
+      .filter((event): event is SessionEvent<'approval/policy'> | SessionEvent<'approval/policy-always'> =>
+        event.type === 'approval/policy' || event.type === 'approval/policy-always')
     expect(policies.map(event => event.data.policy)).toEqual(['always', 'never', 'ask'])
     expect(injected).toEqual([
       'The approval policy changed from "ask" to "always" (changed by the user).',
       'The approval policy changed from "always" to "never" (changed by the user).',
       'The approval policy changed from "never" to "ask" (changed by the user).',
     ])
-    expect(new Set(session.snapshotEvents().map(event => event.type))).toEqual(new Set(['turn/start', 'approval/policy']))
+    expect(new Set(session.snapshotEvents().map(event => event.type)))
+      .toEqual(new Set(['turn/start', 'approval/policy', 'approval/policy-always']))
   }))
 
   it('reports the effective tier through the runtime-context snapshot for every policy', async () => {

@@ -30,7 +30,7 @@ type ApprovalOutcome = 'allowed-once' | 'rejected' | 'cancelled' | 'unavailable'
 
 ## Per-session policy
 
-`ApprovalPolicy` determines what happens before interactive answerers run. `ask` delegates to the composed answerer chain, whose no-answer default is `unavailable`; `never` deterministically returns `rejected` without dispatching any answerer. The effective value is the last `approval/policy` event in the session log, falling back to the service config. Consumers read it with `ctx.approval.effectivePolicy(session)`; `setApprovalPolicy(session, policy)` is the single write path, so replay reconstructs the override.
+`ApprovalPolicy` determines what happens before interactive answerers run. `ask` delegates to the composed answerer chain, whose no-answer default is `unavailable`; `never` deterministically returns `rejected` without dispatching any answerer; `always` upgrades every otherwise-allowed tool call into an ask at the tool runtime's pre-execute stage. The effective value is the last policy event in the session log (`approval/policy` for `ask`/`never` switches, `approval/policy-always` for the `always` tier, folded by seq), falling back to the service config. Consumers read it with `ctx.approval.effectivePolicy(session)`; `setApprovalPolicy(session, policy)` is the single write path, so replay reconstructs the override.
 
 ```ts type-equiv
 /**
@@ -39,11 +39,16 @@ type ApprovalOutcome = 'allowed-once' | 'rejected' | 'cancelled' | 'unavailable'
  *
  * - `'ask'` (the default) — delegate to the composed answerers; with none
  *   composed the chain falls through to the fail-closed `'unavailable'`.
+ *   Ordinary tool calls that no ask source covers still run without asking.
  * - `'never'` — never prompt anyone: every ask resolves `'rejected'`
  *   deterministically. The strict headless stance (CI, unattended runs) and
  *   the policy whose outcome is knowable without asking.
+ * - `'always'` — every tool call asks before it runs: a pre-execute listener
+ *   turns each call into an ask that dispatches to the composed answerers.
+ *   The external-client stance (ACP `permission_policy=always`) where every
+ *   action needs an explicit one-shot grant.
  */
-type ApprovalPolicy = 'ask' | 'never'
+type ApprovalPolicy = 'ask' | 'never' | 'always'
 ```
 
 Both policies contribute their complete current meaning to the cache-safe runtime-context snapshot. The sourced `user/message` is the durable model-visible input; changing approval state appends a new full snapshot after retained history without touching the `system/message` nodes that hold the rendered system prompt.
@@ -130,6 +135,17 @@ setPolicy(agent: Agent, policy: ApprovalPolicy): void
  *   append commit point.
  */
 async request(req: ApprovalRequest): Promise<ApprovalOutcome>
+
+/**
+ * The session's effective policy: its own policy-event fold
+ * (`approval/policy` + `approval/policy-always`), else the
+ * configured default (the schema already defaulted an omitted policy to
+ * `'ask'`; the `??` only narrows the optional-input TYPE). Read by the ACP
+ * config advertisement to publish the current policy value.
+ * @param session - the exact accepted session whose policy applies.
+ * @returns the policy every ask for this session resolves under right now.
+ */
+effectivePolicy(session: Session): ApprovalPolicy
 
 /**
  * Read the session override without applying the configured default.

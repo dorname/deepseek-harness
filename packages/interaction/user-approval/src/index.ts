@@ -30,15 +30,36 @@ declare module '@deepseek-ai/cordis' {
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     /**
-     * The session's approval policy was switched — log-only, durable,
-     * replayable, never in the model transcript (the model learns the policy
-     * from the runtime-context snapshot and live switch notices). The LAST
-     * such event is the session's override.
+     * The session's approval policy was switched to `'ask'` or `'never'` —
+     * log-only, durable, replayable, never in the model transcript (the model
+     * learns the policy from the runtime-context snapshot and live switch
+     * notices). The LAST policy event across this type and
+     * `approval/policy-always` (by seq) is the session's override. The payload
+     * is frozen at the format-4 vocabulary: widening it would be a breaking
+     * persistence change, so later tiers switch through their own event type.
      * `source: 'delegation'` marks an override seeded into a child; an absent
      * source is a runtime switch.
      */
     'approval/policy': {
-      policy: ApprovalPolicy
+      policy: 'ask' | 'never'
+      /** Marks an override seeded into a child at delegation. */
+      source?: 'delegation'
+    }
+    /**
+     * The session's approval policy was switched to `'always'` — the same
+     * durable record as `approval/policy` for the tier added after format 4.
+     * A separate ordinary event type keeps `approval/policy`'s payload frozen
+     * at the accepted format-4 union (adding an event type is a same-version
+     * persistence change; widening an existing payload union is not). Born
+     * versioned (the `subagent/catalog` pattern) so future payload growth
+     * lands as higher-`version` alternatives without a format bump. The LAST
+     * policy event across `approval/policy` and this type (by seq) is the
+     * session's override. `source: 'delegation'` marks an override seeded
+     * into a child; an absent source is a runtime switch.
+     */
+    'approval/policy-always': {
+      version: 0
+      policy: 'always'
       /** Marks an override seeded into a child at delegation. */
       source?: 'delegation'
     }
@@ -74,6 +95,14 @@ export type ApprovalPolicy = 'ask' | 'never' | 'always'
 /** Every {@link ApprovalPolicy}, for option advertisement and runtime validation of untrusted policy strings. */
 export const APPROVAL_POLICIES: readonly ApprovalPolicy[] = ['ask', 'never', 'always']
 
+/**
+ * The payload `version` of every `approval/policy-always` event written today.
+ * Exported so writers and readers share the constant behind the event map's
+ * `version: 0` literal; future payload growth raises it alongside a new
+ * versioned alternative.
+ */
+export const APPROVAL_POLICY_ALWAYS_VERSION = 0
+
 /** Model-facing statement for the deterministic `'never'` policy. */
 const NEVER_SENTENCE = 'Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).'
 /** Model-facing statement for an interactive policy that may still fail closed. */
@@ -99,8 +128,10 @@ function hasOpenTurn(session: Session): boolean {
 }
 
 /**
- * Append the sole durable representation of a session policy override. Invalid
- * values throw before the log changes; consumers fold the new value on each read.
+ * Append the durable representation of a session policy override. Invalid
+ * values throw before the log changes; consumers fold the new value on each
+ * read. `always` switches land on `approval/policy-always` — the tier added
+ * after format 4, whose event type keeps `approval/policy`'s payload frozen.
  * @param session - the session the override belongs to.
  * @param policy - the policy in effect until the next switch.
  */
@@ -108,7 +139,11 @@ export function setApprovalPolicy(session: Session, policy: ApprovalPolicy): voi
   if (!APPROVAL_POLICIES.includes(policy)) {
     throw new TypeError('approval policy must be one of "ask", "never", or "always"')
   }
-  session.append('approval/policy', { policy })
+  if (policy === 'always') {
+    session.append('approval/policy-always', { version: APPROVAL_POLICY_ALWAYS_VERSION, policy })
+  } else {
+    session.append('approval/policy', { policy })
+  }
 }
 
 /**
@@ -256,7 +291,8 @@ export class ApprovalService extends Service {
   }
 
   /**
-   * The session's effective policy: its own `approval/policy` fold, else the
+   * The session's effective policy: its own policy-event fold
+   * (`approval/policy` + `approval/policy-always`), else the
    * configured default (the schema already defaulted an omitted policy to
    * `'ask'`; the `??` only narrows the optional-input TYPE). Read by the ACP
    * config advertisement to publish the current policy value.
@@ -276,7 +312,7 @@ export class ApprovalService extends Service {
     for (let seq = session.seq - 1; seq >= 0; seq -= 1) {
       // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const event = session.eventAt(SessionSeq(seq))
-      if (event?.type === 'approval/policy') return event.data.policy
+      if (event?.type === 'approval/policy' || event?.type === 'approval/policy-always') return event.data.policy
     }
     return undefined
   }

@@ -17,7 +17,7 @@ Client                         AcpBridge.setSessionConfigOption      ApprovalSer
   │─── allow-once / reject-once ─────────────▶│ 一次性应答结算
 ```
 
-- 策略与预设状态经既有 `approval/policy` 会话事件持久化，resume 经既有投影折叠恢复；`always` 新枚举值按 required-on-read 语义完成读兼容评估。
+- 策略与预设状态经策略事件对持久化（ask/never 落既有 `approval/policy`，always 落新增普通事件类型 `approval/policy-always`，payload 冻结于 format-4 词表），resume 经既有投影折叠恢复；旧构建已知类型集不含新事件，按 required-on-read 语义拒绝打开含该事件的日志（fail-loud）。
 - `always` 档下每次工具调用在执行前发起 `session/request_permission`；发起前沿用既有 drainUpdates 顺序，客户端先收到该 turn 之前的全部更新。
 - 未实现 `session/request_permission` 的客户端沿用 fail-closed：该次调用被拒，会话不中断，不降级放行。
 - 既有网络认证、连接隔离和会话持久化机制不变；审批策略是会话级状态，不引入跨用户或跨实例的新授权面，token 授权边界不变。

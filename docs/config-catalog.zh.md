@@ -18,7 +18,7 @@
 
 - `inject`: `agents` · `llm` · `sessionPersistence` · `sessions`
 - `refs`: `AuthenticateRequest` (`@agentclientprotocol/sdk`) · `Stream` (`@agentclientprotocol/sdk`)
-- `source`: [`packages/acp/acp/src/index.ts:51`](../packages/acp/acp/src/index.ts)
+- `source`: [`packages/acp/acp/src/index.ts:52`](../packages/acp/acp/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -2317,7 +2317,7 @@ export interface Config {
 
 - `inject`: `shell` · `approval` · `sessions` · `sessionProjections`
 - `refs`: [`ApprovalPolicy`](subsystems/approval.zh.md) · [`SandboxMode`](subsystems/sandbox.zh.md) · `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/interaction/permission-presets/src/index.ts:159`](../packages/interaction/permission-presets/src/index.ts)
+- `source`: [`packages/interaction/permission-presets/src/index.ts:167`](../packages/interaction/permission-presets/src/index.ts)
 
 ```ts config-catalog
 /** The {@link PermissionPresetService} config: preset table and composition default. */
@@ -4342,7 +4342,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-tools`
 
 - `inject`: `systemPrompt`
-- `source`: [`packages/core/tools/src/index.ts:674`](../packages/core/tools/src/index.ts)
+- `source`: [`packages/core/tools/src/index.ts:676`](../packages/core/tools/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: how the registered tools are presented to the model. */
@@ -4395,31 +4395,22 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-user-approval`
 
-- `source`: [`packages/interaction/user-approval/src/index.ts:135`](../packages/interaction/user-approval/src/index.ts)
+- `source`: [`packages/interaction/user-approval/src/index.ts:183`](../packages/interaction/user-approval/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config. All optional — `static Config` supplies the defaults. */
 export interface Config {
   /**
-   * The deployment's default {@link ApprovalPolicy} for sessions without an
+   * The deployment's default approval stance for sessions without an
    * `approval/policy` override — `'ask'` delegates to the composed answerers
    * (fail-closed with none); `'never'` auto-rejects every ask without
-   * prompting (the deterministic CI/unattended stance).
+   * prompting (the deterministic CI/unattended stance). `'always'` is not a
+   * deployable default: it is a per-session interactive stance switched by
+   * the user (or an ACP client) after the session exists, so the config
+   * schema accepts only `'ask' | 'never'`.
    */
-  readonly policy?: ApprovalPolicy
+  readonly policy?: 'ask' | 'never'
 }
-
-/**
- * A session's approval policy — what happens to an {@link ApprovalService}
- * ask BEFORE any interactive answerer sees it:
- *
- * - `'ask'` (the default) — delegate to the composed answerers; with none
- *   composed the chain falls through to the fail-closed `'unavailable'`.
- * - `'never'` — never prompt anyone: every ask resolves `'rejected'`
- *   deterministically. The strict headless stance (CI, unattended runs) and
- *   the policy whose outcome is knowable without asking.
- */
-export type ApprovalPolicy = 'ask' | 'never'
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-user-approval -->
 

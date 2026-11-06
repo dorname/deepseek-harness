@@ -61,7 +61,7 @@
 - **触发条件**：外部 ACP 客户端（如 dspm）对会话设置审批策略 `permission_policy` 或应用权限预设 `permission_preset`，以及策略生效后的工具调用审批交互。
 - **用户价值**：外部客户端可以令 agent 按会话发起审批，审批回调从「通道存在但默认不可达」变为端到端可用；人对外部自动化中的代理行为恢复控制与可见性（← P01/P08）。
 - **优先级**：P0
-- **主路径**：客户端 `session/set_config_option { permission_policy }` → bridge 校验词表 `ask`/`never`/`always` → 既有 `ApprovalService.setPolicy` 落 `approval/policy` 会话事件并注入模型可见切换通知 → configOptions 回显当前值 → 后续工具调用按档分发：`always` 对每次工具调用产生询问并路由进既有 serviceAsk 管线；`never` 自动拒绝询问；`ask`（默认）放行既有触发源产生的询问 → 询问经既有 `session/request_permission` 回环送达客户端 → allow-once / reject-once 一次性应答结算。
+- **主路径**：客户端 `session/set_config_option { permission_policy }` → bridge 校验词表 `ask`/`never`/`always` → 既有 `ApprovalService.setPolicy` 落策略会话事件（ask/never 落 `approval/policy`，always 落新增 `approval/policy-always`）并注入模型可见切换通知 → configOptions 回显当前值 → 后续工具调用按档分发：`always` 对每次工具调用产生询问并路由进既有 serviceAsk 管线；`never` 自动拒绝询问；`ask`（默认）放行既有触发源产生的询问 → 询问经既有 `session/request_permission` 回环送达客户端 → allow-once / reject-once 一次性应答结算。
 - **边界**：`permission_preset` 应用 permission-presets 既有 `{sandbox, approval}` 打包预设（read-only / workspace-write / danger-full-access，目录动态枚举，各档 approval 值沿用现行定义）；类别级询问（ask-writes / ask-network）不在范围；不提供 `allow_always` 持久授权选项；`/permission` 命令与 profile 会话种子行为不因本场景改变。
 
 #### 验收条件

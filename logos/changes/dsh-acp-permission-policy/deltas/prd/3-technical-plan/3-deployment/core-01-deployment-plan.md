@@ -7,13 +7,13 @@
 - 发布物为包含 `acp`、`interaction/user-approval`、`interaction/permission-presets`、`core/tools` 及对应文档变更的新 dsh 版本或镜像，部署记录必须包含精确 commit；本地源码修改不构成 dspm 可消费交付。
 - 构建前确认受影响单元、真实 Loader 组合、ACP 集成、keyless 快照和聚焦 coverage 通过；部署后 smoke 与真实 API e2e 分别记录。
 - 发布包含 `docs/upgrade-guide/<发布版本>/acp-permission-policy/` 中英文指南，说明新增 option id、`always` 词表值、一次性选项语义保持与 fail-closed 行为。
-- `approval/policy` 事件携带新值 `always` 的读兼容性（required-on-read 语义）在实现期评估；评估结论与所选机制记录在实现清单，不依赖日志向前兼容完成回滚。
+- `always` 切换落新增普通事件类型 `approval/policy-always`（same-version 持久化变更，已按 `docs/persistence-changes/` 记录确认）；旧构建读已知类型集不含该事件，按 required-on-read 语义拒绝打开含该事件的日志（fail-loud），不依赖日志向前兼容完成回滚。评估结论与所选机制记录在实现清单。
 
 ### 配置
 
 - 不新增 Secret、环境变量或 profile 配置项；审批策略是会话级状态，由客户端按会话设置，部署侧无需预置。
 - 未设置策略的会话保持默认 `ask` 放行语义，升级前后行为一致；部署不为任何会话预置 `always`/`never`。
-- 无数据库或 Session 格式迁移；策略与预设沿用既有 `approval/policy` 会话事件持久化。
+- 无数据库或 Session 格式迁移（Session format 维持 4）；ask/never 切换沿用既有 `approval/policy` 事件、`always` 切换落新增 `approval/policy-always` 事件持久化。回滚到旧构建后，含 `always` 切换的会话不可被旧构建打开（fail-loud 报未知事件类型），仅含 ask/never 的会话完全可读。
 
 ### staging 部署步骤
 

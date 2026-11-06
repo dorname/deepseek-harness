@@ -45,7 +45,7 @@ kind: "package-reference"
 |---|---|---|
 | `policy` | `ask` | 没有 `approval/policy` 覆盖的会话的默认策略 |
 
-生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-user-approval)是每个受支持字段及其 JSDoc 的穷尽式真源。`setPolicy(agent, policy)` 切换运行中的 agent 的策略，并为它的下一个模型步骤排队一条「由用户更改」消息；`setApprovalPolicy(session, policy)` 是会话初始化使用的直接持久写入路径。
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-user-approval)是每个受支持字段及其 JSDoc 的穷尽式真源。`setPolicy(agent, policy)` 切换运行中的 agent 的策略，并为它的下一个模型步骤排队一条「由用户更改」消息；`setApprovalPolicy(session, policy)` 是会话初始化使用的直接持久写入路径。持久化上，`ask`/`never` 切换追加 `approval/policy` 事件，其 payload 冻结于 format-4 词表；`always` 切换追加 `approval/policy-always` 事件（`version: 0`）——独立的普通事件类型，早于该档位的构建会拒绝打开包含它的日志，而不是误读策略。有效策略按 seq 跨两类事件折叠最后一条策略事件。
 
 ### 请求决定
 

@@ -100,7 +100,7 @@ export interface KnobState {
   preset: string | null
   /** Last `sandbox/mode` payload, or null. */
   sandbox: SandboxMode | null
-  /** Last `approval/policy` payload, or null. */
+  /** Last policy-event payload (`approval/policy`/`approval/policy-always`), or null. */
   approval: ApprovalPolicy | null
 }
 
@@ -147,6 +147,8 @@ function applyPermissionEvent(
     case 'sandbox/mode':
       return { ...state, sandbox: event.data.mode }
     case 'approval/policy':
+      return { ...state, approval: event.data.policy }
+    case 'approval/policy-always':
       return { ...state, approval: event.data.policy }
     case 'session/end-seed':
       return { ...state, seeded: true }

@@ -53,7 +53,8 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionMap {
     /**
      * The session's current permission, folded from the three whole-value
-     * knob events (`permission/preset`, `sandbox/mode`, `approval/policy`)
+     * knob events (`permission/preset`, `sandbox/mode`, and the policy pair
+     * `approval/policy`/`approval/policy-always`)
      * over the composition defaults. Selectable options come from the
      * process-level catalog Remote. Key absence means no permission service
      * is composed — clients hide the control.

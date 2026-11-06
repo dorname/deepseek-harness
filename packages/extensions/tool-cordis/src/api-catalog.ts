@@ -408,6 +408,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['when no turn is open or either audit event fails before the session append commit point.'],
       },
       {
+        signature: 'effectivePolicy(session: Session): ApprovalPolicy',
+        description: 'The session\'s effective policy: its own policy-event fold (`approval/policy` + `approval/policy-always`), else the configured default (the schema already defaulted an omitted policy to `\'ask\'`; the `??` only narrows the optional-input TYPE). Read by the ACP config advertisement to publish the current policy value.',
+        parameters: [{ name: 'session', description: 'the exact accepted session whose policy applies.' }],
+        returns: 'the policy every ask for this session resolves under right now.',
+      },
+      {
         signature: 'overrideOf(session: Session): ApprovalPolicy | undefined',
         description: 'Read the session override without applying the configured default.',
         parameters: [{ name: 'session', description: 'session whose log supplies the override.' }],
@@ -4634,7 +4640,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ApprovalPolicy',
-    declaration: 'export type ApprovalPolicy = \'ask\' | \'never\';',
+    declaration: 'export type ApprovalPolicy = \'ask\' | \'never\' | \'always\';',
   },
   {
     name: 'ApprovalRequest',

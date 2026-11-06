@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-11-06-approval-policy-always-event.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-11-06-approval-policy-always-event.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-11-06-approval-policy-always-event:
+  en: 7cc5f90c072322f1
+  zh: 5ebdcbf92417a201
+/2026-11-06-approval-policy-always-event/summary:
+  en: 55b82279d359ff6e
+  zh: 898e63b9ea8f14c3
+/2026-11-06-approval-policy-always-event/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-11-06-approval-policy-always-event/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-11-06-approval-policy-always-event/compatibility:
+  en: 65dc01267201b404
+  zh: 50da94be870ab0ca
+/2026-11-06-approval-policy-always-event/verification:
+  en: d1745508a8883cc6
+  zh: 42259771f5b6214a
+/2026-11-06-approval-policy-always-event/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

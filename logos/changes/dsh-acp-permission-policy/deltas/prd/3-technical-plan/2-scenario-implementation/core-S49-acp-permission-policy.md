@@ -19,7 +19,7 @@
 
 ## 2. 配置与词表
 
-1. `permission_policy` 词表：`ask`（默认，放行既有触发源产生的询问）、`never`（自动拒绝询问）、`always`（每次工具调用先询问）。`always` 为本变更新增档，写入既有 `approval/policy` 事件；读侧按 required-on-read 语义完成兼容评估，必要时标记 `ignorable: true`。
+1. `permission_policy` 词表：`ask`（默认，放行既有触发源产生的询问）、`never`（自动拒绝询问）、`always`（每次工具调用先询问）。`always` 为本变更新增档，写入新增普通事件类型 `approval/policy-always`（`version: 0`）；ask/never 切换继续落既有 `approval/policy`（payload 冻结于 format-4 词表，扩宽即破坏性持久化变更）。折叠按 seq 跨两类事件取最后者；旧构建已知类型集不含新事件，按 required-on-read 语义拒绝打开含该事件的日志（fail-loud）。
 2. `permission_preset` 值域为 permission-presets 既有预设目录（read-only / workspace-write / danger-full-access），目录经 `catalog()` 动态枚举；应用走既有 `set()`，各档 `{sandbox, approval}` 值沿用现行定义，不在本变更中重定义。
 3. 两个 option 在 `session/new`、`session/resume` 的 configOptions 广告当前值；策略与预设状态经既有会话事件折叠在 resume 恢复，不新增存储。
 4. 设置走 bridge `setSessionConfigOption` 的策略分支（先于模型选项委托）；序列化沿用既有 promise tail，并发设置不交错。
@@ -37,7 +37,7 @@ sequenceDiagram
   C->>B: set_config_option(permission_policy=always)
   B->>B: validate vocabulary (unknown → invalid params)
   B->>A: setPolicy(agent, 'always')
-  A->>A: append approval/policy event + model-visible switch notice
+  A->>A: append approval/policy-always event + model-visible switch notice
   B-->>C: ok; configOptions reflect always
   C->>B: session/prompt (tool-using turn)
   T->>P: tool call about to execute

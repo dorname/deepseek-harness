@@ -12,7 +12,7 @@
 
 **配置**：`session/set_config_option` 新增两个 option id。`permission_policy` 词表为 `ask`（默认，放行既有触发源产生的询问）/ `never`（自动拒绝询问）/ `always`（每次工具调用先询问）——`always` 是本变更新增的审批策略档。`permission_preset` 值来自 permission-presets 既有预设目录（read-only / workspace-write / danger-full-access），按现行定义应用 `{sandbox, approval}` 打包，各档 approval 值不在本变更中重定义。两个 option 均在 `session/new` 与 `session/resume` 的 `configOptions` 中广告当前值与可选目录。
 
-**内部接口**：bridge 在 `setSessionConfigOption` 中先于模型选项委托处理这两个 id，调用既有 `ApprovalService.setPolicy` 与 permission-presets 既有写路径；`always` 档由 pre-execute 对每次工具调用产生询问并路由进既有 serviceAsk 管线。策略切换落既有 `approval/policy` 会话事件（LAST-wins 折叠）并注入模型可见切换通知，resume 经既有投影折叠恢复；`always` 作为该事件新枚举值，实现期按 required-on-read 语义完成读兼容评估，必要时标记 `ignorable: true`。本变更不新增 Session 事件类型、ACP 方法或 TypeScript/Python SDK 会话接口；如实现触及 `SessionEventMap`，必须在同一切片补充双 SDK expected outputs。
+**内部接口**：bridge 在 `setSessionConfigOption` 中先于模型选项委托处理这两个 id，调用既有 `ApprovalService.setPolicy` 与 permission-presets 既有写路径；`always` 档由 pre-execute 对每次工具调用产生询问并路由进既有 serviceAsk 管线。ask/never 切换落既有 `approval/policy` 会话事件；`always` 切换落新增普通事件类型 `approval/policy-always`（出生即带 `version: 0`，沿 `subagent/catalog` 先例为未来 payload 增长预留同版通道）。两类事件按 seq 跨类型 LAST-wins 折叠并注入模型可见切换通知，resume 经既有投影折叠恢复；`approval/policy` payload 冻结于 format-4 词表（`ask`/`never`）， widening 即破坏性持久化变更。旧构建读已知类型集不含 `approval/policy-always`，按 required-on-read 语义拒绝打开含该事件的日志（fail-loud）；仅用过 ask/never 的会话不受影响。本变更新增一个 Session 事件类型、不新增 ACP 方法或 TypeScript/Python SDK 会话接口；如实现触及 `SessionEventMap` 的 SDK 可见面，必须在同一切片补充双 SDK expected outputs。
 
 ### 审批交互规则
 
@@ -26,7 +26,7 @@
 ##### 正常：策略设置与回显
 - **GIVEN** 客户端在会话上设置 `permission_policy=always` 并读取 configOptions
 - **WHEN** 设置成功后再次读取
-- **THEN** 设置被接受且 configOptions 回显 `always`；会话日志含 `approval/policy` 事件与模型可见切换通知
+- **THEN** 设置被接受且 configOptions 回显 `always`；会话日志含 `approval/policy-always` 事件与模型可见切换通知
 ##### 正常：always 触发一次性审批
 - **GIVEN** 会话策略为 `always`
 - **WHEN** agent 执行文件写，客户端先 allow-once 后对第二次调用 reject-once

@@ -45,7 +45,7 @@ The effective policy is the one set for the session, falling back to the configu
 |---|---|---|
 | `policy` | `ask` | Default for sessions without an `approval/policy` override |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-user-approval) is the exhaustive source for every accepted field and its JSDoc. `setPolicy(agent, policy)` switches a live agent and queues a "changed by the user" message for its next model step; `setApprovalPolicy(session, policy)` is the direct durable write path used by session initialization.
+The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-user-approval) is the exhaustive source for every accepted field and its JSDoc. `setPolicy(agent, policy)` switches a live agent and queues a "changed by the user" message for its next model step; `setApprovalPolicy(session, policy)` is the direct durable write path used by session initialization. Durably, `ask`/`never` switches append an `approval/policy` event whose payload is frozen at the format-4 vocabulary, and `always` switches append an `approval/policy-always` event (`version: 0`) — a separate ordinary event type, so builds that predate the tier refuse to open logs containing one instead of misreading the policy. The effective policy folds the last policy event of either type by seq.
 
 ### Requesting a decision
 

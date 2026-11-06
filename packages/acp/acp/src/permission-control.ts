@@ -45,7 +45,11 @@ export class AcpPermissionControl {
     private readonly agent: Agent,
   ) {}
 
-  /** Whether {@link set} handles this option id (the bridge routes before model options). */
+  /**
+   * Whether {@link set} handles this option id (the bridge routes before model options).
+   * @param configId - the config option id the bridge is routing.
+   * @returns `true` when the id is the permission policy or preset option.
+   */
   owns(configId: string): boolean {
     return configId === POLICY_CONFIG_ID || configId === PRESET_CONFIG_ID
   }

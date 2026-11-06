@@ -1,0 +1,94 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:approval/policy-always",
+      "kind": "event",
+      "event": "approval/policy-always",
+      "surface": false,
+      "digest": "185b1eaaf2c894cd6293c92773f43eeff133b1cd3f875393d5970948f0b9baa0",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "policy",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "source",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "version",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "always"
+          },
+          {
+            "kind": "literal",
+            "value": "delegation"
+          },
+          {
+            "kind": "literal",
+            "value": 0
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "approval/policy-always"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

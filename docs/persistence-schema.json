@@ -3485,6 +3485,94 @@
       }
     },
     {
+      "key": "event:approval/policy-always",
+      "kind": "event",
+      "event": "approval/policy-always",
+      "surface": false,
+      "digest": "185b1eaaf2c894cd6293c92773f43eeff133b1cd3f875393d5970948f0b9baa0",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "policy",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "source",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "version",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "always"
+          },
+          {
+            "kind": "literal",
+            "value": "delegation"
+          },
+          {
+            "kind": "literal",
+            "value": 0
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "approval/policy-always"
+          }
+        ]
+      }
+    },
+    {
       "key": "event:assistant/attempt",
       "kind": "event",
       "event": "assistant/attempt",
@@ -21835,12 +21923,8 @@
     },
     {
       "digest": "05d2ae1e0c7f8770f83f9a09047afb39a335d8ac986df3193659aa1e581472cf",
-      "names": [
-        "packages/interaction/user-approval/src/index.ts#ApprovalPolicy"
-      ],
-      "sources": [
-        "packages/interaction/user-approval/src/index.ts:67"
-      ]
+      "names": [],
+      "sources": []
     },
     {
       "digest": "0657d3ca5ac4e7bf79b00bcf860b1c7159d01a9da137497221ec2f1776e365f7",
@@ -22040,7 +22124,7 @@
       "digest": "11f70b595aa76897fc4e25a352bfa718c659f44b799e5aa14e84e5a38fe72912",
       "names": [],
       "sources": [
-        "packages/interaction/user-approval/src/index.ts:40"
+        "packages/interaction/user-approval/src/index.ts:43"
       ]
     },
     {
@@ -22127,6 +22211,11 @@
       "sources": [
         "packages/core/session/src/types.ts:427"
       ]
+    },
+    {
+      "digest": "185b1eaaf2c894cd6293c92773f43eeff133b1cd3f875393d5970948f0b9baa0",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "186159f5f6f67a0b8cd095b8fe55bef42d4f25ca1a1c248f859867af2ece0467",
@@ -22708,7 +22797,7 @@
         "packages/core/tools/src/index.ts#ToolRestriction"
       ],
       "sources": [
-        "packages/core/tools/src/index.ts:700"
+        "packages/core/tools/src/index.ts:702"
       ]
     },
     {
@@ -23919,7 +24008,7 @@
       "digest": "8fcb0b44a575e998665c053643d1ab04c82f39253ebd190ac0c975b78e40b543",
       "names": [],
       "sources": [
-        "packages/core/tools/src/index.ts:34"
+        "packages/core/tools/src/index.ts:36"
       ]
     },
     {
@@ -24005,6 +24094,11 @@
       "sources": [
         "packages/core/agent/src/types.ts:39"
       ]
+    },
+    {
+      "digest": "98646cfe708c7a6883ddcd726e1fc47119d0b30fcfdfa8d26734398c6b32b39f",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "9890113e97dd3541787bfe6704f2b223d3a890b5325ca0acae2b0398909b413e",
@@ -24743,6 +24837,13 @@
       ],
       "sources": [
         "packages/util/values/src/index.ts:4"
+      ]
+    },
+    {
+      "digest": "c5df02d85d4c122f8c1196b9d61703d5ba1147fb6cff7f3bd4aeb404f0f4deb8",
+      "names": [],
+      "sources": [
+        "packages/interaction/user-approval/src/index.ts:60"
       ]
     },
     {
