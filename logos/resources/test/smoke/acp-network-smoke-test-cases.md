@@ -89,6 +89,31 @@
 - 第 7 步 resume 后 configOptions 仍回显 `always`。
 - 全程既有 prompt/resume 行为不受影响。
 
+## SMOKE-acp-network-04：会话技能清单枚举
+
+### 目的
+
+验证 staging 部署面上，外部客户端可经 `session/skills_list` 枚举会话可见技能清单及双调用旗标，未知会话错误分支生效，且既有通道与会话行为不受影响。
+
+### 前置条件
+
+- 同 SMOKE-acp-network-01（已部署目标 commit、HMAC token、`DSH_ACP_NETWORK_SECRET` 配置）。
+- 部署组合含 `dsh-base`（默认即挂载 `@deepseek-ai/dsh-skill` 与 `@deepseek-ai/dsh-skill-filesystem`）。
+
+### 步骤
+
+1. 连接并认证，`session/new`。
+2. `session/skills_list { sessionId }`。
+3. 对部署环境已知技能目录（用户级根目录）核对清单一致性。
+4. `session/skills_list { sessionId: 'unknown-id' }` 验证错误分支。
+5. 正常 prompt 往返一次，随后再次 `session/skills_list`。
+
+### 期望结果
+
+- 第 2 步返回 `{ skills: [...] }` 数组，按名字典序排列，每项恰含 `name`、`description`、`modelInvocable`、`userInvocable`；与已知技能目录一致（部署环境无技能时合法返回空数组）。
+- 第 4 步返回 invalid params 类错误。
+- 第 5 步 prompt 正常结算，再次枚举与第 2 步一致；既有 prompt/resume 行为不受影响。
+
 ## 失败判定
 
 以下任一情况视为 smoke 失败：
@@ -99,9 +124,10 @@
 - `session/resume` 对已关闭会话失败。
 - SMOKE-acp-network-03 中：`always` 会话的工具调用未触发 `session/request_permission`，或 allow-once 后工具未执行、reject-once 后会话中断。
 - SMOKE-acp-network-03 中：未知策略值未返回错误、resume 后策略未恢复，或未配置策略的既有会话出现计划外询问。
+- SMOKE-acp-network-04 中：`skills_list` 响应结构不合法（非数组、缺字段、乱序），已知技能缺席，或未知会话未返回错误。
 
 ## 执行方式
 
 - 本地：`pnpm -F @deepseek-ai/dsh-acp-network smoke`
-  - 源码：`packages/acp/acp-network/tests/smoke/protocol-smoke.ts`（含 SMOKE-acp-network-03 审批策略往返；无 answerer 的 fail-closed 分支在单元层覆盖，不在本地 smoke 重复）。
+  - 源码：`packages/acp/acp-network/tests/smoke/protocol-smoke.ts`（含 SMOKE-acp-network-03 审批策略往返与 SMOKE-acp-network-04 技能清单枚举；无 answerer 的 fail-closed 分支在单元层覆盖，不在本地 smoke 重复）。
 - Staging：通过 `deploy/acp-network/k8s/` 部署后，在 relay 侧或独立 runner 执行（含 SMOKE-acp-network-03）。
