@@ -158,3 +158,16 @@ K8s staging manifests 位于 `deploy/acp-network/k8s/`。
 - plan-review 的 request_permission 映射依赖模型调用 `exit_plan_mode`，不在确定性冒烟范围，由单元与真实 API e2e 承载；dspm 集成验收可在真实会话中触发计划评审并复用三态映射断言。
 - 回滚方案不变（disabled route / 缩容 / 轮换 secret）；本变更零新增持久化数据，回滚无迁移；回滚后旧构建对 `session/set_mode` 返回 -32601、`modes` 字段消失（客户端按可选字段容忍）。
 - relay 侧实现不需要为 S51 增加新语义：`current_mode_update` 与评审请求均为标准 JSON-RPC 帧透传；dspm UI 侧需实现 optionId 词表（approve / keep-planning）的评审卡片。
+
+## 会话压缩入口发布（S52）
+
+- 发布物包含 `acp` 扩展方法 `session/compact` 与 capability 门控的 `compaction_update` 派发；端口暴露、Service/Ingress、NetworkPolicy、Token Secret 注入与探针均不变。
+- `acp-network` profile 经 `dsh-base` 已挂载压缩服务与命令插件，部署无需新增装配或配置；自动触发阈值等压缩策略仍为部署配置所有，本变更不新增旋钮。
+- staging 验证在既有本地流程（`pnpm -F @deepseek-ai/dsh-acp-network smoke` + `dsh --profile acp-network`）之外，增加压缩面验证：
+  1. 有效 token 连接后 `session/new`，真实模型 prompt 产历史，调用 `session/compact { sessionId }`。
+  2. 核对成功响应结构（compactionId / summarySeq / shadowedCount / shadowedTokenCount / summary）；`session/resume` 后历史已被 shadow 替换。
+  3. 压缩进行中并发第二次调用验证 `data.code: 'busy'`；对未知会话 id 验证 invalid params。
+  4. 声明 `clientCapabilities.session.compaction` 的连接核对 `compaction_update`（in_progress → completed）；未声明的连接核对零通知。
+  5. 回归既有 prompt/resume、审批策略（S49）、技能枚举（S50）、计划模式（S51）与 `/compact` 命令路径。
+- 回滚方案不变（disabled route / 缩容 / 轮换 secret）；本变更零新增持久化数据，已压缩会话旧构建可正常打开，回滚无迁移。
+- relay 侧实现不需要为 S52 增加新语义：方法与通知均为普通 JSON-RPC 帧，透传即可；dspm 客户端按其 §6 答复决定是否声明 compaction 能力（不声明即纯同步语义）。
