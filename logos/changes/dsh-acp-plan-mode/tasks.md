@@ -15,5 +15,5 @@
 - [x] 实现单切片：bridge 注册标准方法 `session/set_mode`（未知会话/未知 modeId/plan-mode 缺席/会话关闭四错误分支）；`session/new` / `session/resume` 响应广告可选 `modes`（plan/normal 二值、已提交状态、插件缺席省略）；`AcpSession.onSessionEvent` 新增 `plan/mode` → `current_mode_update` 派生推送；bridge 连接上注册 `user-questions/request` 瀑布应答者（plan-review intent → `session/request_permission` approve/keep-planning 映射、drainUpdates 排序、cancelled → ASK_CANCELLED、其余 next()）；交付 UT-S51-01..06、ST-S51-01、keyless 快照、受影响包中英文 README/JSDoc 与 `docs/upgrade-guide/<发布版本>/acp-plan-mode/` 升级指南；实现 SMOKE-acp-network-05 并接入统一 smoke dispatcher，完成 smoke 覆盖预检。
 
 ## [deploy] 部署任务
-- [ ] 按合并后的部署方案构建带 commit 标识的 dsh 发布物并部署到 staging。（人工确认点：需用户明确授权后执行）
-- [ ] 验证真实 ACP 会话模式面往返（modes 广告、set_mode 提交与 current_mode_update 时序、未知 modeId 错误、resume 恢复），并回归既有 prompt/resume、S49 审批策略与 S50 技能枚举路径，确认上一版发布物回滚路径。
+- [x] 按合并后的部署方案构建带 commit 标识的 dsh 发布物并部署到 staging。（人工确认点：用户已授权，见 logos/resources/verify/s51-deployment-report.md）
+- [x] 验证真实 ACP 会话模式面往返（modes 广告、set_mode 提交与 current_mode_update 时序、未知 modeId 错误、resume 恢复），并回归既有 prompt/resume、S49 审批策略与 S50 技能枚举路径，确认上一版发布物回滚路径。
