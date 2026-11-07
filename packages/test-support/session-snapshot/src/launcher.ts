@@ -21,6 +21,7 @@ import {
   type CancelNotification,
   type CloseSessionRequest,
   type CloseSessionResponse,
+  type ContentBlock,
   type InitializeRequest,
   type InitializeResponse,
   type ListSessionsRequest,
@@ -79,6 +80,15 @@ export interface AcpTestLaunchOptions {
   requestPermission?: (params: RequestPermissionRequest) => Promise<RequestPermissionResponse>
 }
 
+/** Statistics and summary blocks of one successful `session/compact` response. */
+export interface AcpTestCompactionResult {
+  compactionId: string
+  summarySeq: number
+  shadowedCount: number
+  shadowedTokenCount: number
+  summary: ContentBlock[]
+}
+
 /** Stable ACP methods used by the subprocess test harness. */
 export interface AcpTestClient {
   readonly closed: Promise<void>
@@ -90,6 +100,8 @@ export interface AcpTestClient {
   setSessionConfigOption: (params: SetSessionConfigOptionRequest) => Promise<SetSessionConfigOptionResponse>
   /** The standard plan-mode face; the response follows the committed-state update. */
   setSessionMode: (params: SetSessionModeRequest) => Promise<SetSessionModeResponse>
+  /** The dsh extension explicit-compaction method; execution runs on the session's engine. */
+  compact: (params: { sessionId: string }) => Promise<{ result: AcpTestCompactionResult | null }>
   prompt: (params: PromptRequest) => Promise<PromptResponse>
   cancel: (params: CancelNotification) => Promise<void>
   /** The dsh extension skill catalog; response entries carry both invocation flags. */
@@ -248,6 +260,7 @@ export function launchAcpTestAgent(options: AcpTestLaunchOptions): LaunchedAcpTe
     /* v8 ignore next -- exercised by the real-process ACP control-surface conformance e2e. */
     setSessionConfigOption: params => context.request(methods.agent.session.setConfigOption, params),
     setSessionMode: params => context.request(methods.agent.session.setMode, params),
+    compact: params => context.request('session/compact', params),
     prompt: params => context.request(methods.agent.session.prompt, params),
     cancel: params => context.notify(methods.agent.session.cancel, params),
     skillsList: params => context.request('session/skills_list', params),

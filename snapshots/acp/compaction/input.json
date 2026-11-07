@@ -1,0 +1,11 @@
+{
+  "steps": [
+    { "op": "initialize", "compactionCapability": true },
+    { "op": "newSession" },
+    { "op": "compact" },
+    { "op": "compactExpectError", "sessionId": "unknown-id" },
+    { "op": "prompt", "text": "In plain prose (no lists), explain in about 200 words how a lighthouse fresnel lens concentrates light into a horizontal beam for sailors." },
+    { "op": "prompt", "text": "Now explain in about 200 words how a tidal power station converts rising and falling water levels into electricity, covering the reservoir, the turbines, and the grid connection." },
+    { "op": "compact", "waitForTerminal": true }
+  ]
+}

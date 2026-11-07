@@ -1,0 +1,10 @@
+# Explicit-compaction overlay over the acp-default snapshot patch: automatic
+# triggering stays off so the run's only compaction is the client-called
+# `session/compact`, and the small retain budget makes a two-turn prose history
+# safely compactible on record and replay alike.
+
+- id: compaction-basic
+  name: '@deepseek-ai/dsh-compaction-basic'
+  config:
+    auto: false
+    retainTokens: 100

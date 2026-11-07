@@ -20,6 +20,12 @@
  *   `current_mode_update`, silent noop, vocabulary error branch, prompt
  *   round-trip). Rides standard methods, so it also verifies a staging
  *   target's deployed face.
+ * - SMOKE-acp-network-06: the `session/compact` face over the network
+ *   transport (structured result + ordered `compaction_update` pair on a
+ *   capability-declaring connection, mid-turn busy branch, fresh-history
+ *   `{ result: null }`, unknown-session error, undeclared-connection silence,
+ *   resume through the compacted log). Staging targets skip it — the scripted
+ *   compaction needs the local composition — and never report PASS for it.
  *
  * When namespace `dsh-acp-network-staging` is Ready and
  * `/tmp/dsh-acp-network-staging-creds.env` exists, also runs the staging
@@ -160,6 +166,7 @@ function main(): void {
       { id: 'SMOKE-acp-network-03', scenario: 'local permission round-trip' },
       { id: 'SMOKE-acp-network-04', scenario: 'local skills list enumeration' },
       { id: 'SMOKE-acp-network-05', scenario: 'local plan mode surface' },
+      { id: 'SMOKE-acp-network-06', scenario: 'local compaction face' },
     ] as const
     for (const lane of failedLanes) {
       const outcome: Parameters<typeof report>[1] = {
@@ -192,6 +199,10 @@ function main(): void {
   report('SMOKE-acp-network-05', {
     durationMs: local.durationMs,
     scenario: 'local plan mode surface',
+  })
+  report('SMOKE-acp-network-06', {
+    durationMs: local.durationMs,
+    scenario: 'local compaction face',
   })
 
   // Staging handshake is advisory here: ledger coverage for 01/02 already

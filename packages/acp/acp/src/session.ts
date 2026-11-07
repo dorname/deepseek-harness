@@ -3,6 +3,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import {
   RequestError,
+  type ContentBlock as AcpContentBlock,
   type McpServer,
   type PromptRequest,
   type PromptResponse,
@@ -12,9 +13,11 @@ import {
   type StopReason,
 } from '@agentclientprotocol/sdk'
 import type { Agent, AgentHandle, AgentOptions, ModelSelection } from '@deepseek-ai/dsh-agent'
-import { createUserMessage, errorChain, type UserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, errorChain, type ContentBlock, type UserMessage } from '@deepseek-ai/dsh-llm'
 import { type Session, type SessionEvent, type SessionId, type TurnEndReason } from '@deepseek-ai/dsh-session'
-import { AcpContentError, admitAcpPrompt } from './content.ts'
+import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
+import { AcpContentError, admitAcpPrompt, assistantBlockToAcp } from './content.ts'
+import { type AcpCompactionResponse } from './compaction.ts'
 import { turnEndToStopReason } from './codec.ts'
 import { mountAcpMcpServers } from './mcp.ts'
 import { AcpModelControl } from './model-control.ts'
@@ -37,6 +40,8 @@ interface AcpSessionBuildOptions {
   fallbackSelection: ModelSelection | undefined
   signal: AbortSignal
   notify: (notification: SessionNotification) => Promise<void>
+  /** Whether the client declared `session.compaction` at initialize. */
+  compactionUpdates: boolean
 }
 
 /** Fresh ACP session construction inputs. */
@@ -114,6 +119,7 @@ export class AcpSession {
     private readonly ctx: Context,
     handle: AgentHandle,
     modelControl: AcpModelControl,
+    private readonly compactionUpdates: boolean,
     private readonly notify: (notification: SessionNotification) => Promise<void>,
   ) {
     this.agent = handle.agent
@@ -123,6 +129,8 @@ export class AcpSession {
   }
 
   private readonly disposeAgent: () => Promise<void>
+  /** Stashed `compaction/summary` blocks by compaction id, consumed by the terminal update. */
+  private readonly compactionSummaries = new Map<string, ContentBlock[]>()
 
   /**
    * Compose a fresh Agent and all requested MCP clients before publication.
@@ -142,7 +150,7 @@ export class AcpSession {
         await mountAcpMcpServers(agentCtx, options.mcpServers, options.cwd)
       },
     })
-    return new AcpSession(ctx, handle, modelControl, options.notify)
+    return new AcpSession(ctx, handle, modelControl, options.compactionUpdates, options.notify)
   }
 
   /**
@@ -172,7 +180,7 @@ export class AcpSession {
       throw internalError('session/resume did not compose model selection')
     }
     /* v8 ignore stop */
-    return new AcpSession(ctx, handle, modelControl, options.notify)
+    return new AcpSession(ctx, handle, modelControl, options.compactionUpdates, options.notify)
   }
 
   /**
@@ -236,6 +244,45 @@ export class AcpSession {
   }
 
   /**
+   * Run one explicit compaction through the composed engine and map its result
+   * onto the extension response. The engine owns every policy: it claims an
+   * idle maintenance slot (a live turn rejects with `busy`), writes the
+   * durable `compaction/start` … `compaction/end` transaction, and queues
+   * prompts that arrive mid-compaction. A composition without a compaction
+   * engine fails loud rather than silently degrading.
+   * @param sourceCommandId - the bridge-minted initiator id recorded on the
+   *   durable `compaction/*` triple.
+   * @param signal - the JSON-RPC request cancellation signal.
+   * @returns the statistics and summary blocks, or `null` when no compactable
+   *   history exists (not an error).
+   * @throws the engine's classified failures and the service-absent internal
+   *   error; the bridge maps them onto the wire vocabulary.
+   */
+  async compact(sourceCommandId: CommandId, signal: AbortSignal): Promise<AcpCompactionResponse> {
+    this.assertActive()
+    const compaction = this.ctx.get('compaction')
+    if (compaction === undefined) {
+      throw internalError('compaction service is absent: this composition does not mount a compaction engine')
+    }
+    const result = await compaction.compactNow(this.agent, signal, sourceCommandId)
+    if (result === null) return { result: null }
+    const summary: AcpContentBlock[] = []
+    for (const block of result.summary) {
+      const converted = await assistantBlockToAcp(this.ctx, block)
+      if (converted !== undefined) summary.push(converted)
+    }
+    return {
+      result: {
+        compactionId: result.compactionId,
+        summarySeq: result.summarySeq,
+        shadowedCount: result.shadowedSeqs.length,
+        shadowedTokenCount: result.shadowedTokenCount,
+        summary,
+      },
+    }
+  }
+
+  /**
    * Apply one standard configuration option to later ACP turns. Permission
    * ids route to the permission control; the remaining ids keep the model
    * selection path. Mutations serialize in receive order, and every response
@@ -262,6 +309,70 @@ export class AcpSession {
     const result = this.configTail.then(operation)
     this.configTail = result.then(() => undefined, () => undefined)
     return result
+  }
+
+  /**
+   * Derive one UNSTABLE `compaction_update` from a committed `compaction/*`
+   * event, or stash the summary blocks for the terminal update to carry.
+   * Nothing is sent to a client that did not declare the `session.compaction`
+   * capability; `compaction/prune` never derives a notification.
+   * @param event - committed compaction lifecycle event.
+   */
+  private queueCompactionUpdate(
+    event: SessionEvent<'compaction/start'> | SessionEvent<'compaction/summary'> | SessionEvent<'compaction/end'>,
+  ): void {
+    if (!this.compactionUpdates) return
+    const sessionId = this.agent.session.id
+    let build: Promise<SessionNotification['update']>
+    if (event.type === 'compaction/summary') {
+      this.compactionSummaries.set(event.data.compactionId, event.data.summary)
+      return
+    }
+    if (event.type === 'compaction/start') {
+      build = Promise.resolve({
+        sessionUpdate: 'compaction_update',
+        compactionId: event.data.compactionId,
+        status: 'in_progress',
+      })
+    } else if (event.data.error === undefined) {
+      const summary = this.compactionSummaries.get(event.data.compactionId) ?? []
+      this.compactionSummaries.delete(event.data.compactionId)
+      build = this.convertSummaryBlocks(summary).then((blocks) => {
+        const update: SessionNotification['update'] = {
+          sessionUpdate: 'compaction_update',
+          compactionId: event.data.compactionId,
+          status: 'completed',
+        }
+        return blocks.length > 0 ? { ...update, summary: blocks } : update
+      })
+    } else {
+      const error = event.data.error
+      this.compactionSummaries.delete(event.data.compactionId)
+      build = Promise.resolve({
+        sessionUpdate: 'compaction_update',
+        compactionId: event.data.compactionId,
+        status: 'failed',
+        ...error.length > 0 ? { error } : {},
+      })
+    }
+    const previous = this.outputTail
+    this.outputTail = previous
+      .then(async () => this.notify({ sessionId, update: await build }))
+      /* v8 ignore start -- the bridge notifier contains transport failure; summary conversion is contained. */
+      .catch((error: unknown) => {
+        this.ctx.logger.warn(`acp: compaction update delivery failed: ${errorChain(error)}`)
+      })
+    /* v8 ignore stop */
+  }
+
+  /** Translate stashed summary blocks onto the wire, dropping non-output blocks. */
+  private async convertSummaryBlocks(blocks: readonly ContentBlock[]): Promise<AcpContentBlock[]> {
+    const converted: AcpContentBlock[] = []
+    for (const block of blocks) {
+      const wire = await assistantBlockToAcp(this.ctx, block)
+      if (wire !== undefined) converted.push(wire)
+    }
+    return converted
   }
 
   /** Merge the model and permission option states, model options first. */
@@ -454,6 +565,12 @@ export class AcpSession {
             this.ctx.logger.warn(`acp: mode update delivery failed: ${errorChain(error)}`)
           })
         /* v8 ignore stop */
+      } else if (
+        event.type === 'compaction/start'
+        || event.type === 'compaction/summary'
+        || event.type === 'compaction/end'
+      ) {
+        this.queueCompactionUpdate(event)
       }
     } finally {
       const inflight = this.inflight
@@ -533,6 +650,7 @@ export class AcpSession {
         failures.push(error)
       }
       this.pendingSelections.clear()
+      this.compactionSummaries.clear()
       if (failures.length === 1) throw failures[0]
       /* v8 ignore start -- independent teardown failures can aggregate only under multiple simultaneous provider faults. */
       if (failures.length > 1) {

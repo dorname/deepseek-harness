@@ -1,0 +1,47 @@
+# Keyless replay for the compaction scenario: the adapter swaps to the recorded
+# script replay, and the explicit-compaction overlay rides along so the only
+# compaction is the client-called `session/compact`. The replay catalog
+# materializes the same adapter defaults the live adapter resolved (256k
+# max tokens, max reasoning effort) so the rebuilt request headers match the
+# recorded pin.
+
+- id: llm-deepseek
+  name: '@deepseek-ai/dsh-llm-deepseek-api-key'
+  disabled: true
+
+- id: compaction-basic
+  name: '@deepseek-ai/dsh-compaction-basic'
+  config:
+    auto: false
+    retainTokens: 100
+
+- insert:
+    - id: llm-replay
+      name: '@deepseek-ai/dsh-llm-replay'
+      config:
+        providers:
+          - id: deepseek-official
+            name: DeepSeek
+            models:
+              # The catalog mirrors the live adapter's: the same three models
+              # keep the advertised config options identical, and the context
+              # window plus adapter defaults keep the usage updates and rebuilt
+              # request headers identical.
+              - id: deepseek-v4-flash
+                inputModalities: [text]
+                contextWindow: 1000000
+                defaultMaxTokens: 256000
+                reasoningEfforts: [off, low, high, max]
+                defaultReasoningEffort: max
+              - id: deepseek-v4-pro
+                inputModalities: [text]
+                contextWindow: 1000000
+                defaultMaxTokens: 256000
+                reasoningEfforts: [off, low, high, max]
+                defaultReasoningEffort: max
+              - id: deepseek-v4-flash-vision-exp
+                inputModalities: [text, image]
+                contextWindow: 1000000
+                defaultMaxTokens: 256000
+                reasoningEfforts: [off, low, high, max]
+                defaultReasoningEffort: max

@@ -32,6 +32,14 @@ export {
 } from './bridge.ts'
 export { AcpModelConfigError, AcpModelControl } from './model-control.ts'
 export {
+  COMPACTION_METHOD,
+  parseCompactionRequest,
+  sessionCompactWireError,
+  type AcpCompactionRequest,
+  type AcpCompactionResponse,
+  type AcpCompactionResult,
+} from './compaction.ts'
+export {
   applySessionMode,
   NORMAL_MODE_ID,
   parseSessionModeId,

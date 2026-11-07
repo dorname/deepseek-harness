@@ -45,6 +45,7 @@ import {
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SendRequestOptions,
+  type SessionUpdate,
 } from '@agentclientprotocol/sdk'
 import { createWebSocketStream } from '@agentclientprotocol/sdk/experimental/ws-client'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
@@ -62,6 +63,7 @@ import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import * as SkillFileSystem from '@deepseek-ai/dsh-skill-filesystem'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
+import BasicCompactionEngine from '@deepseek-ai/dsh-compaction-basic'
 import PlanModeController from '@deepseek-ai/dsh-plan-mode'
 import ApprovalService from '@deepseek-ai/dsh-user-approval'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
@@ -79,6 +81,9 @@ const PHASE_CWD = process.env.ACP_SMOKE_CWD ?? '/dsh-home/acp-smoke'
 const SESSION_FILE = process.env.ACP_SMOKE_SESSION_FILE
 const RESUME_SESSION_ID = process.env.ACP_SMOKE_SESSION_ID
 
+/** One scripted entry: plain chunks, or chunks held back for `waitMs` first. */
+type ScriptedEntry = StreamChunk[] | { waitMs: number; chunks: StreamChunk[] }
+
 class SmokeAdapter extends LlmAdapter {
   constructor(
     private readonly responses: Map<string, StreamChunk[]>,
@@ -86,7 +91,7 @@ class SmokeAdapter extends LlmAdapter {
      * Per-key FIFO of full responses consumed ahead of the static map, so one
      * key can drive a multi-step turn (tool call, tool call, final text).
      */
-    private readonly scripted: Map<string, StreamChunk[][]> = new Map(),
+    private readonly scripted: Map<string, ScriptedEntry[]> = new Map(),
     private readonly provider = 'mock-smoke',
   ) {
     super()
@@ -124,7 +129,15 @@ class SmokeAdapter extends LlmAdapter {
     const queued = this.scripted.get(key)?.shift()
     const entry = queued ?? this.responses.get(key)
     if (entry === undefined) throw new Error(`SmokeAdapter: no script for "${key}"`)
-    for (const chunk of entry) {
+    if (!Array.isArray(entry)) {
+      // Hold the response back so the turn stays active for a wide busy window.
+      const deadline = Date.now() + entry.waitMs
+      while (Date.now() < deadline) {
+        if (options.signal?.aborted) throw new Error('aborted')
+        await new Promise(resolve => setTimeout(resolve, 20))
+      }
+    }
+    for (const chunk of Array.isArray(entry) ? entry : entry.chunks) {
       if (options.signal?.aborted) throw new Error('aborted')
       yield chunk
     }
@@ -150,6 +163,23 @@ function toolCallResponse(name: string, callId: string): StreamChunk[] {
   ]
 }
 
+/**
+ * The SMOKE-06 compaction prompts. Long enough that the framed checkpoint
+ * stays below the shadowed span's route price — the shrink invariant rejects
+ * a summary that would not lower pressure, so the history must comfortably
+ * exceed the fixed framing's own estimate (~90 tokens).
+ */
+const CONDENSE_PROMPT_A = [
+  'In plain prose (no lists), write about 150 words on how a lighthouse fresnel lens concentrates light into a horizontal beam.',
+  'For context the summary should preserve: the lens replaced arrays of silvered mirrors, cut reflection losses, and let one optical design serve stations across a wide range of nominal ranges.'.repeat(2),
+  'Also note for the summary that coastal stations standardized on several lens orders, and that the rotating apparatus was originally driven by clockwork weights wound by hand every night.',
+].join(' ')
+const CONDENSE_PROMPT_B = [
+  'In plain prose (no lists), write about 150 words on how a tidal power station converts rising and falling water levels into electricity.',
+  'For context the summary should preserve: a barrage across an estuary impounds a basin, sluice gates fill it at high tide, and the head difference drives low-head turbines on the ebb.'.repeat(2),
+  'Also note for the summary that output tracks the lunar cycle, that tidal-stream arrays are the newer in-water alternative, and that the plant connects to the grid through a substation.',
+].join(' ')
+
 interface SmokeClient {
   initialize: (params: { protocolVersion: number }) => Promise<unknown>
   authenticate: (params: { methodId: string; _meta: { token: string } }) => Promise<unknown>
@@ -162,19 +192,33 @@ interface SmokeClient {
     modes?: { currentModeId: string }
   }>
   closeSession: (params: { sessionId: string }) => Promise<unknown>
+  cancel: (params: { sessionId: string }) => Promise<void>
   setSessionConfigOption: (params: { sessionId: string; configId: string; value: string }) => Promise<unknown>
   setSessionMode: (params: { sessionId: string; modeId: string }) => Promise<unknown>
   skillsList: (params: { sessionId: string } | Record<string, never>) => Promise<{
     skills: { name: string; description: string; modelInvocable: boolean; userInvocable: boolean }[]
   }>
   prompt: (params: PromptRequest, options?: SendRequestOptions) => Promise<PromptResponse>
-  /** Session updates in receive order, for the plan-mode update assertions. */
-  updates: { sessionUpdate: string; currentModeId?: string }[]
+  /** The dsh extension explicit-compaction method; execution runs on the session's engine. */
+  compact: (params: { sessionId: string }) => Promise<{
+    result: {
+      compactionId: string
+      summarySeq: number
+      shadowedCount: number
+      shadowedTokenCount: number
+      summary: { type: string }[]
+    } | null
+  }>
+  /** Session updates in receive order, for the plan-mode and compaction assertions. */
+  updates: SessionUpdate[]
 }
 
 async function makeClient(
   url: string,
-  options: { answerPermission?: (request: RequestPermissionRequest) => Promise<RequestPermissionResponse> } = {},
+  options: {
+    answerPermission?: (request: RequestPermissionRequest) => Promise<RequestPermissionResponse>
+    declareCompaction?: boolean
+  } = {},
 ): Promise<{ client: SmokeClient; dispose: () => Promise<void> }> {
   const token = AcpNetworkPlugin.signHmacToken(SECRET, SUBJECT, AUDIENCE)
   const updates: SmokeClient['updates'] = []
@@ -196,14 +240,19 @@ async function makeClient(
     listSessions: params => agent.request(methods.agent.session.list, params),
     resumeSession: params => agent.request(methods.agent.session.resume, params),
     closeSession: params => agent.request(methods.agent.session.close, params),
+    cancel: params => agent.notify(methods.agent.session.cancel, params),
     setSessionConfigOption: params => agent.request(methods.agent.session.setConfigOption, params),
     setSessionMode: params => agent.request(methods.agent.session.setMode, params),
     skillsList: params => agent.request('session/skills_list', params),
     prompt: (params, options) => agent.request(methods.agent.session.prompt, params, options),
+    compact: params => agent.request('session/compact', params),
     updates,
   }
 
-  await client.initialize({ protocolVersion: PROTOCOL_VERSION })
+  const initializeParams: { protocolVersion: number; clientCapabilities?: { session: { compaction: Record<string, never> } } }
+    = { protocolVersion: PROTOCOL_VERSION }
+  if (options.declareCompaction === true) initializeParams.clientCapabilities = { session: { compaction: {} } }
+  await client.initialize(initializeParams)
   await client.authenticate({ methodId: 'bearer', _meta: { token } })
 
   return {
@@ -308,8 +357,15 @@ async function startLocalServer(): Promise<{
     ['hello', textResponse('hello from smoke')],
     ['resume', textResponse('resumed successfully')],
   ])
-  const scripted = new Map<string, StreamChunk[][]>([
+  const scripted = new Map<string, ScriptedEntry[]>([
     ['probe', [toolCallResponse('smoke_probe', 'call-allow'), toolCallResponse('smoke_probe', 'call-reject'), textResponse('second call was denied, stopping')]],
+    // SMOKE-06 keys. The compaction summarizer reuses the conversation's last
+    // user text as its adapter key, so each key queues its turn response and
+    // then the summary response; the busy key holds its final text back to
+    // keep the agent active while the race lands.
+    [CONDENSE_PROMPT_A, [textResponse('history worth condensing'), textResponse('## Checkpoint\n\nThe lens question was fully answered.')]],
+    [CONDENSE_PROMPT_B, [textResponse('undeclared history worth condensing'), textResponse('## Checkpoint\n\nThe tidal question was fully answered.')]],
+    ['busy probe', [{ waitMs: 200, chunks: toolCallResponse('smoke_probe', 'call-busy') }, { waitMs: 1500, chunks: textResponse('probe finished') }]],
   ])
   const executed: string[] = []
   const adapter = new SmokeAdapter(responses, scripted)
@@ -318,6 +374,9 @@ async function startLocalServer(): Promise<{
   await mountAgentLoopTestDependencies(ctx, { systemPrompt: { personaPrefix: '' } })
   await ctx.plugin(JsonlSessionPersistence, { root: persistenceRoot, compression: 'none' })
   await ctx.plugin(TokenMeter)
+  // Explicit-only compaction for SMOKE-06: the zero retain budget keeps even a
+  // one-turn scripted history compactible.
+  await ctx.plugin(BasicCompactionEngine, { auto: false, retainTokens: 0 })
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(ApprovalService)
   await ctx.plugin(PlanModeController, { section: 'Smoke plan guidance: plan before acting.' })
@@ -547,7 +606,7 @@ async function runSmoke04(url: string, persistenceRoot: string): Promise<void> {
  */
 async function runSmoke05(url: string, persistenceRoot: string): Promise<void> {
   const modeIds = (client: SmokeClient): string[] =>
-    client.updates.filter(update => update.sessionUpdate === 'current_mode_update')
+    client.updates.filter((update): update is Extract<SessionUpdate, { sessionUpdate: 'current_mode_update' }> => update.sessionUpdate === 'current_mode_update')
       .map(update => update.currentModeId ?? '<missing>')
 
   const { client, dispose } = await makeClient(url)
@@ -633,6 +692,139 @@ async function runSmoke05(url: string, persistenceRoot: string): Promise<void> {
     console.log('SMOKE-05 closeSession: ok')
   } finally {
     await dispose2()
+  }
+}
+
+/** Poll a predicate until it holds, or fail the label after the timeout. */
+async function waitForCondition(label: string, probe: () => boolean, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (!probe()) {
+    if (Date.now() > deadline) throw new Error(`${label}: timed out`)
+    await new Promise(resolve => setTimeout(resolve, 25))
+  }
+}
+
+/** Reject with the recorded wire error, or fail when the call resolves. */
+async function expectWireError<T>(label: string, call: PromiseLike<T>): Promise<{ message: string; data?: unknown }> {
+  return await call.then(
+    () => { throw new Error(`${label}: the wire call resolved instead of failing`) },
+    (error: unknown) => {
+      if (error instanceof Error) return { message: error.message, data: (error as { data?: unknown }).data }
+      throw new Error(`${label}: non-error rejection ${String(error)}`)
+    },
+  )
+}
+
+/**
+ * SMOKE-acp-network-06: the `session/compact` face on the network transport.
+ * A capability-declaring client compacts a one-turn scripted history and
+ * receives the ordered `compaction_update` pair, a mid-turn race classifies
+ * busy, fresh history and unknown sessions hit their wire branches, an
+ * undeclared connection stays silent through the same lifecycle, and the
+ * compacted session resumes and keeps serving turns. Needs the local smoke
+ * composition (compaction engine over the scripted adapter).
+ */
+async function runSmoke06(url: string, persistenceRoot: string): Promise<void> {
+  const compactionUpdates = (client: SmokeClient): Extract<SessionUpdate, { sessionUpdate: 'compaction_update' }>[] =>
+    client.updates.filter((update): update is Extract<SessionUpdate, { sessionUpdate: 'compaction_update' }> => update.sessionUpdate === 'compaction_update')
+
+  const { client, dispose } = await makeClient(url, { declareCompaction: true })
+  try {
+    // Declared connection: one compactible turn, then the structured result
+    // and the ordered in_progress → completed notification pair.
+    const created = await client.newSession({ cwd: persistenceRoot, mcpServers: [] })
+    assertStopReason('SMOKE-06', await client.prompt({
+      sessionId: created.sessionId,
+      prompt: [{ type: 'text', text: CONDENSE_PROMPT_A }],
+    }))
+    const response = await client.compact({ sessionId: created.sessionId })
+    if (response.result === null) throw new Error('SMOKE-06: compact returned null for known history')
+    const { compactionId, summarySeq, shadowedCount, shadowedTokenCount, summary } = response.result
+    if (typeof compactionId !== 'string' || compactionId.length === 0) throw new Error('SMOKE-06: bad compactionId')
+    if (typeof summarySeq !== 'number') throw new Error('SMOKE-06: bad summarySeq')
+    if (!(shadowedCount >= 1)) throw new Error(`SMOKE-06: bad shadowedCount ${String(shadowedCount)}`)
+    if (!(shadowedTokenCount >= 1)) throw new Error(`SMOKE-06: bad shadowedTokenCount ${String(shadowedTokenCount)}`)
+    if (summary.length === 0 || summary[0]?.type !== 'text') throw new Error('SMOKE-06: bad summary blocks')
+    await waitForCondition('SMOKE-06 compaction updates', () => compactionUpdates(client).length >= 2)
+    const [inProgress, completed] = compactionUpdates(client)
+    if (inProgress?.status !== 'in_progress' || inProgress.compactionId !== compactionId) {
+      throw new Error(`SMOKE-06: first update ${JSON.stringify(inProgress)} instead of in_progress`)
+    }
+    if (completed?.status !== 'completed' || completed.compactionId !== compactionId) {
+      throw new Error(`SMOKE-06: second update ${JSON.stringify(completed)} instead of completed`)
+    }
+    if ((completed.summary?.length ?? 0) === 0) throw new Error('SMOKE-06: completed update carries no summary blocks')
+    console.log(`SMOKE-06 compact + notifications: ok (shadowed ${String(shadowedCount)} nodes, ${String(shadowedTokenCount)} tokens)`)
+
+    // Resume after reconnect reconstructs through the compaction-bearing log.
+    await client.closeSession({ sessionId: created.sessionId })
+    const { client: resumed, dispose: disposeResumed } = await makeClient(url, { declareCompaction: true })
+    try {
+      await resumed.resumeSession({ sessionId: created.sessionId, cwd: persistenceRoot, mcpServers: [] })
+      assertStopReason('SMOKE-06 resume', await resumed.prompt({
+        sessionId: created.sessionId,
+        prompt: [{ type: 'text', text: 'resume' }],
+      }))
+      if (compactionUpdates(resumed).length !== 0) {
+        throw new Error('SMOKE-06: resume emitted compaction updates')
+      }
+      console.log('SMOKE-06 resume through compacted log: ok')
+    } finally {
+      await disposeResumed()
+    }
+
+    // Mid-turn race: while the scripted turn holds its final segment back, the
+    // agent is active and the compaction classifies busy. The tool-call card
+    // proves the turn is mid-flight before the race fires.
+    const busy = await client.newSession({ cwd: persistenceRoot, mcpServers: [] })
+    await client.setSessionConfigOption({ sessionId: busy.sessionId, configId: 'permission_policy', value: 'never' })
+    const longTurn = client.prompt({ sessionId: busy.sessionId, prompt: [{ type: 'text', text: 'busy probe' }] })
+    await waitForCondition('SMOKE-06 mid-turn anchor', () => client.updates.some(update => update.sessionUpdate === 'tool_call_update'))
+    const busyError = await expectWireError('SMOKE-06 race', client.compact({ sessionId: busy.sessionId }))
+    if (!busyError.message.includes('Compaction is unavailable') || JSON.stringify(busyError.data ?? {}) !== JSON.stringify({ code: 'busy' })) {
+      throw new Error(`SMOKE-06: wrong busy error: ${busyError.message} ${JSON.stringify(busyError.data ?? {})}`)
+    }
+    await client.cancel({ sessionId: busy.sessionId })
+    if ((await longTurn).stopReason !== 'cancelled') {
+      throw new Error('SMOKE-06: the raced turn did not cancel cleanly')
+    }
+    console.log('SMOKE-06 busy branch: ok')
+
+    // Fresh history and unknown sessions hit their wire branches.
+    const fresh = await client.newSession({ cwd: persistenceRoot, mcpServers: [] })
+    const freshResult = await client.compact({ sessionId: fresh.sessionId })
+    if (freshResult.result !== null) throw new Error('SMOKE-06: fresh-history compact did not return null')
+    if (compactionUpdates(client).length !== 2) throw new Error('SMOKE-06: the null compaction emitted updates')
+    console.log('SMOKE-06 fresh null without events: ok')
+    const unknownError = await expectWireError('SMOKE-06 unknown', client.compact({ sessionId: 'unknown-id' }))
+    if (!unknownError.message.includes('unknown session: unknown-id')) {
+      throw new Error(`SMOKE-06: wrong unknown-session error: ${unknownError.message}`)
+    }
+    console.log('SMOKE-06 unknown session: ok')
+
+    await client.closeSession({ sessionId: busy.sessionId })
+    await client.closeSession({ sessionId: fresh.sessionId })
+  } finally {
+    await dispose()
+  }
+
+  // Undeclared connection: the identical lifecycle delivers zero updates.
+  const { client: quiet, dispose: disposeQuiet } = await makeClient(url)
+  try {
+    const quietSession = await quiet.newSession({ cwd: persistenceRoot, mcpServers: [] })
+    assertStopReason('SMOKE-06 undeclared', await quiet.prompt({
+      sessionId: quietSession.sessionId,
+      prompt: [{ type: 'text', text: CONDENSE_PROMPT_B }],
+    }))
+    const quietResult = await quiet.compact({ sessionId: quietSession.sessionId })
+    if (quietResult.result === null) throw new Error('SMOKE-06: the undeclared compaction returned null')
+    if (compactionUpdates(quiet).length !== 0) {
+      throw new Error('SMOKE-06: the undeclared connection received compaction updates')
+    }
+    await quiet.closeSession({ sessionId: quietSession.sessionId })
+    console.log('SMOKE-06 undeclared silence: ok')
+  } finally {
+    await disposeQuiet()
   }
 }
 
@@ -772,6 +964,15 @@ async function main(): Promise<void> {
     // mapping is not part of the smoke: it depends on model behavior and
     // stays on the unit and real-API lanes.
     await runSmoke05(url, persistenceRoot)
+
+    // SMOKE-06 needs the local composition (compaction engine over the
+    // scripted adapter); a staging target or the handshake-only mode cannot
+    // reproduce it, and that is reported as a skip rather than a pass.
+    if (STAGING_URL || NO_PROMPT) {
+      console.log('\nSMOKE-06 skipped: the compaction face needs the local smoke composition.')
+    } else {
+      await runSmoke06(url, persistenceRoot)
+    }
 
     console.log('\nAll ACP-over-network smoke checks passed.')
     reportResult('ST-S01', 'pass')

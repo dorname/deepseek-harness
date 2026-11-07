@@ -20,9 +20,20 @@ import {
 } from '@agentclientprotocol/sdk'
 import AttachmentStore, { AttachmentError, AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentLimits, ImageAttachmentRef, SaveImageAttachment, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
-import { type GenerateOptions, LlmAdapter, ReasoningEffortId, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import { type ContentBlock, type GenerateOptions, LlmAdapter, ReasoningEffortId, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { type CommandId } from '@deepseek-ai/dsh-commands/brand'
+import {
+  CompactionEngine,
+  CompactionId,
+  ManualCompactionError,
+  type CompactionResult,
+  type ManualCompactAgentContext,
+  type ManualCompactionErrorCode,
+} from '@deepseek-ai/dsh-compaction'
+import BasicCompactionEngine from '@deepseek-ai/dsh-compaction-basic'
+import { type Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import { PermissionPresetService } from '@deepseek-ai/dsh-permission-presets'
 import PlanModeController from '@deepseek-ai/dsh-plan-mode'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
@@ -31,7 +42,7 @@ import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import * as AcpPlugin from '../src/index.ts'
-import type { AcpPluginConfig } from '../src/index.ts'
+import type { AcpCompactionResponse, AcpPluginConfig } from '../src/index.ts'
 
 /** Scripted adapter for protocol tests. */
 class MockAdapter extends LlmAdapter {
@@ -154,6 +165,113 @@ class MemoryAttachmentStore extends AttachmentStore {
   }
 }
 
+/** One scripted `compactNow` outcome served in call order. */
+export type ScriptedCompactionOutcome =
+  | { kind: 'result'; result: CompactionResult | null }
+  | { kind: 'error'; code: ManualCompactionErrorCode }
+  | { kind: 'unexpected' }
+  /** Wait for the request signal to abort, then fail with a plain error — models a mid-run abort. */
+  | { kind: 'hang' }
+  /** Append the durable `compaction/*` triple, then succeed — or fail with `error`. */
+  | { kind: 'lifecycle'; summary: ContentBlock[]; error?: string }
+
+/** Result observation recorded per scripted `compactNow` call. */
+export interface ScriptedCompactionCall {
+  agent: ManualCompactAgentContext
+  signal: AbortSignal
+  sourceCommandId: CommandId | undefined
+}
+
+/**
+ * Compaction double serving prearranged `compactNow` outcomes in call order.
+ * Lifecycle outcomes append real durable `compaction/*` events so the bridge's
+ * notification derivation runs against committed log entries.
+ */
+export class ScriptedCompactionEngine extends CompactionEngine {
+  readonly calls: ScriptedCompactionCall[] = []
+  private readonly pending: ScriptedCompactionOutcome[]
+
+  constructor(ctx: Context, outcomes: readonly ScriptedCompactionOutcome[]) {
+    super(ctx)
+    this.pending = [...outcomes]
+  }
+
+  override async compactIfNeeded(): Promise<CompactionResult | null> {
+    throw new Error('scripted compaction engine never runs automatic compaction')
+  }
+
+  override async compactNow(
+    agent: ManualCompactAgentContext,
+    signal: AbortSignal,
+    sourceCommandId?: CommandId,
+  ): Promise<CompactionResult | null> {
+    this.calls.push({ agent, signal, sourceCommandId })
+    const outcome = this.pending.shift()
+    if (outcome === undefined) throw new Error('scripted compaction engine exhausted')
+    switch (outcome.kind) {
+      case 'result': return outcome.result
+      case 'error': throw new ManualCompactionError(outcome.code, 'scripted compaction failure')
+      case 'unexpected': throw new TypeError('scripted unexpected compaction failure')
+      case 'hang':
+        await new Promise<void>((_resolve, reject) => {
+          const fail = (): void => { reject(new Error('scripted compaction aborted')) }
+          signal.addEventListener('abort', fail, { once: true })
+          if (signal.aborted) fail()
+        })
+        return null
+      case 'lifecycle': return this.appendLifecycle(agent, sourceCommandId, outcome)
+    }
+  }
+
+  override async compactRegion(): Promise<CompactionResult> {
+    throw new Error('scripted compaction engine never compacts a region')
+  }
+
+  /** Append one `compaction/start` … `compaction/end` transaction onto the live session. */
+  private appendLifecycle(
+    agent: ManualCompactAgentContext,
+    sourceCommandId: CommandId | undefined,
+    outcome: Extract<ScriptedCompactionOutcome, { kind: 'lifecycle' }>,
+  ): CompactionResult | null {
+    const session: Session = agent.session
+    const compactionId = CompactionId(`scripted-${this.calls.length}`)
+    const source = sourceCommandId === undefined ? {} : { sourceCommandId }
+    const start = session.append('compaction/start', { compactionId, ...source, turn: null })
+    const shadowedSeqs = [SessionSeq(1), SessionSeq(2)]
+    session.append('compaction/summary', {
+      compactionId,
+      ...source,
+      summary: outcome.summary,
+      shadowedRange: { start: shadowedSeqs[0]!, end: shadowedSeqs[1]! },
+      shadowedSeqs,
+      shadowedTokenCount: 42,
+      provider: 'mock',
+      model: 'mock',
+      rawOutput: outcome.summary,
+    })
+    const end = session.append('compaction/end', {
+      compactionId,
+      ...source,
+      turn: null,
+      ...outcome.error === undefined ? {} : { error: outcome.error },
+    })
+    if (outcome.error !== undefined) {
+      throw new ManualCompactionError('summary', 'scripted compaction failure')
+    }
+    return {
+      compactionId,
+      ...sourceCommandId === undefined ? {} : { sourceCommandId },
+      startSeq: start.seq,
+      summarySeq: SessionSeq(end.seq - 1),
+      endSeq: end.seq,
+      summary: outcome.summary,
+      shadowedRange: { start: shadowedSeqs[0]!, end: shadowedSeqs[1]! },
+      shadowedSeqs,
+      shadowedTokenCount: 42,
+    }
+  }
+}
+
 /** Scripted text response ending in a clean stop. */
 export function textResponse(text: string): StreamChunk[] {
   return [
@@ -198,6 +316,8 @@ interface BridgeClient {
   setSessionMode: NonNullable<AcpAgent['setSessionMode']>
   prompt: (params: PromptRequest, options?: SendRequestOptions) => Promise<PromptResponse>
   cancel: NonNullable<AcpAgent['cancel']>
+  /** The dsh extension compaction request (ACP 1.4.0 UNSTABLE has no compact method). */
+  compact: (params: { sessionId: string }, options?: SendRequestOptions) => Promise<AcpCompactionResponse>
   /**
    * The dsh extension skill catalog under test (ACP 1.4.0 has no skill method).
    * `Record<string, never>` admits the empty malformed probe for wire parser
@@ -249,6 +369,10 @@ export async function makeBridgeHarness(options: {
   planMode?: boolean
   /** Compose the real user-questions service (the plan-review answerer stays the bridge's). */
   userQuestions?: boolean
+  /** Mount the real basic compaction engine (automatic triggering off), or a scripted double. */
+  compaction?: 'basic' | 'stub'
+  /** Outcomes served by the stub engine in `compactNow` call order (stub only). */
+  compactionOutcomes?: readonly ScriptedCompactionOutcome[]
 } = {}): Promise<BridgeHarness> {
   const adapter = new MockAdapter(options.script ?? [], options.imageCapable === true)
   const ctx = new Context()
@@ -266,6 +390,8 @@ export async function makeBridgeHarness(options: {
     await ctx.plugin(PlanModeController, { section: 'Test plan guidance: plan before acting.' })
   }
   if (options.userQuestions === true) await ctx.plugin(UserQuestionService)
+  if (options.compaction === 'basic') await ctx.plugin(BasicCompactionEngine, { auto: false })
+  if (options.compaction === 'stub') new ScriptedCompactionEngine(ctx, options.compactionOutcomes ?? [])
   if (options.presets === true) {
     ctx.provide('shell', {
       sandboxMode: 'workspace-write',
@@ -351,6 +477,7 @@ export async function makeBridgeHarness(options: {
     setSessionMode: params => client.request(methods.agent.session.setMode, params),
     prompt: (params, options) => client.request(methods.agent.session.prompt, params, options),
     cancel: params => client.notify(methods.agent.session.cancel, params),
+    compact: (params, options) => client.request('session/compact', params, options),
     skillsList: params => client.request('session/skills_list', params),
   }
   return harness

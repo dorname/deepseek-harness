@@ -70,6 +70,7 @@ kind: "package-reference"
 | `session/set_config_option` | 串行更新公布的 `model`、`reasoning_effort`、`permission_policy` 或 `permission_preset`，按实时目录与部署预设表校验，并返回完整结果状态。 |
 | `session/set_mode` | 按公布的 `plan`／`normal` 词汇校验并应用一次计划模式选择；派生的 `current_mode_update` 是唯一生效事实。 |
 | `session/skills_list` | dsh 扩展方法（ACP 1.4.0 未定义技能界面）：会话的技能目录，按名字典序排列，每项恰含 `name`、`description` 与解析后的 `modelInvocable`／`userInvocable` 双旗标。 |
+| `session/compact` | dsh 扩展方法（ACP 1.4.0 未定义压缩请求）：显式手动压缩，返回引擎的持久结果——`compactionId`、`summarySeq`、带节点数与 token 数的遮蔽区间以及摘要块——历史过短时返回 `null`；会话有活跃工作时以 `busy` 失败。 |
 | `session/prompt` | 有序文本、资源链接与受支持图片，每个会话一次一个提示词；Agent 空闲且有序更新交付后才结算。 |
 | `session/cancel` / `$/cancel_request` | 提示词所拥有的取消路径；没有进行中的 ACP 提示词时取消自主工作，未知会话 id 则为空操作。 |
 | `session/update` | 已提交 assistant 消息与 thought、通用工具生命周期、配置变化、模式变化与上下文用量，按会话串行交付。 |
@@ -78,6 +79,8 @@ kind: "package-reference"
 会话配置从实时 LLM（大语言模型）服务目录提供不透明的提供方／模型选项，在确切模型声明推理选项时提供 `reasoning_effort`，并在审批与权限预设服务已组合时提供 `permission_policy` 单选（`ask`、`never`、`always`；`always` 对该会话的每次工具调用执行前询问，且跨 resume 保留）与部署预设目录上的 `permission_preset` 单选。未知值、以及缺少后端服务时的变更，都以 `Invalid params` 显式失败并给出可接受词汇。选项跟随实时目录：被移除的当前模型仍作为 `currentValue` 报告，但不会重新插入选项列表；`session/set_config_option` 拒绝未列出的值；目录发现失败会向客户端传播，而不是回退到过期选项。提示词会在异步图片准入前快照该选择，并在该轮次的每个模型步骤中固定它；并发选项变更从下一轮次开始生效。ACP 客户端是受信控制器：stdio MCP 条目授权其绝对命令与环境，HTTP 条目授权其绝对 HTTP(S) URL 与 header；初始连接或发现失败会回滚尚未发布的 Agent。不支持的界面会被省略或拒绝：`session/load`、删除、fork、附加目录、SSE（Server-Sent Events）或 ACP 传输 MCP、命令、计划、终端、客户端文件系统操作与 elicitation。
 
 `session/skills_list` 是对目标会话的只读目录读取：先解析预设挂载的作用域技能注册表，再回退宿主组合的全局注册表，返回该会话工作区的合并目录，且不施加调用面过滤——双旗标随报文下发，由各客户端自行施加调用策略。未知会话 id 以 `Invalid params` 失败；既未挂载预设技能注册表也未挂载全局技能服务的组合以 internal error 失败并说明缺口。该调用不追加会话事件，重复调用结果一致；技能体不经 ACP 加载，目录也不推送——客户端重拉以观察变化。
+
+`session/compact` 与 `session/update` 的 `compaction_update` 变体把已组合的压缩引擎呈现为显式 dsh 扩展——ACP 1.4.0 两者皆未定义——通过 `initialize` 时声明的 `session.compaction` 客户端能力协商。已声明的连接会收到有序的一对通知——`in_progress`，随后是携带摘要块的 `completed` 或 `failed`——由持久 `compaction/*` 事件派生，且先于响应写入排队；未声明的连接以完全相同的方式执行，但收不到任何压缩更新。响应报告引擎的持久结果，历史不可压缩时为 `null`。会话有活跃工作时调用以携带 `data.code: "busy"` 的 internal error 失败；未知会话 id 以 `Invalid params` 失败；未组合引擎的组合以 internal error 失败并说明缺口。该调用走与自动压缩相同的持久引擎路径，其摘要只经会话日志进入后续轮次。
 
 `session/set_mode` 与可选的 `modes` 广告把已组合的计划模式控制器呈现在标准界面上。仅当会话组合挂载了 `@deepseek-ai/dsh-plan-mode` 时，`session/new` 与 `session/resume` 才报告 `modes`——`currentModeId` 加上带名称的 `plan`／`normal` 词汇；否则响应整体省略该字段。`session/set_mode` 按该词汇校验 id 并应用；响应不承诺生效——由持久 `plan/mode` 事件派生的 `current_mode_update` 通知是唯一生效事实，且先于响应写入排队。提交时机遵循控制器：轮次间的选择立即提交；轮次中的选择排队到下一次被接受的轮内 pre-step 才提交；重复选择已提交状态会清除反向 pending，但不追加事件。未知 id 以 `Invalid params` 失败并给出词汇；未组合插件的组合以 internal error 失败。计划评审——携带 plan-review intent 的 `exit_plan_mode` 提问——经 `session/request_permission` 通道下发，选项 id 为 `approve`／`keep-planning`；取消结果映射回工具的评审被关闭分支。
 
@@ -112,6 +115,7 @@ kind: "package-reference"
 | [`src/permission-control.ts`](src/permission-control.ts) | `AcpPermissionControl`：`permission_policy`／`permission_preset` 的公布、校验与应用 |
 | [`src/skill-list.ts`](src/skill-list.ts) | `session/skills_list` 扩展方法：参数校验、注册表解析、invocation-neutral 字段映射 |
 | [`src/plan-mode.ts`](src/plan-mode.ts) | 计划模式面（S51）：模式词汇校验、`modes` 广告读取、评审到权限通道的映射 |
+| [`src/compaction.ts`](src/compaction.ts) | `session/compact` 面（S52）：能力门控、参数校验、引擎解析、持久结果映射与 `compaction_update` 队列 |
 
 ### 准入与提示词结算
 

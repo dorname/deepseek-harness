@@ -20,39 +20,35 @@ function assertNever(value: never): never {
 }
 /* v8 ignore stop */
 
-/** Convert expected capability failures into concise human-only outcomes. */
-function expectedFailure(error: ManualCompactionError): CommandResult {
+/**
+ * The human-readable text for one expected manual-compaction failure — the
+ * `/compact` command's wording and the shared vocabulary every machine channel
+ * (ACP `session/compact`) reuses for its wire message.
+ * @param error - classified compaction failure.
+ * @returns the stable human text for the failure class.
+ */
+export function manualCompactionFailureText(error: ManualCompactionError): string {
   switch (error.code) {
     case 'busy':
-      return {
-        kind: 'error',
-        text: 'Compaction is unavailable because this process has an active compaction, or the agent is not idle.',
-      }
+      return 'Compaction is unavailable because this process has an active compaction, or the agent is not idle.'
     case 'cancelled':
-      return { kind: 'error', text: 'Compaction cancelled.' }
+      return 'Compaction cancelled.'
     case 'changed':
-      return {
-        kind: 'error',
-        text: 'The history selected for compaction changed before it could be replaced. The attempt is recorded in the session log.',
-      }
+      return 'The history selected for compaction changed before it could be replaced. The attempt is recorded in the session log.'
     case 'summary':
-      return {
-        kind: 'error',
-        text: 'Compaction could not produce a useful summary. The attempt is recorded in the session log.',
-      }
+      return 'Compaction could not produce a useful summary. The attempt is recorded in the session log.'
     case 'commit':
-      return {
-        kind: 'error',
-        text: 'Compaction did not finish cleanly; some session history may have changed. Inspect the current session state before retrying.',
-      }
+      return 'Compaction did not finish cleanly; some session history may have changed. Inspect the current session state before retrying.'
     case 'persistence':
-      return {
-        kind: 'error',
-        text: 'Compaction finished, but the session could not be saved.',
-      }
+      return 'Compaction finished, but the session could not be saved.'
     /* v8 ignore next 2 -- ManualCompactionErrorCode is closed and every member is handled above */
     default: return assertNever(error.code)
   }
+}
+
+/** Convert expected capability failures into concise human-only outcomes. */
+function expectedFailure(error: ManualCompactionError): CommandResult {
+  return { kind: 'error', text: manualCompactionFailureText(error) }
 }
 
 /** Execute one argument-free manual compaction request. */

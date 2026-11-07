@@ -48,6 +48,8 @@ import {
   type Stream,
 } from '@agentclientprotocol/sdk'
 import type { ModelSelection } from '@deepseek-ai/dsh-agent'
+import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
+import { ManualCompactionError } from '@deepseek-ai/dsh-compaction'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 // Side-effect type import: declaration-merges the approval waterfall answered below.
@@ -56,6 +58,12 @@ import type {} from '@deepseek-ai/dsh-user-approval'
 import type {} from '@deepseek-ai/dsh-plan-mode'
 // Side-effect type import: declaration-merges the review waterfall answered below.
 import type {} from '@deepseek-ai/dsh-user-questions'
+import {
+  COMPACTION_METHOD,
+  parseCompactionRequest,
+  sessionCompactWireError,
+  type AcpCompactionResponse,
+} from './compaction.ts'
 import { supportsAcpImagePrompts } from './content.ts'
 import { AcpMcpConfigError } from './mcp.ts'
 import { AcpModelConfigError } from './model-control.ts'
@@ -188,6 +196,11 @@ export class AcpBridge {
 
     const clientConnRef: { current: AgentContext | undefined } = { current: undefined }
 
+    // The client capability declaration arrives at initialize, before any
+    // session exists; sessions created on this connection carry the flag so
+    // their compaction updates stay inside the declaring connection.
+    let clientCompactionUpdates = false
+
     const notify = async (notification: SessionNotification): Promise<void> => {
       const clientConn = clientConnRef.current
       if (clientConn === undefined) return
@@ -201,8 +214,9 @@ export class AcpBridge {
     }
 
     const implementation = {
-      initialize: async (_params: InitializeRequest): Promise<InitializeResponse> => {
+      initialize: async (params: InitializeRequest): Promise<InitializeResponse> => {
         this.imagePromptEnabled = await supportsAcpImagePrompts(this.ctx, this.config.provider, this.config.model)
+        clientCompactionUpdates = params.clientCapabilities?.session?.compaction != null
         const response: InitializeResponse = {
           protocolVersion: PROTOCOL_VERSION,
           agentInfo: { name: 'deepseek-harness-acp', version: '0.0.1' },
@@ -239,6 +253,7 @@ export class AcpBridge {
             fallbackSelection: initialSelection(this.config),
             signal,
             notify,
+            compactionUpdates: clientCompactionUpdates,
           })
         } catch (error: unknown) {
           if (error instanceof AcpMcpConfigError) throw invalidParams(error.message)
@@ -290,6 +305,7 @@ export class AcpBridge {
               fallbackSelection: initialSelection(this.config),
               signal,
               notify,
+              compactionUpdates: clientCompactionUpdates,
             })
           } catch (error: unknown) {
             if (error instanceof AcpMcpConfigError) throw invalidParams(error.message)
@@ -402,6 +418,21 @@ export class AcpBridge {
         return {}
       },
 
+      compactSession: async (params: { sessionId: string }, signal: AbortSignal): Promise<AcpCompactionResponse> => {
+        assertOpen()
+        const record = requireSession(brandString<SessionId>(params.sessionId))
+        // ACP clients have no command channel, so the bridge mints the durable
+        // transaction's sourceCommandId to mark itself as the initiator.
+        const sourceCommandId = brandString<CommandId>(`acp-${randomUUID()}`)
+        try {
+          return await record.compact(sourceCommandId, signal)
+        } catch (error: unknown) {
+          if (error instanceof RequestError) throw error
+          if (error instanceof ManualCompactionError || signal.aborted) throw sessionCompactWireError(error)
+          throw internalError(`session compaction failed: ${errorChain(error)}`)
+        }
+      },
+
       closeSession: async (params: CloseSessionRequest): Promise<CloseSessionResponse> => {
         assertOpen()
         const sessionId = brandString<SessionId>(params.sessionId)
@@ -444,6 +475,9 @@ export class AcpBridge {
       // extension method with an explicit params parser (see SKILLS_LIST_METHOD).
       .onRequest(SKILLS_LIST_METHOD, parseSkillsListRequest, ({ params }) => implementation.skillsList(params))
       .onRequest(methods.agent.session.setMode, ({ params }) => implementation.setSessionMode(params))
+      // dsh extension: ACP 1.4.0 has no compaction request method; execution
+      // semantics and every policy stay inside the composed engine (S52).
+      .onRequest(COMPACTION_METHOD, parseCompactionRequest, ({ params, signal }) => implementation.compactSession(params, signal))
       .onNotification(methods.agent.session.cancel, ({ params }) => implementation.cancel(params))
 
     // Permission requests are a machine policy channel for ACP clients such as

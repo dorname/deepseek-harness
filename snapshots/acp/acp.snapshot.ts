@@ -45,6 +45,11 @@ const controllerCases: readonly {
     hasModelTurn: true,
     configPath: join(corpusDir, 'image-compaction', 'cordis.yml'),
   },
+  {
+    name: 'compaction',
+    hasModelTurn: true,
+    configPath: join(corpusDir, 'compaction', 'cordis.yml'),
+  },
 ] as const
 
 function localScenarioSource(source: string | undefined): string | undefined {

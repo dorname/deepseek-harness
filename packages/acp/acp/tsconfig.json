@@ -27,6 +27,15 @@
       "path": "../../attachment/attachment"
     },
     {
+      "path": "../../compaction/compaction"
+    },
+    {
+      "path": "../../compaction/command-compact"
+    },
+    {
+      "path": "../../interaction/commands"
+    },
+    {
       "path": "../../llm/llm"
     },
     {

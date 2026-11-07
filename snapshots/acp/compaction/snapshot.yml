@@ -1,0 +1,10 @@
+version: 1
+scenario: compaction
+profile: acp
+composition: compaction
+recording: live
+header:
+  class: compaction
+  pin: true
+  systemPromptSource: permission-policy
+  toolSchemasSource: permission-policy

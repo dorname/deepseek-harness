@@ -18,7 +18,7 @@
 
 - `inject`: `agents` · `llm` · `sessionPersistence` · `sessions`
 - `refs`: `AuthenticateRequest` (`@agentclientprotocol/sdk`) · `Stream` (`@agentclientprotocol/sdk`)
-- `source`: [`packages/acp/acp/src/index.ts:70`](../packages/acp/acp/src/index.ts)
+- `source`: [`packages/acp/acp/src/index.ts:78`](../packages/acp/acp/src/index.ts)
 
 ```ts config-catalog
 /**

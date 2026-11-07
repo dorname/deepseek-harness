@@ -73,11 +73,15 @@ const WAIT_POLL_INTERVAL_MS = 10
  * `waitForEventAfterTurnEnd` waits until a complete record of the given event
  * type follows the latest closed turn — for scenarios whose asserted state
  * (e.g. a goal pause) is appended only after cancellation reaches idle.
+ * `compact` runs the dsh extension compaction method; with `waitForTerminal`
+ * it holds the next step behind the terminal `compaction_update` so the
+ * captured frame order follows the enqueue order on every run (a no-history
+ * call emits no update and must not opt in).
  * A standalone `cancel` may also wait for a cwd-relative readiness marker.
  * All wait timeouts default to 10s.
  */
 export type InputStep =
-  | { op: 'initialize' }
+  | { op: 'initialize'; compactionCapability?: boolean }
   | { op: 'newSession' }
   | { op: 'newSessionExpectError'; additionalDirectories?: string[] }
   | { op: 'setConfigOption'; configId: string; value: string }
@@ -89,6 +93,8 @@ export type InputStep =
   | { op: 'skillsListExpectError'; sessionId: string }
   | { op: 'setSessionMode'; modeId: string }
   | { op: 'setSessionModeExpectError'; modeId: string; sessionId?: string }
+  | { op: 'compact'; sessionId?: string; waitForTerminal?: boolean }
+  | { op: 'compactExpectError'; sessionId: string }
   | {
     op: 'promptAndCancel'
     text: string
@@ -425,7 +431,9 @@ async function runStep(
     case 'initialize':
       await client.initialize({
         protocolVersion: PROTOCOL_VERSION,
-        clientCapabilities: {},
+        clientCapabilities: {
+          ...step.compactionCapability === true ? { session: { compaction: {} } } : {},
+        },
       })
       return
     case 'newSession': {
@@ -517,6 +525,27 @@ async function runStep(
       // Same swallow-as-expected-result pattern as skillsListExpectError.
       await client.setSessionMode({ sessionId: step.sessionId ?? getSessionId() ?? '', modeId: step.modeId })
         .then(() => { throw new Error('snapshot-harness: expected setSessionMode to fail but it succeeded') },
+          () => { /* expected: the bridge returned an error */ })
+      return
+    }
+    case 'compact': {
+      const sessionId = step.sessionId ?? getSessionId()
+      if (sessionId === undefined) throw new Error('snapshot-harness: compact before newSession')
+      // A no-history call answers `{ result: null }` without any lifecycle
+      // event, so only scenarios that scripted a real compaction hold the
+      // script behind the terminal update.
+      const terminalDone = step.waitForTerminal === true
+        ? waitForUpdate(update => update.sessionUpdate === 'compaction_update'
+          && (update.status === 'completed' || update.status === 'failed'))
+        : undefined
+      await client.compact({ sessionId })
+      await terminalDone
+      return
+    }
+    case 'compactExpectError': {
+      // Same swallow-as-expected-result pattern as skillsListExpectError.
+      await client.compact({ sessionId: step.sessionId })
+        .then(() => { throw new Error('snapshot-harness: expected compact to fail but it succeeded') },
           () => { /* expected: the bridge returned an error */ })
       return
     }

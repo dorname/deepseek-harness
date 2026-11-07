@@ -33,6 +33,7 @@ export {
 export {
   launchAcpTestAgent,
   materializeProfilePatch,
+  type AcpTestCompactionResult,
   type AcpTestLaunchOptions,
   type AgentUnderTest,
   type LaunchedAcpTestAgent,
