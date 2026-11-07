@@ -114,6 +114,35 @@
 - 第 4 步返回 invalid params 类错误。
 - 第 5 步 prompt 正常结算，再次枚举与第 2 步一致；既有 prompt/resume 行为不受影响。
 
+## SMOKE-acp-network-05：会话计划模式面
+
+### 目的
+
+验证 staging 部署面上，外部客户端可经标准方法 `session/set_mode` 感知与切换 dsh 计划模式，`modes` 广告与 `current_mode_update` 时序符合规格，错误分支生效，且既有通道与会话行为不受影响。
+
+### 前置条件
+
+- 同 SMOKE-acp-network-01（已部署目标 commit、HMAC token、`DSH_ACP_NETWORK_SECRET` 配置）。
+- 部署组合含 `dsh-base`（默认即挂载 `@deepseek-ai/dsh-plan-mode`）。
+
+### 步骤
+
+1. 连接并认证，`session/new`，读取响应 `modes`。
+2. `session/set_mode { modeId: 'plan' }`，观察 `session/update` 的 `current_mode_update`。
+3. `session/resume`（断连重连），读取响应 `modes`。
+4. `session/set_mode { modeId: 'normal' }`，观察更新；随后重复设置 `normal` 一次。
+5. `session/set_mode { modeId: 'plan' }` + `session/set_mode { modeId: 'other' }` 验证词表错误分支。
+6. 正常 prompt 往返一次。
+
+### 期望结果
+
+- 第 1 步 `modes.availableModes` 恰为 plan / normal 二值（含 name），`currentModeId` 为 `normal`。
+- 第 2 步响应立即返回且恰伴随一次 `current_mode_update(plan)`。
+- 第 3 步 resume 后 `currentModeId` 为 `plan`。
+- 第 4 步切回 normal 紧随一次更新；重复设置无新更新。
+- 第 5 步 plan 正常提交；`other` 返回 invalid params 类错误且消息含 plan/normal 词表。
+- 第 6 步 prompt 正常结算；SMOKE-acp-network-01..04 既有行为不受影响。
+
 ## 失败判定
 
 以下任一情况视为 smoke 失败：
@@ -125,9 +154,10 @@
 - SMOKE-acp-network-03 中：`always` 会话的工具调用未触发 `session/request_permission`，或 allow-once 后工具未执行、reject-once 后会话中断。
 - SMOKE-acp-network-03 中：未知策略值未返回错误、resume 后策略未恢复，或未配置策略的既有会话出现计划外询问。
 - SMOKE-acp-network-04 中：`skills_list` 响应结构不合法（非数组、缺字段、乱序），已知技能缺席，或未知会话未返回错误。
+- SMOKE-acp-network-05 中：`modes` 广告缺失或词表不合法，`set_mode` 后无 `current_mode_update` 或出现冗余更新，resume 后模式未恢复，或未知 modeId 未返回含词表的 invalid params 类错误。
 
 ## 执行方式
 
 - 本地：`pnpm -F @deepseek-ai/dsh-acp-network smoke`
-  - 源码：`packages/acp/acp-network/tests/smoke/protocol-smoke.ts`（含 SMOKE-acp-network-03 审批策略往返与 SMOKE-acp-network-04 技能清单枚举；无 answerer 的 fail-closed 分支在单元层覆盖，不在本地 smoke 重复）。
+  - 源码：`packages/acp/acp-network/tests/smoke/protocol-smoke.ts`（含 SMOKE-acp-network-03 审批策略往返、SMOKE-acp-network-04 技能清单枚举与 SMOKE-acp-network-05 计划模式面；plan-review 评审映射依赖模型行为，不在本地 smoke，由单元与真实 API e2e 承载）。
 - Staging：通过 `deploy/acp-network/k8s/` 部署后，在 relay 侧或独立 runner 执行（含 SMOKE-acp-network-03）。
