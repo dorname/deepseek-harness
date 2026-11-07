@@ -6,7 +6,9 @@
  * 1. Local (default): boots a real dsh-acp-network server on a random loopback
  *    port with a mocked LLM, then drives it through the ACP SDK over WebSocket.
  *    The local composition also mounts the approval and permission-preset
- *    services and one probe tool for the `always` permission round-trip.
+ *    services and one probe tool for the `always` permission round-trip, plus
+ *    the real skill registry over a seeded project skills fixture for the
+ *    `session/skills_list` enumeration.
  * 2. Staging: connect to an existing server URL via `ACP_SMOKE_URL`. That
  *    target's composition is unknown, so the permission round-trip is skipped
  *    (reported by the caller, never as a pass).
@@ -27,7 +29,7 @@
  *   pnpm exec tsx packages/acp/acp-network/tests/smoke/protocol-smoke.ts
  */
 
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import WebSocket from 'ws'
@@ -56,6 +58,8 @@ import {
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import SkillRegistry from '@deepseek-ai/dsh-skill'
+import * as SkillFileSystem from '@deepseek-ai/dsh-skill-filesystem'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import ApprovalService from '@deepseek-ai/dsh-user-approval'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
@@ -152,6 +156,9 @@ interface SmokeClient {
   resumeSession: (params: { sessionId: string; cwd: string; mcpServers: [] }) => Promise<unknown>
   closeSession: (params: { sessionId: string }) => Promise<unknown>
   setSessionConfigOption: (params: { sessionId: string; configId: string; value: string }) => Promise<unknown>
+  skillsList: (params: { sessionId: string } | Record<string, never>) => Promise<{
+    skills: { name: string; description: string; modelInvocable: boolean; userInvocable: boolean }[]
+  }>
   prompt: (params: PromptRequest, options?: SendRequestOptions) => Promise<PromptResponse>
 }
 
@@ -176,6 +183,7 @@ async function makeClient(
     resumeSession: params => agent.request(methods.agent.session.resume, params),
     closeSession: params => agent.request(methods.agent.session.close, params),
     setSessionConfigOption: params => agent.request(methods.agent.session.setConfigOption, params),
+    skillsList: params => agent.request('session/skills_list', params),
     prompt: (params, options) => agent.request(methods.agent.session.prompt, params, options),
   }
 
@@ -296,6 +304,8 @@ async function startLocalServer(): Promise<{
   await ctx.plugin(TokenMeter)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(ApprovalService)
+  await ctx.plugin(SkillRegistry)
+  await ctx.plugin(SkillFileSystem, { watch: false })
   ctx.provide('shell', {
     sandboxMode: 'workspace-write',
     resolve() { throw new Error('acp-network smoke does not execute bash') },
@@ -404,6 +414,108 @@ async function runSmoke03(url: string, persistenceRoot: string, executed: string
     }
     await client.closeSession({ sessionId })
     console.log('SMOKE-03 always round-trip: ok (2 asks, allow-once ran, reject-once denied)')
+  } finally {
+    await dispose()
+  }
+}
+
+/**
+ * Seed the project skills fixture under one session cwd: both invocation
+ * exclusives and one both-surfaces skill, so the SMOKE-04 catalog assertions
+ * check frontmatter-resolved flags against a known catalog.
+ */
+async function seedSmokeSkills(root: string): Promise<void> {
+  const entries = [
+    {
+      dir: join(root, '.dsh', 'skills', 'smoke-gesture'),
+      frontmatter: 'name: smoke-gesture\ndescription: Smoke skill on the human gesture surface only\ndisable-model-invocation: true',
+      body: 'Gesture-only smoke skill.',
+    },
+    {
+      dir: join(root, '.dsh', 'skills', 'smoke-shared'),
+      frontmatter: 'name: smoke-shared\ndescription: Smoke skill on both invocation surfaces',
+      body: 'Plain smoke skill.',
+    },
+    {
+      dir: join(root, '.agents', 'skills', 'smoke-model'),
+      frontmatter: 'name: smoke-model\ndescription: Smoke skill on the model surface only\nuser-invocable: false',
+      body: 'Model-only smoke skill.',
+    },
+  ]
+  for (const entry of entries) {
+    await mkdir(entry.dir, { recursive: true })
+    await writeFile(join(entry.dir, 'SKILL.md'), `---\n${entry.frontmatter}\n---\n\n${entry.body}\n`)
+  }
+}
+
+/**
+ * SMOKE-acp-network-04: `session/skills_list` on the network transport. The
+ * seeded project fixture pins structure, ordering, and frontmatter-resolved
+ * flags; the call is read-only across a prompt round-trip.
+ */
+async function runSmoke04(url: string, persistenceRoot: string): Promise<void> {
+  await seedSmokeSkills(persistenceRoot)
+  const { client, dispose } = await makeClient(url)
+  try {
+    const { sessionId } = await client.newSession({ cwd: persistenceRoot, mcpServers: [] })
+
+    const listed = await client.skillsList({ sessionId })
+    const skills = listed.skills
+    // Structure: name-sorted, exactly the four agreed fields per entry, and
+    // scalar field types even for catalog entries beyond the fixture (user
+    // roots of the runner machine may contribute extras).
+    const names = skills.map(skill => skill.name)
+    for (let index = 1; index < names.length; index++) {
+      if (!(names[index - 1]! < names[index]!)) {
+        throw new Error(`SMOKE-04: skills not name-sorted: ${JSON.stringify(names)}`)
+      }
+    }
+    for (const skill of skills) {
+      const keys = Object.keys(skill).sort()
+      if (!(keys.length === 4 && keys[0] === 'description' && keys[1] === 'modelInvocable' && keys[2] === 'name' && keys[3] === 'userInvocable')) {
+        throw new Error(`SMOKE-04: skill entry carries ${JSON.stringify(keys)} instead of the four agreed fields`)
+      }
+      if (typeof skill.description !== 'string' || typeof skill.modelInvocable !== 'boolean' || typeof skill.userInvocable !== 'boolean') {
+        throw new Error(`SMOKE-04: skill entry field types invalid: ${JSON.stringify(skill)}`)
+      }
+    }
+    const byName = new Map(skills.map(skill => [skill.name, skill]))
+    const expected: Array<[string, boolean, boolean]> = [
+      ['smoke-gesture', false, true],
+      ['smoke-model', true, false],
+      ['smoke-shared', true, true],
+    ]
+    for (const [name, modelInvocable, userInvocable] of expected) {
+      const skill = byName.get(name)
+      if (skill === undefined) throw new Error(`SMOKE-04: seeded skill "${name}" missing from the catalog`)
+      if (skill.modelInvocable !== modelInvocable || skill.userInvocable !== userInvocable) {
+        throw new Error(`SMOKE-04: seeded skill "${name}" flags ${JSON.stringify(skill)} instead of model=${String(modelInvocable)} user=${String(userInvocable)}`)
+      }
+    }
+    console.log(`SMOKE-04 skills_list: ok (${String(skills.length)} skills, fixture flags match)`)
+
+    // Unknown ids reject in the invalid params class.
+    await client.skillsList({ sessionId: 'unknown-id' }).then(
+      () => { throw new Error('SMOKE-04: unknown session id was accepted') },
+      (error: unknown) => {
+        if (!(error instanceof Error) || !error.message.includes('unknown session: unknown-id')) {
+          throw new Error(`SMOKE-04: wrong unknown-session error: ${String(error)}`)
+        }
+      },
+    )
+    console.log('SMOKE-04 unknown session: ok')
+
+    // Read-only: a prompt round-trip settles and a re-list agrees.
+    const result = await client.prompt({ sessionId, prompt: [{ type: 'text', text: 'hello' }] })
+    assertStopReason('SMOKE-04', result)
+    const relisted = await client.skillsList({ sessionId })
+    if (JSON.stringify(relisted.skills) !== JSON.stringify(skills)) {
+      throw new Error('SMOKE-04: re-listed catalog diverged after a prompt')
+    }
+    console.log('SMOKE-04 prompt round-trip + re-list: ok')
+
+    await client.closeSession({ sessionId })
+    console.log('SMOKE-04 closeSession: ok')
   } finally {
     await dispose()
   }
@@ -529,6 +641,15 @@ async function main(): Promise<void> {
       console.log('\nSMOKE-03 skipped: the permission round-trip needs the local smoke composition.')
     } else {
       await runSmoke03(url, persistenceRoot, server.executed)
+    }
+
+    // SMOKE-04 needs the local composition (skill registry over the seeded
+    // fixture) and a prompt round-trip; a staging target or the handshake-only
+    // mode cannot reproduce it, and that is reported as a skip rather than a pass.
+    if (STAGING_URL || NO_PROMPT) {
+      console.log('\nSMOKE-04 skipped: skill enumeration needs the local smoke composition.')
+    } else {
+      await runSmoke04(url, persistenceRoot)
     }
 
     console.log('\nAll ACP-over-network smoke checks passed.')

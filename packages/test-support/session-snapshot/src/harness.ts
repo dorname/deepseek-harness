@@ -85,6 +85,8 @@ export type InputStep =
   | { op: 'promptContent'; content: AcpContentBlock[] }
   | { op: 'promptAndWaitForAgentMessage'; text: string; waitForText: string }
   | { op: 'promptExpectError'; text: string }
+  | { op: 'skillsList' }
+  | { op: 'skillsListExpectError'; sessionId: string }
   | {
     op: 'promptAndCancel'
     text: string
@@ -481,6 +483,21 @@ async function runStep(
       await client.prompt({ sessionId, prompt: [{ type: 'text', text: step.text }] })
         .then(() => { throw new Error('snapshot-harness: expected the prompt to fail but it succeeded') },
           () => { /* expected: the turn failed and the bridge returned an error */ })
+      return
+    }
+    case 'skillsList': {
+      const sessionId = getSessionId()
+      if (sessionId === undefined) throw new Error('snapshot-harness: skillsList before newSession')
+      await client.skillsList({ sessionId })
+      return
+    }
+    case 'skillsListExpectError': {
+      // The bridge answers with a JSON-RPC error and the SDK rejects. That
+      // rejection IS the expected protocol result — swallow it so the run
+      // completes and the stdout transcript (the error frame) is captured.
+      await client.skillsList({ sessionId: step.sessionId })
+        .then(() => { throw new Error('snapshot-harness: expected skillsList to fail but it succeeded') },
+          () => { /* expected: the bridge returned an error */ })
       return
     }
     case 'promptAndCancel': {

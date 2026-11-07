@@ -1,0 +1,8 @@
+{
+  "steps": [
+    { "op": "initialize" },
+    { "op": "newSession" },
+    { "op": "skillsList" },
+    { "op": "skillsListExpectError", "sessionId": "unknown-id" }
+  ]
+}

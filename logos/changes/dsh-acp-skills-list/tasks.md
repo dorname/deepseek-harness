@@ -12,7 +12,7 @@
 - [ ] 产出 `deltas/test/smoke/acp-network-smoke-test-cases.md` — 新增真实技能枚举冒烟 SMOKE-acp-network-04。
 
 ## [code] 代码实现
-- [ ] 实现单切片：bridge 扩展方法 `session/skills_list`（SDK 扩展方法注册、参数校验、live agent 预设作用域 → 全局注册表回退解析链、双旗标无过滤映射、registry 缺失 fail-loud）；`packages/acp` 新增 `@deepseek-ai/dsh-skill` 与 `@deepseek-ai/dsh-agent-preset-registry` peer/dev 依赖（类型与解析链所需）；交付 UT-S50-01..05、ST-S50-01、keyless 快照、受影响包中英文 README/JSDoc 与 `docs/upgrade-guide/<发布版本>/acp-skills-list/` 升级指南；实现 SMOKE-acp-network-04 并接入统一 smoke dispatcher，完成 smoke 覆盖预检（覆盖 UT-S50-01、UT-S50-02、UT-S50-03、UT-S50-04、UT-S50-05、ST-S50-01、SMOKE-acp-network-04）
+- [x] 实现单切片：bridge 扩展方法 `session/skills_list`（SDK 扩展方法注册、参数校验、live agent 预设作用域 → 全局注册表回退解析链、双旗标无过滤映射、registry 缺失 fail-loud）；`packages/acp` 新增 `@deepseek-ai/dsh-skill` 与 `@deepseek-ai/dsh-agent-preset-registry` peer/dev 依赖（类型与解析链所需：augmentation 为 `ctx.get('agentPresets')` 提供类型，解析链接口仍以结构化 `ScopedSkillSource` 表达）；交付 UT-S50-01..05、ST-S50-01、keyless 快照、受影响包中英文 README/JSDoc 与 `docs/upgrade-guide/v0.2.1-alpha.1/acp-skills-list/` 升级指南；实现 SMOKE-acp-network-04 并接入统一 smoke dispatcher，完成 smoke 覆盖预检（覆盖 UT-S50-01、UT-S50-02、UT-S50-03、UT-S50-04、UT-S50-05、ST-S50-01、SMOKE-acp-network-04） — 桥接扩展方法 + 单元套件 8/8 + acp 15 文件 162 用例全绿；本地协议冒烟四通道（01/02/03/04）全过（SMOKE-04 五技能、fixture 旗标命中）；快照 `snapshots/acp/skills-list` record + keyless refresh 通过；typecheck、lint、doc-sync（42 门）通过；constraints / verify-no-unknown-casts / stagehand 快照为环境既有红（见变更记录）
 
 ## [deploy] 部署任务
 - [ ] 按合并后的部署方案构建带 commit 标识的 dsh 发布物并部署到 staging。

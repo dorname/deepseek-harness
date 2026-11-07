@@ -18,6 +18,7 @@ import { turnEndToStopReason } from './codec.ts'
 import { mountAcpMcpServers } from './mcp.ts'
 import { AcpModelControl } from './model-control.ts'
 import { AcpPermissionControl } from './permission-control.ts'
+import { listSessionSkills, type AcpSkillList } from './skill-list.ts'
 import { assistantUpdates, toolCallUpdate, toolResultUpdate } from './updates.ts'
 
 /** The continuable-subagent teardown used without depending on the subagent package. */
@@ -199,6 +200,15 @@ export class AcpSession {
   configOptions(signal?: AbortSignal): Promise<SessionConfigOption[]> {
     this.assertActive()
     return this.assembleOptions(signal)
+  }
+
+  /**
+   * Enumerate this session's skills with both invocation flags, unfiltered.
+   * @returns the name-sorted invocation-neutral catalog for this composition.
+   */
+  skills(): Promise<AcpSkillList> {
+    this.assertActive()
+    return listSessionSkills(this.ctx, this.agent)
   }
 
   /**

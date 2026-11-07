@@ -68,12 +68,15 @@ One connection can run several sessions at once, each independent. The calls a c
 | `session/resume` | A persisted inactive session whose canonical workspace is verified before composition; its log is restored without replaying old updates. |
 | `session/close` | Quiescent cancellation, update draining, descendant disposal, persistence flush, and disposal of only the addressed Agent scope. |
 | `session/set_config_option` | A serialized update to the advertised `model`, `reasoning_effort`, `permission_policy`, or `permission_preset`, validated against the live catalog and the deployment's preset table, returning the complete resulting state. |
+| `session/skills_list` | A dsh extension method (ACP 1.4.0 defines no skill surface): the session's skill catalog, name-sorted, each entry carrying exactly `name`, `description`, and the resolved `modelInvocable` / `userInvocable` flags. |
 | `session/prompt` | Ordered text, resource links, and supported images, one prompt at a time per session; settlement follows Agent idle and ordered update delivery. |
 | `session/cancel` / `$/cancel_request` | The prompt-owned cancellation path; without an ACP prompt in flight it cancels autonomous work, while unknown session ids are no-ops. |
 | `session/update` | Committed assistant messages and thoughts, generic tool lifecycle, configuration changes, and context usage, serialized per session. |
 | `session/request_permission` | A permission prompt with one-shot allow/reject choices; your client can answer automatically. |
 
 Session configuration offers opaque provider/model choices from the live LLM service catalog, a `reasoning_effort` selector when the exact model declares one, and — when the approval and permission-preset services are composed — a `permission_policy` select (`ask`, `never`, `always`; `always` asks before every tool call for that session and persists across resume) plus a `permission_preset` select over the deployment's preset catalog. Unknown values and mutations without the backing service fail with `Invalid params` naming the accepted vocabulary. Choices track the live catalog: a removed current model stays as the reported `currentValue` but is not reinserted into choices, `session/set_config_option` rejects unlisted values, and catalog discovery failures propagate to the client instead of falling back to stale options. A prompt snapshots that selection before asynchronous image admission and pins it across every model step in that turn; a concurrent option change applies to the next turn. ACP clients are trusted controllers: stdio MCP entries authorize their absolute commands and environment, HTTP entries authorize their absolute HTTP(S) URLs and headers, and any initial connection or discovery failure rolls back the unpublished Agent. Unsupported surfaces are omitted or rejected: `session/load`, deletion, fork, additional directories, SSE or ACP-transport MCP, modes, commands, plans, terminals, client filesystem operations, and elicitation.
+
+`session/skills_list` is a read-only catalog read for the addressed session: it resolves the preset-mounted scoped skill registry first, then the host composition's global registry, and returns the merged catalog for the session's workspace without applying invocation filtering — both flags ride the wire so each client applies its own policy. An unknown session id fails with `Invalid params`; a composition that mounts neither the preset skill registry nor the global skill service fails with an internal error naming the gap. The call appends no session event and is cache-consistent across repeated calls; skill bodies are never loaded over ACP, and the catalog is not pushed — clients re-pull to observe changes.
 
 -----
 
@@ -104,6 +107,7 @@ The decision history lives in the [ACP as an automation-only protocol note](../.
 | [`src/content.ts`](src/content.ts) | Wire-content admission and projection: image validation, route recheck, prompt reconstruction, assistant block conversion |
 | [`src/codec.ts`](src/codec.ts) | Pure turn-ending to ACP `stopReason` mapping |
 | [`src/permission-control.ts`](src/permission-control.ts) | `AcpPermissionControl`: `permission_policy` / `permission_preset` advertisement, validation, and application |
+| [`src/skill-list.ts`](src/skill-list.ts) | `session/skills_list` extension method: params validation, registry resolution, invocation-neutral field mapping |
 
 ### Admission and prompt settlement
 

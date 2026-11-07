@@ -54,6 +54,11 @@ import { supportsAcpImagePrompts } from './content.ts'
 import { AcpMcpConfigError } from './mcp.ts'
 import { AcpModelConfigError } from './model-control.ts'
 import { AcpPermissionConfigError } from './permission-control.ts'
+import {
+  parseSkillsListRequest,
+  SKILLS_LIST_METHOD,
+  type AcpSkillList,
+} from './skill-list.ts'
 import { AcpSession } from './session.ts'
 
 const DEFAULT_SESSION_LIST_PAGE_SIZE = 100
@@ -355,6 +360,17 @@ export class AcpBridge {
         }
       },
 
+      skillsList: async (params: { sessionId: string }): Promise<AcpSkillList> => {
+        assertOpen()
+        const record = requireSession(brandString<SessionId>(params.sessionId))
+        try {
+          return await record.skills()
+        } catch (error: unknown) {
+          if (error instanceof RequestError) throw error
+          throw internalError(`skills list failed: ${errorChain(error)}`)
+        }
+      },
+
       closeSession: async (params: CloseSessionRequest): Promise<CloseSessionResponse> => {
         assertOpen()
         const sessionId = brandString<SessionId>(params.sessionId)
@@ -393,6 +409,9 @@ export class AcpBridge {
       .onRequest(methods.agent.session.close, ({ params }) => implementation.closeSession(params))
       .onRequest(methods.agent.session.setConfigOption, ({ params, signal }) => implementation.setSessionConfigOption(params, signal))
       .onRequest(methods.agent.session.prompt, ({ params, signal }) => implementation.prompt(params, signal))
+      // dsh extension: ACP 1.4.0 has no skill surface, so the catalog rides an
+      // extension method with an explicit params parser (see SKILLS_LIST_METHOD).
+      .onRequest(SKILLS_LIST_METHOD, parseSkillsListRequest, ({ params }) => implementation.skillsList(params))
       .onNotification(methods.agent.session.cancel, ({ params }) => implementation.cancel(params))
 
     // Permission requests are a machine policy channel for ACP clients such as

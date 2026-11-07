@@ -1,6 +1,7 @@
 /**
- * ACP-over-network smoke (`SMOKE-acp-network-01/02/03`, changes
- * `20261020-1643-acp-over-network` and `dsh-acp-permission-policy`).
+ * ACP-over-network smoke (`SMOKE-acp-network-01/02/03/04`, changes
+ * `20261020-1643-acp-over-network`, `dsh-acp-permission-policy`, and
+ * `dsh-acp-skills-list`).
  *
  * - SMOKE-acp-network-01: WebSocket auth + session/new + prompt end-to-end
  *   (local mock LLM via `packages/acp/acp-network/tests/smoke/protocol-smoke.ts`).
@@ -9,6 +10,11 @@
  *   transport (two asks, allow-once executes, reject-once denies, unknown
  *   policy values fail loud). Staging targets skip it — the round-trip needs
  *   the local approval/preset/tool composition — and never report PASS for it.
+ * - SMOKE-acp-network-04: `session/skills_list` enumeration over the network
+ *   transport (seeded project fixture, four-field structure, name sort,
+ *   frontmatter-resolved flags, unknown-session error, prompt round-trip +
+ *   re-list). Staging targets skip it — the fixture needs the local skill
+ *   composition — and never report PASS for it.
  *
  * When namespace `dsh-acp-network-staging` is Ready and
  * `/tmp/dsh-acp-network-staging-creds.env` exists, also runs the staging
@@ -147,6 +153,7 @@ function main(): void {
       { id: 'SMOKE-acp-network-01', scenario: 'local protocol prompt' },
       { id: 'SMOKE-acp-network-02', scenario: 'local protocol resume' },
       { id: 'SMOKE-acp-network-03', scenario: 'local permission round-trip' },
+      { id: 'SMOKE-acp-network-04', scenario: 'local skills list enumeration' },
     ] as const
     for (const lane of failedLanes) {
       const outcome: Parameters<typeof report>[1] = {
@@ -171,6 +178,10 @@ function main(): void {
   report('SMOKE-acp-network-03', {
     durationMs: local.durationMs,
     scenario: 'local permission round-trip',
+  })
+  report('SMOKE-acp-network-04', {
+    durationMs: local.durationMs,
+    scenario: 'local skills list enumeration',
   })
 
   // Staging handshake is advisory here: ledger coverage for 01/02 already

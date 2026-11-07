@@ -26,6 +26,7 @@ import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-test
 import { PermissionPresetService } from '@deepseek-ai/dsh-permission-presets'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import ApprovalService from '@deepseek-ai/dsh-user-approval'
+import SkillRegistry from '@deepseek-ai/dsh-skill'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import * as AcpPlugin from '../src/index.ts'
 import type { AcpPluginConfig } from '../src/index.ts'
@@ -194,6 +195,14 @@ interface BridgeClient {
   setSessionConfigOption: NonNullable<AcpAgent['setSessionConfigOption']>
   prompt: (params: PromptRequest, options?: SendRequestOptions) => Promise<PromptResponse>
   cancel: NonNullable<AcpAgent['cancel']>
+  /**
+   * The dsh extension skill catalog under test (ACP 1.4.0 has no skill method).
+   * `Record<string, never>` admits the empty malformed probe for wire parser
+   * validation.
+   */
+  skillsList: (params: { sessionId: string } | Record<string, never>) => Promise<{
+    skills: { name: string; description: string; modelInvocable: boolean; userInvocable: boolean }[]
+  }>
 }
 
 export interface BridgeHarness {
@@ -231,6 +240,8 @@ export async function makeBridgeHarness(options: {
   approval?: boolean
   /** Compose the permission-preset service over a non-executing shell double (implies `approval`). */
   presets?: boolean
+  /** Compose the real skill registry; tests register runtime skills through `ctx.skills`. */
+  skills?: boolean
 } = {}): Promise<BridgeHarness> {
   const adapter = new MockAdapter(options.script ?? [], options.imageCapable === true)
   const ctx = new Context()
@@ -243,6 +254,7 @@ export async function makeBridgeHarness(options: {
   const loopFiber = await ctx.plugin(AgentLoop, { agents: [] })
   const primaryAdapter = ctx.llm.registerAdapter(['mock'], adapter)
   if (options.presets === true || options.approval === true) await ctx.plugin(ApprovalService)
+  if (options.skills === true) await ctx.plugin(SkillRegistry)
   if (options.presets === true) {
     ctx.provide('shell', {
       sandboxMode: 'workspace-write',
@@ -327,6 +339,7 @@ export async function makeBridgeHarness(options: {
     setSessionConfigOption: params => client.request(methods.agent.session.setConfigOption, params),
     prompt: (params, options) => client.request(methods.agent.session.prompt, params, options),
     cancel: params => client.notify(methods.agent.session.cancel, params),
+    skillsList: params => client.request('session/skills_list', params),
   }
   return harness
 }

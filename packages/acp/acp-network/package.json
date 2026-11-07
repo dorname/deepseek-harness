@@ -43,6 +43,8 @@
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-acp": "workspace:*",
     "@deepseek-ai/dsh-host-webserver": "workspace:*",
+    "@deepseek-ai/dsh-skill": "workspace:*",
+    "@deepseek-ai/dsh-skill-filesystem": "workspace:*",
     "@types/ws": "^8.5.13",
     "tsx": "^4.22.4"
   }

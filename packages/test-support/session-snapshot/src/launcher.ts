@@ -88,6 +88,13 @@ export interface AcpTestClient {
   setSessionConfigOption: (params: SetSessionConfigOptionRequest) => Promise<SetSessionConfigOptionResponse>
   prompt: (params: PromptRequest) => Promise<PromptResponse>
   cancel: (params: CancelNotification) => Promise<void>
+  /** The dsh extension skill catalog; response entries carry both invocation flags. */
+  skillsList: (params: { sessionId: string }) => Promise<{ skills: {
+    name: string
+    description: string
+    modelInvocable: boolean
+    userInvocable: boolean
+  }[] }>
 }
 
 /** A running ACP test process and its captured client-side outputs. */
@@ -238,6 +245,7 @@ export function launchAcpTestAgent(options: AcpTestLaunchOptions): LaunchedAcpTe
     setSessionConfigOption: params => context.request(methods.agent.session.setConfigOption, params),
     prompt: params => context.request(methods.agent.session.prompt, params),
     cancel: params => context.notify(methods.agent.session.cancel, params),
+    skillsList: params => context.request('session/skills_list', params),
   }
   // `exit` only reports the parent process's status. Descendants may retain
   // inherited stdout/stderr handles and buffered ACP frames may still be

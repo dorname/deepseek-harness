@@ -32,6 +32,15 @@ export {
 } from './bridge.ts'
 export { AcpModelConfigError, AcpModelControl } from './model-control.ts'
 export { AcpPermissionConfigError, AcpPermissionControl } from './permission-control.ts'
+export {
+  listSessionSkills,
+  parseSkillsListRequest,
+  SKILLS_LIST_METHOD,
+  type AcpSkillEntry,
+  type AcpSkillList,
+  type AcpSkillListRequest,
+  type ScopedSkillSource,
+} from './skill-list.ts'
 export type { ModelSelection, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 
 /** Public Config schema exposed by this plugin. */

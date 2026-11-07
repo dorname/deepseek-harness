@@ -16,7 +16,7 @@ Each package entry labels its data with three identifiers: `inject` lists the se
 
 - `inject`: `agents` · `llm` · `sessionPersistence` · `sessions`
 - `refs`: `AuthenticateRequest` (`@agentclientprotocol/sdk`) · `Stream` (`@agentclientprotocol/sdk`)
-- `source`: [`packages/acp/acp/src/index.ts:52`](../packages/acp/acp/src/index.ts)
+- `source`: [`packages/acp/acp/src/index.ts:61`](../packages/acp/acp/src/index.ts)
 
 ```ts config-catalog
 /**
