@@ -6,9 +6,10 @@
  * 1. Local (default): boots a real dsh-acp-network server on a random loopback
  *    port with a mocked LLM, then drives it through the ACP SDK over WebSocket.
  *    The local composition also mounts the approval and permission-preset
- *    services and one probe tool for the `always` permission round-trip, plus
- *    the real skill registry over a seeded project skills fixture for the
- *    `session/skills_list` enumeration.
+ *    services and one probe tool for the `always` permission round-trip, the
+ *    real skill registry over a seeded project skills fixture for the
+ *    `session/skills_list` enumeration, and the real plan-mode controller for
+ *    the `session/set_mode` surface.
  * 2. Staging: connect to an existing server URL via `ACP_SMOKE_URL`. That
  *    target's composition is unknown, so the permission round-trip is skipped
  *    (reported by the caller, never as a pass).
@@ -61,6 +62,7 @@ import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import * as SkillFileSystem from '@deepseek-ai/dsh-skill-filesystem'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
+import PlanModeController from '@deepseek-ai/dsh-plan-mode'
 import ApprovalService from '@deepseek-ai/dsh-user-approval'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
 import * as AcpNetworkPlugin from '../../src/index.ts'
@@ -151,15 +153,23 @@ function toolCallResponse(name: string, callId: string): StreamChunk[] {
 interface SmokeClient {
   initialize: (params: { protocolVersion: number }) => Promise<unknown>
   authenticate: (params: { methodId: string; _meta: { token: string } }) => Promise<unknown>
-  newSession: (params: { cwd: string; mcpServers: [] }) => Promise<{ sessionId: string }>
+  newSession: (params: { cwd: string; mcpServers: [] }) => Promise<{
+    sessionId: string
+    modes?: { currentModeId: string; availableModes: { id: string; name: string }[] }
+  }>
   listSessions: (params: { cwd: string }) => Promise<{ sessions: Array<{ sessionId: string; cwd: string }> }>
-  resumeSession: (params: { sessionId: string; cwd: string; mcpServers: [] }) => Promise<unknown>
+  resumeSession: (params: { sessionId: string; cwd: string; mcpServers: [] }) => Promise<{
+    modes?: { currentModeId: string }
+  }>
   closeSession: (params: { sessionId: string }) => Promise<unknown>
   setSessionConfigOption: (params: { sessionId: string; configId: string; value: string }) => Promise<unknown>
+  setSessionMode: (params: { sessionId: string; modeId: string }) => Promise<unknown>
   skillsList: (params: { sessionId: string } | Record<string, never>) => Promise<{
     skills: { name: string; description: string; modelInvocable: boolean; userInvocable: boolean }[]
   }>
   prompt: (params: PromptRequest, options?: SendRequestOptions) => Promise<PromptResponse>
+  /** Session updates in receive order, for the plan-mode update assertions. */
+  updates: { sessionUpdate: string; currentModeId?: string }[]
 }
 
 async function makeClient(
@@ -167,7 +177,11 @@ async function makeClient(
   options: { answerPermission?: (request: RequestPermissionRequest) => Promise<RequestPermissionResponse> } = {},
 ): Promise<{ client: SmokeClient; dispose: () => Promise<void> }> {
   const token = AcpNetworkPlugin.signHmacToken(SECRET, SUBJECT, AUDIENCE)
+  const updates: SmokeClient['updates'] = []
   const clientApp = createAcpClientApp({ name: 'dsh-acp-network-smoke-client' })
+  clientApp.onNotification(methods.client.session.update, ({ params }) => {
+    updates.push(params.update)
+  })
   if (options.answerPermission !== undefined) {
     clientApp.onRequest(methods.client.session.requestPermission, ({ params }) => options.answerPermission!(params))
   }
@@ -183,8 +197,10 @@ async function makeClient(
     resumeSession: params => agent.request(methods.agent.session.resume, params),
     closeSession: params => agent.request(methods.agent.session.close, params),
     setSessionConfigOption: params => agent.request(methods.agent.session.setConfigOption, params),
+    setSessionMode: params => agent.request(methods.agent.session.setMode, params),
     skillsList: params => agent.request('session/skills_list', params),
     prompt: (params, options) => agent.request(methods.agent.session.prompt, params, options),
+    updates,
   }
 
   await client.initialize({ protocolVersion: PROTOCOL_VERSION })
@@ -304,6 +320,7 @@ async function startLocalServer(): Promise<{
   await ctx.plugin(TokenMeter)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(ApprovalService)
+  await ctx.plugin(PlanModeController, { section: 'Smoke plan guidance: plan before acting.' })
   await ctx.plugin(SkillRegistry)
   await ctx.plugin(SkillFileSystem, { watch: false })
   ctx.provide('shell', {
@@ -521,6 +538,104 @@ async function runSmoke04(url: string, persistenceRoot: string): Promise<void> {
   }
 }
 
+/**
+ * SMOKE-acp-network-05: the plan-mode face (`session/set_mode`, the `modes`
+ * advertisement, and `current_mode_update` timing) on the network transport.
+ * Every step rides standard methods, so it also verifies a staging target's
+ * deployed face; the plan-review permission mapping stays on the unit and
+ * real-API lanes because it depends on model behavior.
+ */
+async function runSmoke05(url: string, persistenceRoot: string): Promise<void> {
+  const modeIds = (client: SmokeClient): string[] =>
+    client.updates.filter(update => update.sessionUpdate === 'current_mode_update')
+      .map(update => update.currentModeId ?? '<missing>')
+
+  const { client, dispose } = await makeClient(url)
+  let sessionId: string
+  try {
+    const created = await client.newSession({ cwd: persistenceRoot, mcpServers: [] })
+    sessionId = created.sessionId
+    console.log(`SMOKE-05 newSession: ${sessionId}`)
+
+    const modes = created.modes
+    if (modes === undefined) throw new Error('SMOKE-05: newSession response lacks the modes advertisement')
+    if (modes.currentModeId !== 'normal') {
+      throw new Error(`SMOKE-05: currentModeId ${JSON.stringify(modes.currentModeId)} instead of "normal"`)
+    }
+    const advertised = modes.availableModes.map(mode => mode.id)
+    if (advertised.length !== 2 || advertised[0] !== 'plan' || advertised[1] !== 'normal') {
+      throw new Error(`SMOKE-05: availableModes ${JSON.stringify(advertised)} instead of exactly plan, normal`)
+    }
+    if (!modes.availableModes.every(mode => typeof mode.name === 'string' && mode.name.length > 0)) {
+      throw new Error('SMOKE-05: an advertised mode lacks a name')
+    }
+    console.log('SMOKE-05 modes advertisement: ok')
+
+    await client.setSessionMode({ sessionId, modeId: 'plan' })
+    if (JSON.stringify(modeIds(client)) !== JSON.stringify(['plan'])) {
+      throw new Error(`SMOKE-05: mode updates after set plan: ${JSON.stringify(modeIds(client))}`)
+    }
+    console.log('SMOKE-05 set_mode plan + exactly one update: ok')
+
+    // The record survives disconnects as active; release it so the reconnect
+    // below may resume.
+    await client.closeSession({ sessionId })
+  } finally {
+    await dispose()
+  }
+
+  // Resume after reconnect restores the committed mode.
+  const { client: client2, dispose: dispose2 } = await makeClient(url)
+  try {
+    const resumed = await client2.resumeSession({ sessionId, cwd: persistenceRoot, mcpServers: [] })
+    if (resumed.modes?.currentModeId !== 'plan') {
+      throw new Error(`SMOKE-05: resumed currentModeId ${JSON.stringify(resumed.modes?.currentModeId)} instead of "plan"`)
+    }
+    console.log('SMOKE-05 resume restores plan: ok')
+
+    // Switch back, then repeat the committed state silently.
+    await client2.setSessionMode({ sessionId, modeId: 'normal' })
+    if (JSON.stringify(modeIds(client2)) !== JSON.stringify(['normal'])) {
+      throw new Error(`SMOKE-05: mode updates after set normal: ${JSON.stringify(modeIds(client2))}`)
+    }
+    await client2.setSessionMode({ sessionId, modeId: 'normal' })
+    if (modeIds(client2).length !== 1) {
+      throw new Error(`SMOKE-05: the repeated set emitted updates: ${JSON.stringify(modeIds(client2))}`)
+    }
+    console.log('SMOKE-05 switch back + silent noop: ok')
+
+    // Re-enter plan; an unknown id rejects in the invalid params class with
+    // the advertised vocabulary and no update.
+    await client2.setSessionMode({ sessionId, modeId: 'plan' })
+    if (JSON.stringify(modeIds(client2)) !== JSON.stringify(['normal', 'plan'])) {
+      throw new Error(`SMOKE-05: mode updates after re-entering plan: ${JSON.stringify(modeIds(client2))}`)
+    }
+    await client2.setSessionMode({ sessionId, modeId: 'other' }).then(
+      () => { throw new Error('SMOKE-05: unknown mode id was accepted') },
+      (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error)
+        if (!message.includes('unknown session mode: other') || !message.includes('plan, normal')) {
+          throw new Error(`SMOKE-05: wrong unknown-mode error: ${message}`)
+        }
+      },
+    )
+    if (modeIds(client2).length !== 2) {
+      throw new Error(`SMOKE-05: the rejected set emitted updates: ${JSON.stringify(modeIds(client2))}`)
+    }
+    console.log('SMOKE-05 vocabulary error branch: ok')
+
+    // An ordinary prompt round-trip still settles, then the session closes.
+    const result = await client2.prompt({ sessionId, prompt: [{ type: 'text', text: 'hello' }] })
+    assertStopReason('SMOKE-05', result)
+    console.log('SMOKE-05 prompt round-trip: ok')
+
+    await client2.closeSession({ sessionId })
+    console.log('SMOKE-05 closeSession: ok')
+  } finally {
+    await dispose2()
+  }
+}
+
 /** Phase 'persist': create one session, prompt it, close it, and publish its id. */
 async function runPersistPhase(client: SmokeClient): Promise<void> {
   const { sessionId } = await client.newSession({ cwd: PHASE_CWD, mcpServers: [] })
@@ -651,6 +766,12 @@ async function main(): Promise<void> {
     } else {
       await runSmoke04(url, persistenceRoot)
     }
+
+    // SMOKE-05 rides only standard methods, so it runs against a staging
+    // target's deployed plan-mode face too. The plan-review permission
+    // mapping is not part of the smoke: it depends on model behavior and
+    // stays on the unit and real-API lanes.
+    await runSmoke05(url, persistenceRoot)
 
     console.log('\nAll ACP-over-network smoke checks passed.')
     reportResult('ST-S01', 'pass')

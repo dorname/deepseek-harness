@@ -1,0 +1,7 @@
+version: 1
+scenario: plan-mode
+profile: acp
+composition: acp-default
+recording: live
+header:
+  class: acp-default

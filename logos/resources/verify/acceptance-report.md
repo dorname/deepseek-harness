@@ -6,12 +6,12 @@
 
 | Metric | Value |
 |--------|-------|
-| Defined cases | 211 |
+| Defined cases | 218 |
 | Manual cases (excluded) | 2 |
-| Executed cases | 211 |
+| Executed cases | 218 |
 | Passed | 60 |
 | Failed | 0 |
-| Skipped | 151 |
+| Skipped | 158 |
 | Uncovered | 0 |
 | Coverage | 100% |
 | Pass rate | 28% |
@@ -170,6 +170,13 @@
 - UT-S50-04
 - UT-S50-05
 - ST-S50-01
+- UT-S51-01
+- UT-S51-02
+- UT-S51-03
+- UT-S51-04
+- UT-S51-05
+- UT-S51-06
+- ST-S51-01
 
 ## Design-time Coverage (Layer 1)
 

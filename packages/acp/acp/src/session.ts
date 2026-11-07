@@ -7,6 +7,7 @@ import {
   type PromptRequest,
   type PromptResponse,
   type SessionConfigOption,
+  type SessionModeState,
   type SessionNotification,
   type StopReason,
 } from '@agentclientprotocol/sdk'
@@ -19,6 +20,7 @@ import { mountAcpMcpServers } from './mcp.ts'
 import { AcpModelControl } from './model-control.ts'
 import { AcpPermissionControl } from './permission-control.ts'
 import { listSessionSkills, type AcpSkillList } from './skill-list.ts'
+import { NORMAL_MODE_ID, PLAN_MODE_ID, applySessionMode, sessionModes } from './plan-mode.ts'
 import { assistantUpdates, toolCallUpdate, toolResultUpdate } from './updates.ts'
 
 /** The continuable-subagent teardown used without depending on the subagent package. */
@@ -209,6 +211,28 @@ export class AcpSession {
   skills(): Promise<AcpSkillList> {
     this.assertActive()
     return listSessionSkills(this.ctx, this.agent)
+  }
+
+  /**
+   * Read the committed plan state as the standard mode advertisement.
+   * @returns the two-mode state, or `undefined` when the session composition
+   *   has no plan-mode controller (the response omits `modes`).
+   */
+  modes(): SessionModeState | undefined {
+    this.assertActive()
+    return sessionModes(this.ctx, this.agent)
+  }
+
+  /**
+   * Apply one `session/set_mode` selection to the session's plan controller.
+   * The selection outcome is intentionally not reported here: the
+   * `current_mode_update` derived from the durable `plan/mode` event is the
+   * only effect observation.
+   * @param modeId - client-supplied mode id, validated against the vocabulary.
+   */
+  setMode(modeId: string): void {
+    this.assertActive()
+    applySessionMode(this.ctx, this.agent, modeId)
   }
 
   /**
@@ -413,6 +437,21 @@ export class AcpSession {
           /* v8 ignore start -- supplemental-content conversion failure is contained and cannot fail Agent work. */
           .catch((error: unknown) => {
             this.ctx.logger.warn(`acp: tool-result update delivery failed: ${errorChain(error)}`)
+          })
+        /* v8 ignore stop */
+      } else if (event.type === 'plan/mode') {
+        const previous = this.outputTail
+        this.outputTail = previous
+          .then(() => this.notify({
+            sessionId: this.agent.session.id,
+            update: {
+              sessionUpdate: 'current_mode_update',
+              currentModeId: event.data.active ? PLAN_MODE_ID : NORMAL_MODE_ID,
+            },
+          }))
+          /* v8 ignore start -- the bridge notifier contains transport failure. */
+          .catch((error: unknown) => {
+            this.ctx.logger.warn(`acp: mode update delivery failed: ${errorChain(error)}`)
           })
         /* v8 ignore stop */
       }

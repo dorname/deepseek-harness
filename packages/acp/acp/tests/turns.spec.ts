@@ -418,16 +418,24 @@ describe('ACP prompt lifecycle', () => {
     harness = await makeBridgeHarness({ imageCapable: true, script: [] })
     const sessionId = await newSession(harness)
     const saveImages = harness.attachments!.saveImages.bind(harness.attachments!)
-    vi.spyOn(harness.attachments!, 'saveImages').mockImplementationOnce(async (inputs) => {
-      const refs = await saveImages(inputs)
-      queueMicrotask(() => { void harness!.client.cancel({ sessionId }) })
-      return refs
+    const releaseSave = Promise.withResolvers<undefined>()
+    const saveImagesSpy = vi.spyOn(harness.attachments!, 'saveImages').mockImplementationOnce(async (inputs) => {
+      await releaseSave.promise
+      return saveImages(inputs)
     })
-
-    await expect(harness.client.prompt({
+    const prompt = harness.client.prompt({
       sessionId,
       prompt: [{ type: 'image', data: 'AQ==', mimeType: 'image/png' }],
-    })).resolves.toEqual({ stopReason: 'cancelled' })
+    })
+    // Hold admission until the cancel has landed: await the wire write, then
+    // drain the agent-side dispatch on a macrotask, so the abort precedes the
+    // gate release regardless of how many handlers lengthen dispatch.
+    await vi.waitFor(() => { expect(saveImagesSpy).toHaveBeenCalled() })
+    await harness.client.cancel({ sessionId })
+    await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
+    releaseSave.resolve(undefined)
+
+    await expect(prompt).resolves.toEqual({ stopReason: 'cancelled' })
     expect(harness.adapter.requests).toEqual([])
   })
 

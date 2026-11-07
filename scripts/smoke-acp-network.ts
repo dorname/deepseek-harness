@@ -1,7 +1,7 @@
 /**
- * ACP-over-network smoke (`SMOKE-acp-network-01/02/03/04`, changes
- * `20261020-1643-acp-over-network`, `dsh-acp-permission-policy`, and
- * `dsh-acp-skills-list`).
+ * ACP-over-network smoke (`SMOKE-acp-network-01/02/03/04/05`, changes
+ * `20261020-1643-acp-over-network`, `dsh-acp-permission-policy`,
+ * `dsh-acp-skills-list`, and `dsh-acp-plan-mode`).
  *
  * - SMOKE-acp-network-01: WebSocket auth + session/new + prompt end-to-end
  *   (local mock LLM via `packages/acp/acp-network/tests/smoke/protocol-smoke.ts`).
@@ -15,6 +15,11 @@
  *   frontmatter-resolved flags, unknown-session error, prompt round-trip +
  *   re-list). Staging targets skip it — the fixture needs the local skill
  *   composition — and never report PASS for it.
+ * - SMOKE-acp-network-05: the plan-mode face over the network transport
+ *   (`modes` advertisement on new/resume, `set_mode` commit + exactly-one
+ *   `current_mode_update`, silent noop, vocabulary error branch, prompt
+ *   round-trip). Rides standard methods, so it also verifies a staging
+ *   target's deployed face.
  *
  * When namespace `dsh-acp-network-staging` is Ready and
  * `/tmp/dsh-acp-network-staging-creds.env` exists, also runs the staging
@@ -154,6 +159,7 @@ function main(): void {
       { id: 'SMOKE-acp-network-02', scenario: 'local protocol resume' },
       { id: 'SMOKE-acp-network-03', scenario: 'local permission round-trip' },
       { id: 'SMOKE-acp-network-04', scenario: 'local skills list enumeration' },
+      { id: 'SMOKE-acp-network-05', scenario: 'local plan mode surface' },
     ] as const
     for (const lane of failedLanes) {
       const outcome: Parameters<typeof report>[1] = {
@@ -182,6 +188,10 @@ function main(): void {
   report('SMOKE-acp-network-04', {
     durationMs: local.durationMs,
     scenario: 'local skills list enumeration',
+  })
+  report('SMOKE-acp-network-05', {
+    durationMs: local.durationMs,
+    scenario: 'local plan mode surface',
   })
 
   // Staging handshake is advisory here: ledger coverage for 01/02 already

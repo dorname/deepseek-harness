@@ -35,6 +35,8 @@ import {
   type ResumeSessionResponse,
   type SetSessionConfigOptionRequest,
   type SetSessionConfigOptionResponse,
+  type SetSessionModeRequest,
+  type SetSessionModeResponse,
   type SessionNotification,
 } from '@agentclientprotocol/sdk'
 import { entryListSchema, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
@@ -86,6 +88,8 @@ export interface AcpTestClient {
   resumeSession: (params: ResumeSessionRequest) => Promise<ResumeSessionResponse>
   closeSession: (params: CloseSessionRequest) => Promise<CloseSessionResponse>
   setSessionConfigOption: (params: SetSessionConfigOptionRequest) => Promise<SetSessionConfigOptionResponse>
+  /** The standard plan-mode face; the response follows the committed-state update. */
+  setSessionMode: (params: SetSessionModeRequest) => Promise<SetSessionModeResponse>
   prompt: (params: PromptRequest) => Promise<PromptResponse>
   cancel: (params: CancelNotification) => Promise<void>
   /** The dsh extension skill catalog; response entries carry both invocation flags. */
@@ -243,6 +247,7 @@ export function launchAcpTestAgent(options: AcpTestLaunchOptions): LaunchedAcpTe
     closeSession: params => context.request(methods.agent.session.close, params),
     /* v8 ignore next -- exercised by the real-process ACP control-surface conformance e2e. */
     setSessionConfigOption: params => context.request(methods.agent.session.setConfigOption, params),
+    setSessionMode: params => context.request(methods.agent.session.setMode, params),
     prompt: params => context.request(methods.agent.session.prompt, params),
     cancel: params => context.notify(methods.agent.session.cancel, params),
     skillsList: params => context.request('session/skills_list', params),

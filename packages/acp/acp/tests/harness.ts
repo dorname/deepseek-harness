@@ -24,8 +24,10 @@ import { type GenerateOptions, LlmAdapter, ReasoningEffortId, type LlmResolvedMo
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { PermissionPresetService } from '@deepseek-ai/dsh-permission-presets'
+import PlanModeController from '@deepseek-ai/dsh-plan-mode'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import ApprovalService from '@deepseek-ai/dsh-user-approval'
+import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import * as AcpPlugin from '../src/index.ts'
@@ -193,6 +195,7 @@ interface BridgeClient {
   resumeSession: NonNullable<AcpAgent['resumeSession']>
   closeSession: NonNullable<AcpAgent['closeSession']>
   setSessionConfigOption: NonNullable<AcpAgent['setSessionConfigOption']>
+  setSessionMode: NonNullable<AcpAgent['setSessionMode']>
   prompt: (params: PromptRequest, options?: SendRequestOptions) => Promise<PromptResponse>
   cancel: NonNullable<AcpAgent['cancel']>
   /**
@@ -242,6 +245,10 @@ export async function makeBridgeHarness(options: {
   presets?: boolean
   /** Compose the real skill registry; tests register runtime skills through `ctx.skills`. */
   skills?: boolean
+  /** Compose the real plan-mode controller with a minimal test guidance section. */
+  planMode?: boolean
+  /** Compose the real user-questions service (the plan-review answerer stays the bridge's). */
+  userQuestions?: boolean
 } = {}): Promise<BridgeHarness> {
   const adapter = new MockAdapter(options.script ?? [], options.imageCapable === true)
   const ctx = new Context()
@@ -255,6 +262,10 @@ export async function makeBridgeHarness(options: {
   const primaryAdapter = ctx.llm.registerAdapter(['mock'], adapter)
   if (options.presets === true || options.approval === true) await ctx.plugin(ApprovalService)
   if (options.skills === true) await ctx.plugin(SkillRegistry)
+  if (options.planMode === true) {
+    await ctx.plugin(PlanModeController, { section: 'Test plan guidance: plan before acting.' })
+  }
+  if (options.userQuestions === true) await ctx.plugin(UserQuestionService)
   if (options.presets === true) {
     ctx.provide('shell', {
       sandboxMode: 'workspace-write',
@@ -337,6 +348,7 @@ export async function makeBridgeHarness(options: {
     resumeSession: params => client.request(methods.agent.session.resume, params),
     closeSession: params => client.request(methods.agent.session.close, params),
     setSessionConfigOption: params => client.request(methods.agent.session.setConfigOption, params),
+    setSessionMode: params => client.request(methods.agent.session.setMode, params),
     prompt: (params, options) => client.request(methods.agent.session.prompt, params, options),
     cancel: params => client.notify(methods.agent.session.cancel, params),
     skillsList: params => client.request('session/skills_list', params),

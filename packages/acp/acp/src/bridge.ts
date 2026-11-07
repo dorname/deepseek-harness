@@ -42,6 +42,8 @@ import {
   type ResumeSessionResponse,
   type SetSessionConfigOptionRequest,
   type SetSessionConfigOptionResponse,
+  type SetSessionModeRequest,
+  type SetSessionModeResponse,
   type SessionNotification,
   type Stream,
 } from '@agentclientprotocol/sdk'
@@ -50,10 +52,20 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 // Side-effect type import: declaration-merges the approval waterfall answered below.
 import type {} from '@deepseek-ai/dsh-user-approval'
+// Side-effect type import: declaration-merges the plan-mode controller read below.
+import type {} from '@deepseek-ai/dsh-plan-mode'
+// Side-effect type import: declaration-merges the review waterfall answered below.
+import type {} from '@deepseek-ai/dsh-user-questions'
 import { supportsAcpImagePrompts } from './content.ts'
 import { AcpMcpConfigError } from './mcp.ts'
 import { AcpModelConfigError } from './model-control.ts'
 import { AcpPermissionConfigError } from './permission-control.ts'
+import {
+  answerPlanReview,
+  parseSessionModeId,
+  planReviewPermissionOptions,
+  type RequestPermissionOutcome,
+} from './plan-mode.ts'
 import {
   parseSkillsListRequest,
   SKILLS_LIST_METHOD,
@@ -240,10 +252,11 @@ export class AcpBridge {
         this.sessions.set(sessionId, record)
         try {
           const configOptions = await record.configOptions(signal)
+          const modes = record.modes()
           assertOpen()
           await this.ctx.sessions.flush(record.agent.session)
           assertOpen()
-          return { sessionId, configOptions }
+          return { sessionId, configOptions, ...modes === undefined ? {} : { modes } }
         } catch (error: unknown) {
           this.sessions.delete(sessionId)
           await record.close('session/new activation failed')
@@ -295,7 +308,9 @@ export class AcpBridge {
           }
           this.sessions.set(sessionId, record)
           try {
-            return { configOptions: await record.configOptions(signal) }
+            const configOptions = await record.configOptions(signal)
+            const modes = record.modes()
+            return { configOptions, ...modes === undefined ? {} : { modes } }
           } catch (error: unknown) {
             this.sessions.delete(sessionId)
             await record.close('session/resume option discovery failed')
@@ -371,6 +386,22 @@ export class AcpBridge {
         }
       },
 
+      setSessionMode: async (params: SetSessionModeRequest): Promise<SetSessionModeResponse> => {
+        assertOpen()
+        const record = requireSession(brandString<SessionId>(params.sessionId))
+        const modeId = parseSessionModeId(params.modeId)
+        try {
+          record.setMode(modeId)
+          // The committed-state update is the effect fact: enqueue it before
+          // the response write so clients observe the new mode first.
+          await record.drainUpdates()
+        } catch (error: unknown) {
+          if (error instanceof RequestError) throw error
+          throw internalError(`session mode change failed: ${errorChain(error)}`)
+        }
+        return {}
+      },
+
       closeSession: async (params: CloseSessionRequest): Promise<CloseSessionResponse> => {
         assertOpen()
         const sessionId = brandString<SessionId>(params.sessionId)
@@ -412,6 +443,7 @@ export class AcpBridge {
       // dsh extension: ACP 1.4.0 has no skill surface, so the catalog rides an
       // extension method with an explicit params parser (see SKILLS_LIST_METHOD).
       .onRequest(SKILLS_LIST_METHOD, parseSkillsListRequest, ({ params }) => implementation.skillsList(params))
+      .onRequest(methods.agent.session.setMode, ({ params }) => implementation.setSessionMode(params))
       .onNotification(methods.agent.session.cancel, ({ params }) => implementation.cancel(params))
 
     // Permission requests are a machine policy channel for ACP clients such as
@@ -439,6 +471,37 @@ export class AcpBridge {
       })
     })
 
+    // Plan reviews (exit_plan_mode) are the one user-questions intent this
+    // bridge answers: they ride the standard permission channel with the
+    // approve/keep-planning option vocabulary. Every other question keeps the
+    // no-answerer behavior reserved for the full userQuestions channel.
+    const sendPermission = (
+      sessionId: string,
+      callId: string,
+      approveLabel: string,
+      declineLabel: string,
+    ): Promise<RequestPermissionOutcome> => {
+      const clientConn = clientConnRef.current
+      if (clientConn === undefined) return Promise.resolve({ kind: 'cancelled' })
+      const params: RequestPermissionRequest = {
+        sessionId,
+        toolCall: { toolCallId: callId },
+        options: planReviewPermissionOptions(approveLabel, declineLabel),
+      }
+      return clientConn.request(methods.client.session.requestPermission, params).then(response => (
+        response.outcome.outcome === 'cancelled'
+          ? { kind: 'cancelled' }
+          : { kind: 'selected', optionId: response.outcome.optionId }
+      ))
+    }
+
+    const questionsOff = this.ctx.on('user-questions/request', (request, next) => {
+      if (request.agent === undefined) return next()
+      const record = this.ownedRecord(request.agent)
+      if (record === undefined) return next()
+      return answerPlanReview(record, request, next, sendPermission)
+    })
+
     const connection = app.connect(stream)
     clientConnRef.current = connection.client
 
@@ -446,6 +509,7 @@ export class AcpBridge {
       if (quiescing !== undefined) return quiescing
       this.closed = true
       approvalOff()
+      questionsOff()
       const records = [...this.sessions.values()]
       quiescing = (async () => {
         const disposals = await Promise.allSettled(records.map(record => record.close('ACP bridge disposed')))

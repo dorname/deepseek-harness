@@ -87,6 +87,8 @@ export type InputStep =
   | { op: 'promptExpectError'; text: string }
   | { op: 'skillsList' }
   | { op: 'skillsListExpectError'; sessionId: string }
+  | { op: 'setSessionMode'; modeId: string }
+  | { op: 'setSessionModeExpectError'; modeId: string; sessionId?: string }
   | {
     op: 'promptAndCancel'
     text: string
@@ -497,6 +499,24 @@ async function runStep(
       // completes and the stdout transcript (the error frame) is captured.
       await client.skillsList({ sessionId: step.sessionId })
         .then(() => { throw new Error('snapshot-harness: expected skillsList to fail but it succeeded') },
+          () => { /* expected: the bridge returned an error */ })
+      return
+    }
+    case 'setSessionMode': {
+      const sessionId = getSessionId()
+      if (sessionId === undefined) throw new Error('snapshot-harness: setSessionMode before newSession')
+      // Await the committed-state update before the response so the captured
+      // frame order matches the bridge's enqueue order on every run.
+      const updateDone = waitForUpdate(update => update.sessionUpdate === 'current_mode_update'
+        && update.currentModeId === step.modeId)
+      await client.setSessionMode({ sessionId, modeId: step.modeId })
+      await updateDone
+      return
+    }
+    case 'setSessionModeExpectError': {
+      // Same swallow-as-expected-result pattern as skillsListExpectError.
+      await client.setSessionMode({ sessionId: step.sessionId ?? getSessionId() ?? '', modeId: step.modeId })
+        .then(() => { throw new Error('snapshot-harness: expected setSessionMode to fail but it succeeded') },
           () => { /* expected: the bridge returned an error */ })
       return
     }

@@ -1,0 +1,10 @@
+{
+  "steps": [
+    { "op": "initialize" },
+    { "op": "newSession" },
+    { "op": "setSessionMode", "modeId": "plan" },
+    { "op": "setSessionMode", "modeId": "normal" },
+    { "op": "setSessionModeExpectError", "modeId": "other" },
+    { "op": "setSessionModeExpectError", "modeId": "plan", "sessionId": "unknown-id" }
+  ]
+}

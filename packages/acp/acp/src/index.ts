@@ -31,6 +31,15 @@ export {
   type Authenticator,
 } from './bridge.ts'
 export { AcpModelConfigError, AcpModelControl } from './model-control.ts'
+export {
+  applySessionMode,
+  NORMAL_MODE_ID,
+  parseSessionModeId,
+  PLAN_MODE_ID,
+  SESSION_MODE_IDS,
+  sessionModes,
+  type RequestPermissionOutcome,
+} from './plan-mode.ts'
 export { AcpPermissionConfigError, AcpPermissionControl } from './permission-control.ts'
 export {
   listSessionSkills,

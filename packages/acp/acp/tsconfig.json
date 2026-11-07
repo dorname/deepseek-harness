@@ -42,7 +42,13 @@
       "path": "../../interaction/user-approval"
     },
     {
+      "path": "../../interaction/user-questions"
+    },
+    {
       "path": "../../interaction/permission-presets"
+    },
+    {
+      "path": "../../plan/plan-mode"
     },
     {
       "path": "../../preset/agent-preset-registry"
