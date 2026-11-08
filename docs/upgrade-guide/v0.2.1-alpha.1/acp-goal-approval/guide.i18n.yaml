@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-alpha.1/acp-goal-approval/guide.md
+/:
+  en: a61e206647fc6760
+  zh: 268547eacbdee385
+/goal-completion-authorization-over-acp:
+  en: 7308f3c8ed28c802
+  zh: ef73b9994898d719
+/goal-completion-authorization-over-acp/change:
+  en: 325c95eed9e73139
+  zh: 16725f7c7374a251
+/goal-completion-authorization-over-acp/migration:
+  en: eee9ababc73d7a93
+  zh: b4b905b8db64fc4f

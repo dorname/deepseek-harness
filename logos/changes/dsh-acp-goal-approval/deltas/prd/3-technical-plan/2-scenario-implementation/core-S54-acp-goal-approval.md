@@ -30,8 +30,8 @@
 | 前置状态 | 行为 | 会话日志 |
 |----------|------|----------|
 | admitted round / 已有 direct-human | 权威门槛通过，不征求 | 与既往一致 |
-| 无授权 + 有通道 + Authorize | 征求 → steer 回传 → 重调完成 | `user-question-reply`（ask 循环）+ `user/message`（steer，源 user）+ goal 完成事件 |
-| 无授权 + 有通道 + Deny / 取消 | 征求 → 既有权威拒绝（注明拒绝） | `user-question-reply`，无注入消息 |
+| 无授权 + 有通道 + Authorize | 征求卡经 `session/request_permission`（wire 面，不入会话日志）→ steer 回传 → 重调完成 | `user/message`（steer，源 user）+ 既有工具/完成事件；无 `user-question-reply`（该事件仅存在于服务 answer() 路径，如 Web） |
+| 无授权 + 有通道 + Deny / 取消 | 征求卡经 `session/request_permission`（wire 面）→ 既有权威拒绝（注明拒绝）或发言回传文本 | 无注入消息；拒绝与取消文本见既有 `tool/result` 错误 |
 | 无授权 + 无通道（headless 等） | 立即 `GOAL_TOOL_AUTHORITY_REQUIRED`（行为不变） | 与既往一致 |
 
 ## 组件与契约
@@ -45,5 +45,5 @@
 
 - 无超时配置：征求以 `exec.signal` 为界（回合取消即取消），与 plan-mode review 同形。
 - 注入消息是普通 `user/message`：旧构建回读无损；旧构建上未授权调用为立即拒绝（无 ask），回滚行为干净。
-- 快照：新增 keyless recorded-session 场景固定 steer 消息与工具结果文本（模型可见文本）；`snapshots/web/goal-multi-turn-actions/` 既有场景不动（其路径不触发未授权调用）。
+- 快照：新增 keyless 场景 `snapshots/acp/goal-authorization/`（authored + replay.override，经 request_permission FIFO 应答）固定 steer 消息、`authorization` 工具结果与 wire 卡词汇；`snapshots/web/goal-multi-turn-actions/` 既有场景不动（其路径不触发未授权调用）。
 - intent 为宿主内类型（不跨 ACP wire：bridge 出线前已转换为 request_permission 选项）：双 SDK 零改动。

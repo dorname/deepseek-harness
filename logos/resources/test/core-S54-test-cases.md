@@ -1,7 +1,7 @@
 # core S54（goal 完成授权经 ACP 客户端应答）— 测试用例
 
 > 来源：变更 `dsh-acp-goal-approval`。场景来源 `core-01-requirements.md` §S54；场景实现见 `core-S54-acp-goal-approval.md`。
-> steer 消息与工具结果文本为模型可见文本，由 keyless recorded-session 快照新场景固定（含 snapshot harness 应答支持，随本变更交付）；配置面零变化，无 config-catalog 影响。
+> steer 消息与工具结果文本为模型可见文本，由 keyless 快照场景 `snapshots/acp/goal-authorization/`（authored + replay.override，`{{fromRequest:}}` 解析 goal id，permissionAnswers 按 kind 应答授权卡，无需 harness 改动）固定；配置面零变化，无 config-catalog 影响。
 
 ## S54: goal 完成授权经 ACP 客户端应答
 
@@ -21,7 +21,7 @@
 
 | ID | 名称 | 关联 AC | 前置 | 操作 | 期望 |
 |----|------|---------|------|------|------|
-| ST-S54-01 | goal 授权卡 ACP 全链路 | S54-AC-01/02/04 | 真实 Loader 组合的 ACP 会话（mock 模型驱动工具调用，网络通道） | prompt 驱动未授权 `complete` → 客户端收 `session/request_permission`（Authorize/Deny）→ 应答 Authorize → 等模型重调 → 重启进程 `session/resume` 复核日志 | 卡片词汇正确；Authorize 后完成提交且日志含注入 `user/message` + `user-question-reply` + 完成事件；resume 后日志投影一致；Deny 分支无注入 |
+| ST-S54-01 | goal 授权卡 ACP 全链路 | S54-AC-01/02/04 | 真实 Loader 组合的 ACP 会话（mock 模型驱动工具调用，网络通道） | prompt 驱动未授权 `complete` → 客户端收 `session/request_permission`（Authorize/Deny）→ 应答 Authorize → 等模型重调 → 复核 wire 面与会话日志；Deny 与取消分支同法覆盖 | 卡片词汇正确（approve/deny · allow_once/reject_once · Authorize/Deny，且随 tool_call 卡之后）；Authorize 后完成提交且日志含注入的源 user `user/message`（无 `user-question-reply`——征求卡是 wire 面呈现，该事件仅存在于服务 answer() 路径如 Web）与完成事件；Deny / 取消分支无注入、goal 保持 active；durable 投影由快照场景承载 |
 
 ### 回归与真实验收
 

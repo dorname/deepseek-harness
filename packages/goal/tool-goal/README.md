@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-tool-goal` lets a model read persisted goals and infer and create a long-running goal from a direct human request. Creating, editing, pausing, or resuming requires that direct request in a top-level agent turn; completing or blocking also works in an autonomous goal round. Updates require the exact goal id and revision returned by a prior read. `resume` rearms active-but-disarmed or blocked goals, while users resume durable paused goals through Web or `/goal resume`. Autonomous blocking requires the same condition for a configurable threshold of three consecutive rounds by default.
+`dsh-tool-goal` lets a model read persisted goals and infer and create a long-running goal from a direct human request. Creating, editing, pausing, or resuming requires that direct request in a top-level agent turn; completing or blocking also works in an autonomous goal round, and without either witness the tool asks the composed user-questions channel to authorize first. Updates require the exact goal id and revision returned by a prior read. `resume` rearms disarmed or blocked goals; users resume durable paused goals through Web or `/goal resume`. Autonomous blocking requires the same condition for a configurable threshold, three rounds by default.
 
 ## Table of Contents
 
@@ -56,6 +56,8 @@ The tools execute only for the exact live calling agent inside its active driver
 
 An autonomous round that successfully reports `complete` or `blocked` also ends the physical turn after that step, and the model receives a closing instruction to write the final message to the user. Direct-human mutations never trigger that stop: the assistant may acknowledge the change and the loop keeps concurrent human steering available.
 
+A `complete` or `blocked` call outside those two paths fails with `GOAL_TOOL_AUTHORITY_REQUIRED`. When a user-questions answerer is composed, the tool turns that denial into one authorization question naming the goal objective and the operation, offered as `Authorize` / `Deny` with the `goal-review` presentation intent. `Authorize` steers a witnessed user-sourced message into the open turn — the human's authorization is part of this turn — and the call's result reports `authorization: { status: 'granted', action }` with the goal state unchanged; the model's immediate re-call with the same goal id and revision passes the direct-human witness. `Deny` (with any free-text message), a dismissal that hands the turn back to the human, a missing answerer, or no current goal all converge on the original rejection, annotated with the decline feedback when present.
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -70,6 +72,7 @@ This section explains how the tools enforce authority and render output; the obs
 
 - **Authority at execution.** Every call resolves the exact live agent, its inherited `AgentRegistry` initiator, running status, and an open turn; `create`, `edit`, `pause`, and `resume` additionally require an accepted `{ kind: 'user' }` message or steering event in a runtime-root agent's current turn. A durable paused goal fails the `resume` action with `GOAL_TOOL_RESUME_PAUSED`; the user-facing command or Web control owns that transition. Durable fork lineage does not demote a resumed root; live subagent ownership does.
 - **Host attestation of human input.** `{ kind: 'user' }` is assigned by `Agent.followup()` and `steer()` when their caller omits a source, so plugins, schedulers, and other non-human producers must pass their own source rather than inheriting human authority.
+- **Authorization ask on denied terminal updates.** A `complete` or `blocked` call that fails the completion authority becomes one `goal-review` question when a user-questions answerer exists. A grant steers a fixed-text witnessed user message and reports `authorization` in that call's result, so the model's own re-call — never the answer itself — performs the transition; every other outcome converges on the original authority rejection.
 - **System-prompt guidance with the configured threshold.** The package registers one `tool:goal` system-prompt section whose fixed text interpolates `blockedAfterConsecutiveRounds`; the same value is the hard lower bound enforced at execution.
 - **Wrap-up context for terminal rounds.** A successful autonomous `complete` or `blocked` defers a closing `<goal_complete>` or `<goal_blocked>` instruction so the model addresses the user once before the turn ends; direct-human mutations never defer this context.
 
@@ -83,7 +86,7 @@ This section explains how the tools enforce authority and render output; the obs
 
 ### Tool output
 
-All three tools share one canonical output: the compact JSON `{ goal: null }` or `{ goal: { id, revision, objective, phase, roundsStarted, maxGoalRounds, blockedReason? }, activation }`. `activation` in a result is a live observation and never becomes replay authority. UI clients receive pure generic cards — read for `get_goal`, other for mutations.
+All three tools share one canonical output: the compact JSON `{ goal: null }` or `{ goal: { id, revision, objective, phase, roundsStarted, maxGoalRounds, blockedReason? }, activation, authorization? }`, where `authorization` is `{ status: 'granted', action }` and appears only in the one result that reports a human grant of that call's denied terminal operation. `activation` in a result is a live observation and never becomes replay authority. UI clients receive pure generic cards — read for `get_goal`, other for mutations.
 
 </details>
 
@@ -128,7 +131,7 @@ Prefix-stable while the plugin scope, configured threshold, and guidance text ar
 
 #### What the model sees
 
-The generated [`get_goal`, `create_goal`, and `update_goal` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-goal). Successful results are compact JSON. A mutation appends the goal domain's durable `goal/change` event without queuing model context. `activation` in a result is a live observation and never becomes replay authority.
+The generated [`get_goal`, `create_goal`, and `update_goal` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-goal). Successful results are compact JSON, carrying `authorization` when the human granted that call's denied terminal operation; a grant also steers one fixed-text user message instructing the model to re-call with the same goal id and revision, and that steered message is ordinary model-visible input. A mutation appends the goal domain's durable `goal/change` event without queuing model context. `activation` in a result is a live observation and never becomes replay authority.
 
 #### Token effect
 

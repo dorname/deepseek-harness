@@ -21,18 +21,34 @@ export interface AskUserQuestionOption {
  * not know a tag renders the generic flow, and the answer encoding is identical
  * either way — an intent changes presentation only, never the protocol.
  */
-export type AskUserQuestionIntent = {
-  /** A plan submitted for review: `detail` is the plan markdown `ask()` requires, and the decision approves or declines it. */
-  kind: 'plan-review'
-  /**
-   * The option label that approves the plan; every other option declines it.
-   * Named rather than positional so no UI infers the verdict from option order.
-   * An `approve` naming no option of its own question is rejected at `ask()`.
-   */
-  approve: string
-  /** Logged tool invocation whose arguments contain the reviewed plan. */
-  callId?: ToolCallId
-}
+export type AskUserQuestionIntent =
+  | {
+    /** A plan submitted for review: `detail` is the plan markdown `ask()` requires, and the decision approves or declines it. */
+    kind: 'plan-review'
+    /**
+     * The option label that approves the plan; every other option declines it.
+     * Named rather than positional so no UI infers the verdict from option order.
+     * An `approve` naming no option of its own question is rejected at `ask()`.
+     */
+    approve: string
+    /** Logged tool invocation whose arguments contain the reviewed plan. */
+    callId?: ToolCallId
+  }
+  | {
+    /** A goal completion or block submitted for authorization: `detail` names the goal and the operation the decision authorizes. */
+    kind: 'goal-review'
+    /**
+     * The option label that authorizes the reviewed operation; every other
+     * option declines it. Named rather than positional so no UI infers the
+     * verdict from option order. An `approve` naming no option of its own
+     * question is rejected at `ask()`.
+     */
+    approve: string
+    /** Durable id of the goal whose operation is under review. */
+    goalId: string
+    /** Logged tool invocation whose authorization is under review. */
+    callId?: ToolCallId
+  }
 
 /** One question in a user-questions request. */
 export interface AskUserQuestionItem {

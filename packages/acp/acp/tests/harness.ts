@@ -20,7 +20,7 @@ import {
 } from '@agentclientprotocol/sdk'
 import AttachmentStore, { AttachmentError, AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentLimits, ImageAttachmentRef, SaveImageAttachment, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
-import { type ContentBlock, type GenerateOptions, LlmAdapter, ReasoningEffortId, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import { type ContentBlock, type GenerateOptions, LlmAdapter, ReasoningEffortId, type LlmResolvedModelInfo, type StreamChunk, ToolCallId } from '@deepseek-ai/dsh-llm'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { type CommandId } from '@deepseek-ai/dsh-commands/brand'
@@ -36,11 +36,13 @@ import BasicCompactionEngine from '@deepseek-ai/dsh-compaction-basic'
 import { type Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import { PermissionPresetService } from '@deepseek-ai/dsh-permission-presets'
 import PlanModeController from '@deepseek-ai/dsh-plan-mode'
+import GoalService from '@deepseek-ai/dsh-goal'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import ApprovalService from '@deepseek-ai/dsh-user-approval'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
+import * as toolGoal from '@deepseek-ai/dsh-tool-goal'
 import * as AcpPlugin from '../src/index.ts'
 import type { AcpCompactionResponse, AcpPluginConfig } from '../src/index.ts'
 
@@ -283,6 +285,16 @@ export function textResponse(text: string): StreamChunk[] {
   ]
 }
 
+/** Scripted response issuing exactly one tool call with explicit JSON arguments. */
+export function oneToolCallWithArgs(name: string, callId: string, args: string): StreamChunk[] {
+  return [
+    { type: 'block-start', index: 0, blockType: 'tool-call' },
+    { type: 'tool-call-delta', index: 0, id: ToolCallId(callId), name, argumentsDelta: args },
+    { type: 'block-end', index: 0, block: { type: 'tool-call', id: ToolCallId(callId), name, arguments: args } },
+    { type: 'finish', reason: { kind: 'tool-calls' } },
+  ]
+}
+
 /** Scripted response ending at the output-token ceiling. */
 export function maxTokensResponse(text: string): StreamChunk[] {
   return [
@@ -369,6 +381,8 @@ export async function makeBridgeHarness(options: {
   planMode?: boolean
   /** Compose the real user-questions service (the plan-review answerer stays the bridge's). */
   userQuestions?: boolean
+  /** Compose the real goal service and the model-facing goal tools (S54). */
+  goal?: boolean
   /** Mount the real basic compaction engine (automatic triggering off), or a scripted double. */
   compaction?: 'basic' | 'stub'
   /** Outcomes served by the stub engine in `compactNow` call order (stub only). */
@@ -390,6 +404,10 @@ export async function makeBridgeHarness(options: {
     await ctx.plugin(PlanModeController, { section: 'Test plan guidance: plan before acting.' })
   }
   if (options.userQuestions === true) await ctx.plugin(UserQuestionService)
+  if (options.goal === true) {
+    await ctx.plugin(GoalService)
+    await ctx.plugin(toolGoal, {})
+  }
   if (options.compaction === 'basic') await ctx.plugin(BasicCompactionEngine, { auto: false })
   if (options.compaction === 'stub') new ScriptedCompactionEngine(ctx, options.compactionOutcomes ?? [])
   if (options.presets === true) {

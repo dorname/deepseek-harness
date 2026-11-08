@@ -65,6 +65,7 @@ import {
   type AcpCompactionResponse,
 } from './compaction.ts'
 import { supportsAcpImagePrompts } from './content.ts'
+import { answerGoalReview, goalReviewPermissionOptions } from './goal-approval.ts'
 import { AcpMcpConfigError } from './mcp.ts'
 import { AcpModelConfigError } from './model-control.ts'
 import { AcpPermissionConfigError } from './permission-control.ts'
@@ -505,22 +506,21 @@ export class AcpBridge {
       })
     })
 
-    // Plan reviews (exit_plan_mode) are the one user-questions intent this
-    // bridge answers: they ride the standard permission channel with the
-    // approve/keep-planning option vocabulary. Every other question keeps the
+    // Goal authorization reviews and plan reviews are the two user-questions
+    // intents this bridge answers: both ride the standard permission channel,
+    // each with its own option vocabulary. Every other question keeps the
     // no-answerer behavior reserved for the full userQuestions channel.
-    const sendPermission = (
+    const sendPermissionOptions = (
       sessionId: string,
       callId: string,
-      approveLabel: string,
-      declineLabel: string,
+      options: RequestPermissionRequest['options'],
     ): Promise<RequestPermissionOutcome> => {
       const clientConn = clientConnRef.current
       if (clientConn === undefined) return Promise.resolve({ kind: 'cancelled' })
       const params: RequestPermissionRequest = {
         sessionId,
         toolCall: { toolCallId: callId },
-        options: planReviewPermissionOptions(approveLabel, declineLabel),
+        options,
       }
       return clientConn.request(methods.client.session.requestPermission, params).then(response => (
         response.outcome.outcome === 'cancelled'
@@ -528,12 +528,26 @@ export class AcpBridge {
           : { kind: 'selected', optionId: response.outcome.optionId }
       ))
     }
+    const sendPlanPermission = (
+      sessionId: string,
+      callId: string,
+      approveLabel: string,
+      declineLabel: string,
+    ): Promise<RequestPermissionOutcome> =>
+      sendPermissionOptions(sessionId, callId, planReviewPermissionOptions(approveLabel, declineLabel))
+    const sendGoalPermission = (
+      sessionId: string,
+      callId: string,
+      approveLabel: string,
+      declineLabel: string,
+    ): Promise<RequestPermissionOutcome> =>
+      sendPermissionOptions(sessionId, callId, goalReviewPermissionOptions(approveLabel, declineLabel))
 
     const questionsOff = this.ctx.on('user-questions/request', (request, next) => {
       if (request.agent === undefined) return next()
       const record = this.ownedRecord(request.agent)
       if (record === undefined) return next()
-      return answerPlanReview(record, request, next, sendPermission)
+      return answerGoalReview(record, request, () => answerPlanReview(record, request, next, sendPlanPermission), sendGoalPermission)
     })
 
     const connection = app.connect(stream)

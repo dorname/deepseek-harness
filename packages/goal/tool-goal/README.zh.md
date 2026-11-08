@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-tool-goal` 让模型读取持久 goal，并根据人类直接请求推断和创建长期 goal。创建、编辑、暂停或恢复要求该直接请求出现在顶层 agent（智能体）轮次中；完成或阻塞也可以在自主 Goal Round 中执行。更新必须使用先前读取到的精确 goal id 和 revision。`resume` 会重新启用 active-but-disarmed 或 blocked 的 goal，而持久的 paused goal 由用户通过 Web 或 `/goal resume` 恢复。自主阻塞要求同一条件持续达到可配置阈值，默认是连续三个 Round。
+`dsh-tool-goal` 让模型读取持久 goal，并根据人类直接请求推断和创建长期 goal。创建、编辑、暂停或恢复要求该直接请求出现在顶层 agent（智能体）轮次中；完成或阻塞也可以在自主 Goal Round 中执行，两种见证都不存在时工具先向已组合的 user-questions 通道征求授权。更新必须使用先前读取到的精确 goal id 和 revision。`resume` 会重新启用 disarmed 或 blocked 的 goal；持久的 paused goal 由用户通过 Web 或 `/goal resume` 恢复。自主阻塞要求同一条件持续达到可配置阈值，默认是连续三个 Round。
 
 ## 目录
 
@@ -56,6 +56,8 @@ kind: "package-reference"
 
 成功报告 `complete` 或 `blocked` 的自主 Round 还会在该步骤后结束物理轮次，模型会收到一条结束指令，要求向用户写出最终消息。人类直接变更绝不会触发这种停止：assistant 可以确认变更，循环仍可接收并发的人类 steering（中途引导）。
 
+不在这两条路径上的 `complete` 或 `blocked` 调用以 `GOAL_TOOL_AUTHORITY_REQUIRED` 失败。当组合了 user-questions 应答方时，工具把该拒绝转换为一条授权问题，点名 goal 目标与操作，以 `Authorize` / `Deny` 选项呈现并携带 `goal-review` 呈现意图。`Authorize` 会把一条有见证的、来源为 user 的消息 steer 进开放轮次——人类的授权就在本轮里——而该次调用的结果报告 `authorization: { status: 'granted', action }`，goal 状态保持不变；模型立即用相同 goal id 和 revision 重调，即可通过直接人类见证。`Deny`（可附带自由文本）、把轮次交还给人类的关闭操作、缺少应答方或没有当前 goal，都汇聚到原有拒绝上，存在拒绝反馈时附带该反馈。
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -70,6 +72,7 @@ kind: "package-reference"
 
 - **执行时权限。** 每次调用都解析精确活跃 agent、其继承的 `AgentRegistry` initiator、running 状态与开放轮次；`create`、`edit`、`pause` 和 `resume` 还要求运行时根 agent 的当前轮次中存在已接受的 `{ kind: 'user' }` 消息或 steering 事件。持久的 paused goal 会让 `resume` 以 `GOAL_TOOL_RESUME_PAUSED` 失败；面向用户的命令或 Web 控件拥有该转换。持久 fork 谱系不会降低已恢复根 agent 的等级；活跃 subagent 所有权会降低。
 - **人类输入的宿主证明。** `Agent.followup()` 与 `steer()` 会在调用方省略 source 时分配 `{ kind: 'user' }`，因此插件、调度器与其他非人类生产方必须传入自己的 source，不能继承人类权限。
+- **终局更新被拒时的授权征求。** 未通过完成权限的 `complete` 或 `blocked` 调用，在存在 user-questions 应答方时成为一条 `goal-review` 问题。授权结果会 steer 一条固定文本、有见证的 user 消息并在该次调用结果中报告 `authorization`，因此是模型自己的重调——而不是应答本身——执行该转换；其余所有结果都汇聚到原有权限拒绝。
 - **带配置阈值的系统提示词指引。** 本包注册一个 `tool:goal` 系统提示词章节，其固定文本插入 `blockedAfterConsecutiveRounds`；同一数值就是执行时强制执行的硬下限。
 - **终局 Round 的结束上下文。** 成功的自主 `complete` 或 `blocked` 会延后一条 `<goal_complete>` 或 `<goal_blocked>` 结束指令，让模型在轮次结束前向用户做一次交代；人类直接变更绝不会延后该上下文。
 
@@ -83,7 +86,7 @@ kind: "package-reference"
 
 ### 工具输出
 
-三个工具共用一种规范输出：紧凑 JSON `{ goal: null }`，或 `{ goal: { id, revision, objective, phase, roundsStarted, maxGoalRounds, blockedReason? }, activation }`。结果中的 `activation` 是实时观察值，绝不会成为回放权限依据。UI 客户端收到纯通用卡片——`get_goal` 为 read，变更使用 other。
+三个工具共用一种规范输出：紧凑 JSON `{ goal: null }`，或 `{ goal: { id, revision, objective, phase, roundsStarted, maxGoalRounds, blockedReason? }, activation, authorization? }`，其中 `authorization` 为 `{ status: 'granted', action }`，只出现在报告人类授权该次调用被拒终局操作的哪一条结果里。结果中的 `activation` 是实时观察值，绝不会成为回放权限依据。UI 客户端收到纯通用卡片——`get_goal` 为 read，变更使用 other。
 
 </details>
 
@@ -128,7 +131,7 @@ create_goal may infer goal intent from a direct human request in any language. A
 
 #### 模型看到的内容
 
-生成的 [`get_goal`、`create_goal` 和 `update_goal` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-goal)。成功结果是紧凑 JSON。变更会追加 goal 领域的持久 `goal/change` 事件，而不会将模型上下文加入队列。结果中的 `activation` 是实时观察值，绝不会成为回放权限依据。
+生成的 [`get_goal`、`create_goal` 和 `update_goal` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-goal)。成功结果是紧凑 JSON，当人类授权了该次调用被拒的终局操作时携带 `authorization`；授权还会 steer 一条固定文本的 user 消息，指示模型用相同 goal id 和 revision 重调，该 steered 消息就是普通模型可见输入。变更会追加 goal 领域的持久 `goal/change` 事件，而不会将模型上下文加入队列。结果中的 `activation` 是实时观察值，绝不会成为回放权限依据。
 
 #### Token 影响
 

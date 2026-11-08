@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "op": "initialize"
+    },
+    {
+      "op": "newSession"
+    },
+    {
+      "op": "prompt",
+      "text": "Create a persistent goal with objective 'produce the ready marker' and no round cap. Then start exactly one background job: one bash call with run_in_background set to true, command sleep 8; printf 'ready\\n' > ready.txt, description 'write the ready marker'. Then pause the goal with update_goal (action pause, using the exact goal_id and revision you already know) so nothing continues it automatically. Do not wait for the job and do not read its output, and do not complete the goal yourself before the wakeup turn. End your turn right after pausing with a one-sentence reply. The system will wake you when the job finishes; in that wakeup turn, complete the goal with update_goal (action complete, same goal_id and revision), then reply with exactly DONE."
+    },
+    {
+      "op": "waitForGoalPhase",
+      "phase": "complete",
+      "timeoutMs": 120000
+    },
+    {
+      "op": "waitForTurnEnd",
+      "timeoutMs": 120000
+    }
+  ],
+  "permissionAnswers": [
+    {
+      "kind": "allow_once"
+    }
+  ]
+}

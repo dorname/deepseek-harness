@@ -8,8 +8,9 @@
  *    The local composition also mounts the approval and permission-preset
  *    services and one probe tool for the `always` permission round-trip, the
  *    real skill registry over a seeded project skills fixture for the
- *    `session/skills_list` enumeration, and the real plan-mode controller for
- *    the `session/set_mode` surface.
+ *    `session/skills_list` enumeration, the real plan-mode controller for
+ *    the `session/set_mode` surface, and the goal stack with a wake fixture
+ *    tool for the goal authorization round-trip.
  * 2. Staging: connect to an existing server URL via `ACP_SMOKE_URL`. That
  *    target's composition is unknown, so the permission round-trip is skipped
  *    (reported by the caller, never as a pass).
@@ -66,11 +67,22 @@ import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import BasicCompactionEngine from '@deepseek-ai/dsh-compaction-basic'
 import PlanModeController from '@deepseek-ai/dsh-plan-mode'
 import ApprovalService from '@deepseek-ai/dsh-user-approval'
+import GoalService from '@deepseek-ai/dsh-goal'
+import UserQuestionService from '@deepseek-ai/dsh-user-questions'
+import * as toolGoal from '@deepseek-ai/dsh-tool-goal'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
 import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai'
 import { closeMockServers, mockServer } from '../../../../llm/llm-pi-ai/tests/mock-server.ts'
 import * as AcpNetworkPlugin from '../../src/index.ts'
 import { reportResult } from '../helpers/reporter.ts'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'smoke-wake': { kind: 'smoke-wake' } & import('@deepseek-ai/dsh-llm').ContextFormed
+  }
+}
 
 const STAGING_URL = process.env.ACP_SMOKE_URL
 const SECRET = process.env.ACP_SMOKE_SECRET ?? 'smoke-test-secret'
@@ -83,8 +95,16 @@ const PHASE_CWD = process.env.ACP_SMOKE_CWD ?? '/dsh-home/acp-smoke'
 const SESSION_FILE = process.env.ACP_SMOKE_SESSION_FILE
 const RESUME_SESSION_ID = process.env.ACP_SMOKE_SESSION_ID
 
-/** One scripted entry: plain chunks, or chunks held back for `waitMs` first. */
-type ScriptedEntry = StreamChunk[] | { waitMs: number; chunks: StreamChunk[] }
+/** One scripted entry: plain chunks, chunks held back for `waitMs`, or chunks computed from the request. */
+type ScriptedEntry = StreamChunk[] | { waitMs: number; chunks: StreamChunk[] } | { resolve: (options: GenerateOptions) => StreamChunk[] }
+
+/**
+ * Pinned prefix of the steered witness text (`authorizedSteerText`). The
+ * post-grant request keys on that text, whose goal id only exists once
+ * create_goal has run, so those responses cannot be scripted under a static
+ * key and come from the adapter's steered FIFO instead.
+ */
+const STEER_KEY_PREFIX = 'The human authorized '
 
 class SmokeAdapter extends LlmAdapter {
   constructor(
@@ -95,6 +115,8 @@ class SmokeAdapter extends LlmAdapter {
      */
     private readonly scripted: Map<string, ScriptedEntry[]> = new Map(),
     private readonly provider = 'mock-smoke',
+    /** FIFO consumed by the requests keyed on the steered witness text. */
+    private readonly steered: ScriptedEntry[] = [],
   ) {
     super()
   }
@@ -129,9 +151,14 @@ class SmokeAdapter extends LlmAdapter {
     const last = userMessages.at(-1)
     const key = last?.content.map(c => c.type === 'text' ? c.text : '').join('').trim() ?? ''
     const queued = this.scripted.get(key)?.shift()
-    const entry = queued ?? this.responses.get(key)
+    let entry = queued ?? this.responses.get(key)
+    if (entry === undefined && key.startsWith(STEER_KEY_PREFIX)) {
+      const steered = this.steered.shift()
+      if (steered === undefined) throw new Error('SmokeAdapter: the steered FIFO is exhausted')
+      entry = steered
+    }
     if (entry === undefined) throw new Error(`SmokeAdapter: no script for "${key}"`)
-    if (!Array.isArray(entry)) {
+    if (!Array.isArray(entry) && 'waitMs' in entry) {
       // Hold the response back so the turn stays active for a wide busy window.
       const deadline = Date.now() + entry.waitMs
       while (Date.now() < deadline) {
@@ -139,10 +166,49 @@ class SmokeAdapter extends LlmAdapter {
         await new Promise(resolve => setTimeout(resolve, 20))
       }
     }
-    for (const chunk of Array.isArray(entry) ? entry : entry.chunks) {
+    const chunks = Array.isArray(entry)
+      ? entry
+      : 'resolve' in entry ? entry.resolve(options) : entry.chunks
+    for (const chunk of chunks) {
       if (options.signal?.aborted) throw new Error('aborted')
       yield chunk
     }
+  }
+}
+
+/**
+ * Latest persisted goal identity readable from the request history: goal tool
+ * results carry it as compact JSON, and the scripted completion call needs the
+ * exact `goal_id`/`revision` the session actually minted.
+ */
+function goalRefFromHistory(options: GenerateOptions): { id: string; revision: number } {
+  for (let index = options.messages.length - 1; index >= 0; index -= 1) {
+    const message = options.messages[index]
+    if (message === undefined || message.role !== 'tool') continue
+    for (const block of message.content) {
+      if (block.type !== 'text') continue
+      try {
+        const parsed = JSON.parse(block.text) as { goal?: { id?: string; revision?: number } }
+        if (typeof parsed.goal?.id === 'string' && typeof parsed.goal.revision === 'number') {
+          return { id: parsed.goal.id, revision: parsed.goal.revision }
+        }
+      } catch {
+        // Ordinary prose blocks fail JSON.parse; only goal tool results parse.
+      }
+    }
+  }
+  throw new Error('SmokeAdapter: no goal tool result in the request history')
+}
+
+/** Scripted response issuing one goal completion call with the session's real goal ref. */
+function resolveGoalCompletion(callId: string) {
+  return {
+    resolve: (options: GenerateOptions): StreamChunk[] => {
+      const goal = goalRefFromHistory(options)
+      return toolCallWithArgs('update_goal', callId, JSON.stringify({
+        goal_id: goal.id, revision: goal.revision, action: 'complete',
+      }))
+    },
   }
 }
 
@@ -179,10 +245,15 @@ function agentText(updates: SessionUpdate[]): string {
 }
 
 function toolCallResponse(name: string, callId: string): StreamChunk[] {
+  return toolCallWithArgs(name, callId, '{}')
+}
+
+/** One OpenAI-compatible tool-call response carrying explicit JSON arguments. */
+function toolCallWithArgs(name: string, callId: string, args: string): StreamChunk[] {
   return [
     { type: 'block-start', index: 0, blockType: 'tool-call' },
-    { type: 'tool-call-delta', index: 0, id: ToolCallId(callId), name, argumentsDelta: '{}' },
-    { type: 'block-end', index: 0, block: { type: 'tool-call', id: ToolCallId(callId), name, arguments: '{}' } },
+    { type: 'tool-call-delta', index: 0, id: ToolCallId(callId), name, argumentsDelta: args },
+    { type: 'block-end', index: 0, block: { type: 'tool-call', id: ToolCallId(callId), name, arguments: args } },
     { type: 'finish', reason: { kind: 'tool-calls' } },
   ]
 }
@@ -203,6 +274,9 @@ const CONDENSE_PROMPT_B = [
   'For context the summary should preserve: a barrage across an estuary impounds a basin, sluice gates fill it at high tide, and the head difference drives low-head turbines on the ebb.'.repeat(2),
   'Also note for the summary that output tracks the lunar cycle, that tidal-stream arrays are the newer in-water alternative, and that the plant connects to the grid through a substation.',
 ].join(' ')
+
+/** The one prompt driving the whole SMOKE-08 chain; its FIFO covers every scripted turn of the goal authorization round-trip. */
+const SMOKE08_PROMPT = 'create a goal and see it through'
 
 /** One config option in a new/resume response; SMOKE-07 reads the grouped `model` select. */
 interface ModelConfigOption {
@@ -385,6 +459,7 @@ async function startLocalServer(): Promise<{
   dispose: () => Promise<void>
   persistenceRoot: string
   executed: string[]
+  goalPhase: (sessionId: string) => string | undefined
 }> {
   const persistenceRoot = await mkdtemp(join(tmpdir(), 'dsh-acp-network-smoke-'))
   const responses = new Map<string, StreamChunk[]>([
@@ -400,9 +475,26 @@ async function startLocalServer(): Promise<{
     [CONDENSE_PROMPT_A, [textResponse('history worth condensing'), textResponse('## Checkpoint\n\nThe lens question was fully answered.')]],
     [CONDENSE_PROMPT_B, [textResponse('undeclared history worth condensing'), textResponse('## Checkpoint\n\nThe tidal question was fully answered.')]],
     ['busy probe', [{ waitMs: 200, chunks: toolCallResponse('smoke_probe', 'call-busy') }, { waitMs: 1500, chunks: textResponse('probe finished') }]],
+    // SMOKE-08 key. One prompt drives the whole chain: create the goal, wake
+    // a non-human continuation, deny its completion ask, wake again, then
+    // grant. The grant's re-call and final text live in the steered FIFO
+    // because their key (the steered witness text) carries the minted goal id.
+    [SMOKE08_PROMPT, [
+      toolCallWithArgs('create_goal', 'call-goal-create', JSON.stringify({ objective: 'finish the smoke objective' })),
+      toolCallResponse('smoke_goal_wake', 'call-wake-1'),
+      textResponse('goal created; the wake continues'),
+      resolveGoalCompletion('call-deny-1'),
+      toolCallResponse('smoke_goal_wake', 'call-wake-2'),
+      textResponse('the decline is recorded; continuing'),
+      resolveGoalCompletion('call-complete-1'),
+    ]],
   ])
+  const steered: ScriptedEntry[] = [
+    resolveGoalCompletion('call-complete-2'),
+    textResponse('goal completed under authorization'),
+  ]
   const executed: string[] = []
-  const adapter = new SmokeAdapter(responses, scripted)
+  const adapter = new SmokeAdapter(responses, scripted, 'mock-smoke', steered)
 
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx, { systemPrompt: { personaPrefix: '' } })
@@ -414,6 +506,9 @@ async function startLocalServer(): Promise<{
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(ApprovalService)
   await ctx.plugin(PlanModeController, { section: 'Smoke plan guidance: plan before acting.' })
+  await ctx.plugin(GoalService)
+  await ctx.plugin(UserQuestionService)
+  await ctx.plugin(toolGoal, {})
   await ctx.plugin(SkillRegistry)
   await ctx.plugin(SkillFileSystem, { watch: false })
   ctx.provide('shell', {
@@ -441,6 +536,22 @@ async function startLocalServer(): Promise<{
       return [{ type: 'text', text: 'probed' }]
     },
   }))
+  // SMOKE-08 trigger: a stand-in non-human producer that opens the next turn
+  // without human or goal-round authority, so the completion ask can fire.
+  const WAKE_TEXT = 'smoke goal continuation'
+  ctx.tools.register(defineContentToolFixture({
+    name: 'smoke_goal_wake',
+    description: 'Wake the agent with a non-human continuation (smoke fixture).',
+    parameters: {},
+    execute: async (_args, exec) => {
+      if (exec.agent === undefined) throw new Error('smoke_goal_wake requires an agent scope')
+      exec.agent.followup(createUserMessage({
+        content: [{ type: 'text', text: WAKE_TEXT }],
+        source: { kind: 'smoke-wake' },
+      }))
+      return [{ type: 'text', text: 'woke' }]
+    },
+  }))
 
   await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 })
   await ctx.plugin({
@@ -466,6 +577,11 @@ async function startLocalServer(): Promise<{
     url,
     persistenceRoot,
     executed,
+    /** Server-side goal view of one live session, for the SMOKE-08 completion probe. */
+    goalPhase: (sessionId: string): string | undefined => {
+      const agent = ctx.agents.get(SessionId(sessionId))
+      return agent === undefined ? undefined : ctx.goals.get(agent)?.phase
+    },
     dispose: async () => {
       await ctx.fiber.dispose()
       await rm(persistenceRoot, { recursive: true, force: true })
@@ -1043,6 +1159,77 @@ async function runResumePhase(client: SmokeClient): Promise<void> {
   console.log('SMOKE-RESUME: ok')
 }
 
+/**
+ * SMOKE-acp-network-08: the goal authorization round-trip on the network
+ * transport. A human prompt creates the goal, then the wake fixture opens a
+ * non-human continuation: the completion ask rides request_permission with
+ * the Authorize/Deny vocabulary, the deny outcome leaves the goal active, and
+ * the second wake's grant steers the witnessed user message so the model's
+ * re-call completes the goal on the server.
+ */
+async function runSmoke08(
+  url: string,
+  persistenceRoot: string,
+  goalPhase: (sessionId: string) => string | undefined,
+): Promise<void> {
+  const requests: RequestPermissionRequest[] = []
+  const answers = ['deny', 'approve']
+  const expectedToolCalls = ['call-deny-1', 'call-complete-1']
+  const { client, dispose } = await makeClient(url, {
+    answerPermission: (request) => {
+      requests.push(request)
+      const optionIds = request.options.map(option => option.optionId)
+      if (optionIds.join(',') !== 'approve,deny') {
+        throw new Error(`SMOKE-08: permission option ids are ${optionIds.join(',')}`)
+      }
+      const kinds = request.options.map(option => option.kind)
+      if (kinds.join(',') !== 'allow_once,reject_once') {
+        throw new Error(`SMOKE-08: permission option kinds are ${kinds.join(',')}`)
+      }
+      const names = request.options.map(option => option.name)
+      if (names.join(',') !== 'Authorize,Deny') {
+        throw new Error(`SMOKE-08: permission option names are ${names.join(',')}`)
+      }
+      const optionId = answers.shift()
+      if (optionId === undefined) throw new Error('SMOKE-08: unexpected third permission request')
+      const toolCallId = expectedToolCalls[requests.length - 1]
+      if (request.toolCall?.toolCallId !== toolCallId) {
+        throw new Error(`SMOKE-08: the permission request names ${String(request.toolCall?.toolCallId)}, expected ${String(toolCallId)}`)
+      }
+      return Promise.resolve({ outcome: { outcome: 'selected', optionId } })
+    },
+  })
+  try {
+    const { sessionId } = await client.newSession({ cwd: persistenceRoot, mcpServers: [] })
+    const seen = client.updates.length
+    const result = await client.prompt({
+      sessionId,
+      prompt: [{ type: 'text', text: SMOKE08_PROMPT }],
+    })
+    assertStopReason('SMOKE-08', result)
+
+    // The wake followups keep the chain running after the prompt turn ends.
+    await waitForCondition('SMOKE-08 goal completion', () => goalPhase(sessionId) === 'complete')
+    if (requests.length !== 2) {
+      throw new Error(`SMOKE-08: ${requests.length} permission requests, expected 2`)
+    }
+    const sawCompletionCard = client.updates.slice(seen).some(update =>
+      update.sessionUpdate === 'tool_call'
+      && 'toolCallId' in update
+      && update.toolCallId === 'call-complete-1')
+    if (!sawCompletionCard) {
+      throw new Error('SMOKE-08: the authorized completion never showed a tool_call card')
+    }
+    if (!agentText(client.updates.slice(seen)).endsWith('goal completed under authorization')) {
+      throw new Error(`SMOKE-08: the final agent text is "${agentText(client.updates.slice(seen))}"`)
+    }
+    await client.closeSession({ sessionId })
+    console.log('SMOKE-08 goal authorization round-trip: ok')
+  } finally {
+    await dispose()
+  }
+}
+
 async function main(): Promise<void> {
   const persistenceRoot = await mkdtemp(join(tmpdir(), 'dsh-acp-network-smoke-'))
   let localServer: Awaited<ReturnType<typeof startLocalServer>> | undefined
@@ -1161,6 +1348,16 @@ async function main(): Promise<void> {
       console.log('\nSMOKE-07 skipped: the multi-provider face needs the local llm-pi-ai array composition.')
     } else {
       await runSmoke07()
+    }
+
+    // SMOKE-08 needs the local composition (goal stack, user questions, wake
+    // fixture) and the interactive permission handshake; a staging target or
+    // the handshake-only mode cannot reproduce it, and that is reported as a
+    // skip rather than a pass.
+    if (STAGING_URL || NO_PROMPT || localServer === undefined) {
+      console.log('\nSMOKE-08 skipped: the goal authorization round-trip needs the local smoke composition.')
+    } else {
+      await runSmoke08(url, persistenceRoot, localServer.goalPhase)
     }
 
     console.log('\nAll ACP-over-network smoke checks passed.')

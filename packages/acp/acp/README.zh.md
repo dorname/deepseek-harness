@@ -82,7 +82,7 @@ kind: "package-reference"
 
 `session/compact` 与 `session/update` 的 `compaction_update` 变体把已组合的压缩引擎呈现为显式 dsh 扩展——ACP 1.4.0 两者皆未定义——通过 `initialize` 时声明的 `session.compaction` 客户端能力协商。已声明的连接会收到有序的一对通知——`in_progress`，随后是携带摘要块的 `completed` 或 `failed`——由持久 `compaction/*` 事件派生，且先于响应写入排队；未声明的连接以完全相同的方式执行，但收不到任何压缩更新。响应报告引擎的持久结果，历史不可压缩时为 `null`。会话有活跃工作时调用以携带 `data.code: "busy"` 的 internal error 失败；未知会话 id 以 `Invalid params` 失败；未组合引擎的组合以 internal error 失败并说明缺口。该调用走与自动压缩相同的持久引擎路径，其摘要只经会话日志进入后续轮次。
 
-`session/set_mode` 与可选的 `modes` 广告把已组合的计划模式控制器呈现在标准界面上。仅当会话组合挂载了 `@deepseek-ai/dsh-plan-mode` 时，`session/new` 与 `session/resume` 才报告 `modes`——`currentModeId` 加上带名称的 `plan`／`normal` 词汇；否则响应整体省略该字段。`session/set_mode` 按该词汇校验 id 并应用；响应不承诺生效——由持久 `plan/mode` 事件派生的 `current_mode_update` 通知是唯一生效事实，且先于响应写入排队。提交时机遵循控制器：轮次间的选择立即提交；轮次中的选择排队到下一次被接受的轮内 pre-step 才提交；重复选择已提交状态会清除反向 pending，但不追加事件。未知 id 以 `Invalid params` 失败并给出词汇；未组合插件的组合以 internal error 失败。计划评审——携带 plan-review intent 的 `exit_plan_mode` 提问——经 `session/request_permission` 通道下发，选项 id 为 `approve`／`keep-planning`；取消结果映射回工具的评审被关闭分支。
+`session/set_mode` 与可选的 `modes` 广告把已组合的计划模式控制器呈现在标准界面上。仅当会话组合挂载了 `@deepseek-ai/dsh-plan-mode` 时，`session/new` 与 `session/resume` 才报告 `modes`——`currentModeId` 加上带名称的 `plan`／`normal` 词汇；否则响应整体省略该字段。`session/set_mode` 按该词汇校验 id 并应用；响应不承诺生效——由持久 `plan/mode` 事件派生的 `current_mode_update` 通知是唯一生效事实，且先于响应写入排队。提交时机遵循控制器：轮次间的选择立即提交；轮次中的选择排队到下一次被接受的轮内 pre-step 才提交；重复选择已提交状态会清除反向 pending，但不追加事件。未知 id 以 `Invalid params` 失败并给出词汇；未组合插件的组合以 internal error 失败。计划评审——携带 plan-review intent 的 `exit_plan_mode` 提问——经 `session/request_permission` 通道下发，选项 id 为 `approve`／`keep-planning`；取消结果映射回工具的评审被关闭分支。goal 授权评审——携带 goal-review intent 的 `update_goal` 完成或阻塞提问——在组合了 goal 工具时经同一通道下发，选项 id 为 `approve`／`deny`；`approve` 结果绝不会经 wire 转换 goal——宿主工具 steer 一条有见证的 user 消息，由模型自己的重调执行转换——取消结果映射为工具的交还轮次消息。
 
 -----
 
@@ -115,6 +115,8 @@ kind: "package-reference"
 | [`src/permission-control.ts`](src/permission-control.ts) | `AcpPermissionControl`：`permission_policy`／`permission_preset` 的公布、校验与应用 |
 | [`src/skill-list.ts`](src/skill-list.ts) | `session/skills_list` 扩展方法：参数校验、注册表解析、invocation-neutral 字段映射 |
 | [`src/plan-mode.ts`](src/plan-mode.ts) | 计划模式面（S51）：模式词汇校验、`modes` 广告读取、评审到权限通道的映射 |
+| [`src/permission-review.ts`](src/permission-review.ts) | 共享评审核心：两个评审面的选项词汇、会话所有权过滤与结果映射 |
+| [`src/goal-approval.ts`](src/goal-approval.ts) | goal 授权面（S54）：经 `session/request_permission` 下发的 `goal-review` intent 应答方，先于计划评审面被认领 |
 | [`src/compaction.ts`](src/compaction.ts) | `session/compact` 面（S52）：能力门控、参数校验、引擎解析、持久结果映射与 `compaction_update` 队列 |
 
 ### 准入与提示词结算

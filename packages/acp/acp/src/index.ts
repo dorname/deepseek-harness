@@ -50,6 +50,12 @@ export {
 } from './plan-mode.ts'
 export { AcpPermissionConfigError, AcpPermissionControl } from './permission-control.ts'
 export {
+  answerGoalReview,
+  GOAL_APPROVE_OPTION_ID,
+  GOAL_DENY_OPTION_ID,
+  goalReviewPermissionOptions,
+} from './goal-approval.ts'
+export {
   listSessionSkills,
   parseSkillsListRequest,
   SKILLS_LIST_METHOD,

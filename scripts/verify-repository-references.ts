@@ -26,12 +26,12 @@ export interface RepositoryReference {
 }
 
 function isMaintained(file: string): boolean {
-  // Archived deltas and committed seed copies retain historical source evidence;
+  // Archived changes and committed seed copies retain historical source evidence;
   // seed journals bind resolved copies to hashes used for recovery and audit.
   // Staging and deployment ledgers under logos/resources/verify keep their
   // executed image tags and command blocks verbatim; scripts and data files in
   // the same tree stay maintained.
-  const historicalSnapshot = /^logos\/changes\/archive\/[^/]+\/deltas\//u.test(file)
+  const historicalSnapshot = /^logos\/changes\/archive\//u.test(file)
     || /^logos\/resources\/verify\/baseline-seed-runs\/[^/]+\/(?:resolved|staging)\//u.test(file)
     || /^logos\/resources\/verify\/(?:[^/]+-report|[^/]+-staging)\.md$/u.test(file)
   return !historicalSnapshot && !excludedPrefixes.some(prefix => file.startsWith(prefix))

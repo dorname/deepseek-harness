@@ -783,7 +783,7 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 - **用户价值**：goal 完成授权不再要求回合结束后的额外 prompt 往返；经 ACP 驱动 dsh 会话的集成方（dspm）在回合内即可应答授权卡片，安全模型（只有人类动作可授予完成）一字未改（← P01/P08）。
 - **优先级**：P1
 - **主路径**：工具在权威门槛拒绝前先经 `userQuestions.ask()` 征求（问题指名 goal 标题与操作、Authorize/Deny 选项、`goal-review` 呈现意图）→ ACP 桥接以 `session/request_permission` 呈现选项词汇并映射应答（web 宿主走既有通用卡片流）→ Authorize 后工具注入一条源为 user 的授权用户消息进入同开放回合（模型可见）并返回指向重调的结果 → 模型重调完成工具经 direct-human 见证通过，完成照常提交。Deny/取消不产生注入与见证输入，工具返回注明拒绝的既有权威拒绝。
-- **边界**：无 userQuestions 通道的组合（headless 等）行为不变——立即 `GOAL_TOOL_AUTHORITY_REQUIRED`；admitted round 与已有 direct-human 的调用在权威门槛即通过，永不征求；授权回传不是任何外部 complete 调用——`GoalService` 零改动、无 id seam 需求，见证条件（根 agent + 开放回合内 `source.kind='user'`）零改动；零新增会话事件类型（ask 应答循既有 `user-question-reply`，注入消息即普通 `user/message`）、零新增协议方法、零新增 Config，Session format 不变；`AskUserQuestionIntent` 新增 `goal-review` tagged kind 属呈现意图扩展，协议与应答编码不变，未知意图的 UI 走通用卡片（联合既有契约）。
+- **边界**：无 userQuestions 通道的组合（headless 等）行为不变——立即 `GOAL_TOOL_AUTHORITY_REQUIRED`；admitted round 与已有 direct-human 的调用在权威门槛即通过，永不征求；授权回传不是任何外部 complete 调用——`GoalService` 零改动、无 id seam 需求，见证条件（根 agent + 开放回合内 `source.kind='user'`）零改动；零新增会话事件类型（ACP 征求卡是 wire 面呈现，不入会话日志；日志面只有注入的普通 `user/message` 与既有工具/完成事件，`user-question-reply` 仅存在于服务 answer() 路径，如 Web）、零新增协议方法、零新增 Config，Session format 不变；`AskUserQuestionIntent` 新增 `goal-review` tagged kind 属呈现意图扩展，协议与应答编码不变，未知意图的 UI 走通用卡片（联合既有契约）。
 ```
 
 ## ADDED — 四、S54 验收条件

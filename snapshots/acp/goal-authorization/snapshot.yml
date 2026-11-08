@@ -1,0 +1,14 @@
+version: 1
+scenario: goal-authorization
+profile: acp
+composition: acp-default
+recording: authored
+header:
+  class: goal-authorization
+  pin: true
+  systemPromptSource: permission-policy
+  toolSchemasSource: permission-policy
+replay:
+  override: true
+workspace:
+  final: true

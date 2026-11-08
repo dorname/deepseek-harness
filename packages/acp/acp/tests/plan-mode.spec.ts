@@ -2,11 +2,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PROTOCOL_VERSION, RequestError } from '@agentclientprotocol/sdk'
-import { ToolCallId, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type { AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions/types'
-import { makeBridgeHarness, textResponse, type BridgeHarness } from './harness.ts'
+import { makeBridgeHarness, oneToolCallWithArgs, textResponse, type BridgeHarness } from './harness.ts'
 import { reported } from './helpers/reporter.ts'
 
 /** JSON-RPC codes the SDK maps wire errors onto. */
@@ -24,16 +23,6 @@ function wireError<T>(call: PromiseLike<T> | T): Promise<RequestError | undefine
     () => { throw new Error('expected the wire call to fail') },
     (error: unknown) => (error instanceof RequestError ? error : undefined),
   )
-}
-
-/** Scripted response issuing exactly one tool call with explicit JSON arguments. */
-function oneToolCallWithArgs(name: string, callId: string, args: string): StreamChunk[] {
-  return [
-    { type: 'block-start', index: 0, blockType: 'tool-call' },
-    { type: 'tool-call-delta', index: 0, id: ToolCallId(callId), name, argumentsDelta: args },
-    { type: 'block-end', index: 0, block: { type: 'tool-call', id: ToolCallId(callId), name, arguments: args } },
-    { type: 'finish', reason: { kind: 'tool-calls' } },
-  ]
 }
 
 /** The `current_mode_update` updates observed so far, in delivery order. */

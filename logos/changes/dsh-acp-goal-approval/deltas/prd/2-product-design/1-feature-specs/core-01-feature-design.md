@@ -23,7 +23,7 @@
 
 - bridge 在既有 `user-questions/request` 瀑布（`bridge.ts:532-537`）新增 goal-review 应答者，与 `answerPlanReview` 同构：仅截获 owned session + 单问题 + `goal-review` 意图 + callId 匹配的请求，经 `session/request_permission` 呈现 Authorize/Deny 选项词汇（`planReviewPermissionOptions` 同构 helper），映射 outcome 回 ask 应答；其余意图与无主会话 `next()` 透传，行为不变。
 - `AskUserQuestionIntent` 新增 `goal-review` tagged kind：呈现意图扩展，协议与应答编码不变；不识别该 kind 的 UI 渲染通用选项卡（联合既有开放契约，`types.ts:18-33`）。intent 为宿主内类型——bridge 出线前已转换为 `session/request_permission` 选项，不跨 ACP wire，双 SDK 零改动。
-- 协议方法零新增（复用 `session/request_permission`）；零新增会话事件类型（ask 循环既有 `user-question-reply`，注入消息即普通 `user/message`）；零新增 Config；`SessionEventMap` 与 Session format 4 不变。模型可见 ⟺ 已记录不变量保持：注入的授权消息与会话内既有事件可完整重建。
+- 协议方法零新增（复用 `session/request_permission`）；零新增会话事件类型（ACP 征求卡是 wire 面呈现，不入会话日志；日志面只有注入的普通 `user/message` 与既有工具/完成事件，`user-question-reply` 仅存在于服务 answer() 路径，如 Web）；零新增 Config；`SessionEventMap` 与 Session format 4 不变。模型可见 ⟺ 已记录不变量保持：注入的授权消息与会话内既有事件可完整重建。
 
 ### 14.4 安全论证
 

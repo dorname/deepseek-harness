@@ -16,10 +16,10 @@ import { RequestError, type SessionModeState } from '@agentclientprotocol/sdk'
 import type { Context } from '@deepseek-ai/cordis'
 import { errorChain } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import type {} from '@deepseek-ai/dsh-plan-mode'
 import type { AskUserQuestionAnswer, AskUserQuestionRequestEvent } from '@deepseek-ai/dsh-user-questions/types'
-import type { AcpSession } from './session.ts'
+import { answerPermissionReview, permissionReviewOptions } from './permission-review.ts'
+import type { PermissionReviewOption, RequestPermissionOutcome, ReviewSessionSource } from './permission-review.ts'
 
 /** The session mode id for dsh plan mode. */
 export const PLAN_MODE_ID = 'plan'
@@ -36,6 +36,8 @@ export const APPROVE_OPTION_ID = 'approve'
 /** optionId that declines the reviewed plan on the permission channel. */
 export const KEEP_PLANNING_OPTION_ID = 'keep-planning'
 
+export type { RequestPermissionOutcome } from './permission-review.ts'
+
 /** Standard invalid-parameter failure with protocol-safe detail. */
 function invalidParams(detail: string): RequestError {
   return RequestError.invalidParams(undefined, detail)
@@ -46,10 +48,11 @@ function internalError(detail: string): RequestError {
   return RequestError.internalError(undefined, detail)
 }
 
-/** The dismissal error the exit tool already maps to its turn-back message. */
-function reviewDismissed(): UserQuestionError {
-  return new UserQuestionError('the ACP client dismissed the plan review', 'ASK_CANCELLED')
-}
+/** The plan-review face: the intent kind this answerer claims and its permission vocabulary. */
+const PLAN_REVIEW_FACE = {
+  intentKind: 'plan-review',
+  buildOptions: planReviewPermissionOptions,
+} as const
 
 /**
  * Validate one client-supplied mode id against the advertised vocabulary.
@@ -112,19 +115,8 @@ export function applySessionMode(ctx: Context, agent: Agent, modeId: string): vo
  * @param declineLabel - the question's other option label.
  * @returns the approve/keep-planning pair in presentation order.
  */
-export function planReviewPermissionOptions(approveLabel: string, declineLabel: string): { optionId: string; name: string; kind: 'allow_once' | 'reject_once' }[] {
-  return [
-    { optionId: APPROVE_OPTION_ID, name: approveLabel, kind: 'allow_once' },
-    { optionId: KEEP_PLANNING_OPTION_ID, name: declineLabel, kind: 'reject_once' },
-  ]
-}
-
-/** A bridge-owned session record narrowed to what the review answerer needs. */
-interface ReviewSessionSource {
-  /** The exact session whose reviews this answerer forwards. */
-  agent: AcpSession['agent']
-  /** Await every update queued before this call. */
-  drainUpdates(): Promise<void>
+export function planReviewPermissionOptions(approveLabel: string, declineLabel: string): PermissionReviewOption[] {
+  return permissionReviewOptions(approveLabel, declineLabel, KEEP_PLANNING_OPTION_ID)
 }
 
 /**
@@ -146,37 +138,5 @@ export function answerPlanReview(
   next: () => Promise<AskUserQuestionAnswer>,
   sendPermission: (sessionId: string, callId: string, approveLabel: string, declineLabel: string) => Promise<RequestPermissionOutcome>,
 ): Promise<AskUserQuestionAnswer> {
-  const record = source.agent === request.agent ? source : undefined
-  if (record === undefined || request.questions.length !== 1) return next()
-  const question = request.questions[0]
-  if (question === undefined) return next()
-  const intent = question.intent
-  if (intent === undefined || intent.callId === undefined) return next()
-  const declineLabel = (question.options ?? []).map(option => option.label).find(label => label !== intent.approve)
-  if (declineLabel === undefined) return next()
-  const callId = intent.callId
-  return source.drainUpdates()
-    .then(() => sendPermission(source.agent.session.id, callId, intent.approve, declineLabel))
-    .then((outcome) => {
-      if (outcome.kind === 'cancelled') throw reviewDismissed()
-      return {
-        answers: [{
-          id: question.id,
-          selected: [outcome.optionId === APPROVE_OPTION_ID ? intent.approve : declineLabel],
-        }],
-      }
-    })
+  return answerPermissionReview(source, request, next, sendPermission, PLAN_REVIEW_FACE)
 }
-
-/** One settled permission round trip, narrowed for the review mapping. */
-export type RequestPermissionOutcome =
-  | {
-    /** The client dismissed the review instead of choosing. */
-    kind: 'cancelled'
-  }
-  | {
-    /** The client selected an option. */
-    kind: 'selected'
-    /** The chosen option id. */
-    optionId: string
-  }

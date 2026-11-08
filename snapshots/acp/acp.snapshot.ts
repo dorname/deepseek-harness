@@ -33,6 +33,7 @@ const controllerCases: readonly {
   { name: 'stale-model-options', hasModelTurn: false, configPath: join(corpusDir, 'stale-model-options', 'cordis.yml') },
   { name: 'skills-list', hasModelTurn: false },
   { name: 'plan-mode', hasModelTurn: false },
+  { name: 'goal-authorization', hasModelTurn: true },
   { name: 'permission-policy', hasModelTurn: true },
   { name: 'cancel', hasModelTurn: true },
   { name: 'cancel-tool-calls', hasModelTurn: true },

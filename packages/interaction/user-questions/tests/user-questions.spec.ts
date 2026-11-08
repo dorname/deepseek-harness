@@ -332,6 +332,40 @@ describe('UserQuestionService', () => {
     expect(p.ask).not.toHaveBeenCalled()
   })
 
+  it('validates a goal-review intent like any review intent before reaching the provider', async () => {
+    const ctx = new Context()
+    await ctx.plugin(UserQuestionService)
+    const p = { ask: vi.fn(async () => ({ answers: [] })) }
+    registerAnswerer(ctx, p)
+    const intent = { kind: 'goal-review', approve: 'Authorize', goalId: 'goal-1' } as const
+
+    // The authorizing label must name an offered option...
+    await expect(ctx.userQuestions.ask({
+      questions: [{
+        id: 'goal-review', question: 'Authorize completing?', detail: 'ship it',
+        options: [{ label: 'Deny' }],
+        intent,
+      }],
+    })).rejects.toMatchObject({ name: 'UserQuestionError', code: 'BAD_INTENT' })
+    // ...and the detail must name the goal operation under review.
+    await expect(ctx.userQuestions.ask({
+      questions: [{
+        id: 'goal-review', question: 'Authorize completing?',
+        options: [{ label: 'Authorize' }, { label: 'Deny' }],
+        intent,
+      }],
+    })).rejects.toMatchObject({ name: 'UserQuestionError', code: 'BAD_INTENT' })
+
+    await ctx.userQuestions.ask({
+      questions: [{
+        id: 'goal-review', question: 'Authorize completing?', detail: 'ship it',
+        options: [{ label: 'Authorize' }, { label: 'Deny' }],
+        intent,
+      }],
+    })
+    expect(p.ask).toHaveBeenCalledTimes(1)
+  })
+
   it('passes an intent through once its approve label names an offered option', async () => {
     const ctx = new Context()
     await ctx.plugin(UserQuestionService)

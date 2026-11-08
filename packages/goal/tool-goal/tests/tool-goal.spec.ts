@@ -12,6 +12,7 @@ import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import SessionStore, {
   SESSION_FORMAT_VERSION,
   Session,
+  SessionEvent,
   SessionId,
   SessionLogOffset,
 } from '@deepseek-ai/dsh-session'
@@ -19,6 +20,8 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
+import UserQuestionService, { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
+import type { AskUserQuestionRequestEvent } from '@deepseek-ai/dsh-user-questions/types'
 import * as toolGoal from '@deepseek-ai/dsh-tool-goal'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 
@@ -97,7 +100,7 @@ function closeTurn(stub: StubAgent, turn: number): void {
   stub.session.append('turn/end', { turn, reason: { kind: 'completed' } })
 }
 
-async function harness(config: toolGoal.Config = {}) {
+async function harness(config: toolGoal.Config = {}, options: { userQuestions?: boolean } = {}) {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
@@ -106,10 +109,29 @@ async function harness(config: toolGoal.Config = {}) {
   await ctx.plugin(ToolRuntime)
   ctx.sessionProjections.register(turnBoundaryProjectionDefinition)
   await ctx.plugin(GoalService)
+  if (options.userQuestions === true) await ctx.plugin(UserQuestionService)
   const fiber = await ctx.plugin(toolGoal, config)
   const root = stubAgent(`goal-tool-root-${Math.random()}`, undefined, ctx)
   await ctx.agents.register(root.agent)
   return { ctx, fiber, root }
+}
+
+/** Land one steered message in the open turn, as the real loop's admission does. */
+function admitSteer(stub: StubAgent): void {
+  stub.agent.steer = (message) => {
+    stub.agent.inbox.append('next-step', message)
+    stub.session.append('user/message', message, { surfaceOp: 'append' })
+  }
+}
+
+/** Register one test answerer that records the request and replies with one label for every question. */
+function answerWithLabel(ctx: Context, label: string): AskUserQuestionRequestEvent[] {
+  const asked: AskUserQuestionRequestEvent[] = []
+  ctx.on('user-questions/request', async (request) => {
+    asked.push(request)
+    return { answers: request.questions.map(question => ({ id: question.id, selected: [label] })) }
+  })
+  return asked
 }
 
 /** Execute one registered tool under an optional driver initiator. */
@@ -119,9 +141,10 @@ async function execute(
   args: unknown,
   agent?: Agent,
   initiator: Agent | undefined = agent,
+  signal: AbortSignal = testToolSignal,
 ): Promise<ToolExecutionResult> {
   const run = () => ctx.tools.execute({
-    signal: testToolSignal,
+    signal,
     callId: ToolCallId(`call-${Math.random()}`),
     name,
     arguments: args,
@@ -659,5 +682,300 @@ describe('goal tool state transitions', () => {
     })
     expect(blocked.concludesTurn).toBeUndefined()
     expect(blocked.additionalContexts).toBeUndefined()
+  })
+})
+
+describe('goal tool authorization review (S54)', () => {
+  const DENIED_MESSAGE = 'complete and blocked require a direct human turn or the current goal round'
+
+  it('asks over userQuestions and returns an authorized result whose steer-back witnesses the re-call', async () => {
+    const { ctx, root } = await harness({}, { userQuestions: true })
+    admitSteer(root)
+    const asked = answerWithLabel(ctx, 'Authorize')
+    const humanTurn = openTurn(root, { kind: 'user' })
+    const created = ctx.goals.create(root.agent, { objective: 'authorized completion' })
+    closeTurn(root, humanTurn)
+    const rogueBoundary = root.session.snapshotEvents().length
+    openTurn(root, { kind: 'test' })
+
+    const first = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'complete',
+    }, root.agent)
+    expect(first.isError).toBe(false)
+    expect(resultJson(first)['authorization']).toEqual({ status: 'granted', action: 'complete' })
+    expect(resultGoal(first)).toMatchObject({ id: created.id, phase: 'active' })
+    expect(ctx.goals.get(root.agent)?.phase).toBe('active')
+
+    // The ask names the goal and operation, carries the goal-review intent
+    // with this call's id, and offers the Authorize/Deny vocabulary.
+    expect(asked).toHaveLength(1)
+    const question = asked[0]?.questions[0]
+    expect(question).toMatchObject({ header: 'Goal review', detail: 'authorized completion' })
+    expect(question?.question).toContain(`"${created.objective}"`)
+    expect(question?.question).toContain(created.id)
+    expect(question?.question).toContain('Authorize completing')
+    expect(question?.options?.map(option => option.label)).toEqual(['Authorize', 'Deny'])
+    expect(question?.intent).toMatchObject({
+      kind: 'goal-review', approve: 'Authorize', goalId: created.id,
+    })
+
+    // The grant steered one user-sourced message into the open turn; the
+    // model's re-call passes the authority gate through that witness.
+    const steered = root.session.snapshotEvents()
+      .filter((event): event is SessionEvent<'user/message'> => event.type === 'user/message'
+        && event.data.source.kind === 'user' && event.seq > rogueBoundary)
+    expect(steered).toHaveLength(1)
+    const steerBlock = steered[0]?.data.content[0]
+    if (steerBlock?.type !== 'text') throw new Error('expected one steered text block')
+    expect(steerBlock.text).toContain('authorized completing goal')
+    expect(steerBlock.text).toContain(created.id)
+    expect(steerBlock.text).toContain('Call update_goal again now')
+
+    const second = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'complete',
+    }, root.agent)
+    expect(resultGoal(second)).toMatchObject({ phase: 'complete' })
+    expect(second.additionalContexts).toBeUndefined()
+  })
+
+  it('maps a Deny answer to the existing authority rejection annotated with the decline', async () => {
+    const { ctx, root } = await harness({}, { userQuestions: true })
+    admitSteer(root)
+    const asked = answerWithLabel(ctx, 'Deny')
+    const humanTurn = openTurn(root, { kind: 'user' })
+    const created = ctx.goals.create(root.agent, { objective: 'denied completion' })
+    closeTurn(root, humanTurn)
+    const rogueBoundary = root.session.snapshotEvents().length
+    openTurn(root, { kind: 'test' })
+
+    const result = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'complete',
+    }, root.agent)
+    expect(result.isError).toBe(true)
+    expect(result.error?.info?.code).toBe('GOAL_TOOL_AUTHORITY_REQUIRED')
+    if (!result.isError) throw new Error('expected goal tool failure')
+    const block = result.content[0]
+    if (block?.type !== 'text') throw new Error('expected text tool failure')
+    expect(block.text).toContain(DENIED_MESSAGE)
+    expect(block.text).toContain('the human declined authorization')
+    expect(ctx.goals.get(root.agent)?.phase).toBe('active')
+    expect(asked).toHaveLength(1)
+    expect(root.session.snapshotEvents()
+      .filter(event => event.type === 'user/message' && event.data.source.kind === 'user'
+        && event.seq > rogueBoundary))
+      .toHaveLength(0)
+  })
+
+  it('keeps the no-channel and no-goal denials byte-identical without asking', async () => {
+    const { ctx, root } = await harness()
+    openTurn(root, { kind: 'test' })
+    const noChannel = await execute(ctx, 'update_goal', {
+      goal_id: 'goal-1', revision: 1, action: 'complete',
+    }, root.agent)
+    expect(noChannel.error?.info?.code).toBe('GOAL_TOOL_AUTHORITY_REQUIRED')
+    if (!noChannel.isError) throw new Error('expected goal tool failure')
+    const noChannelBlock = noChannel.content[0]
+    if (noChannelBlock?.type !== 'text') throw new Error('expected text tool failure')
+    expect(noChannelBlock.text).toBe(`Error: ${DENIED_MESSAGE}`)
+    closeTurn(root, 1)
+  })
+
+  it('maps a dismissed review to the turn-back text and lets signal aborts propagate', async () => {
+    const { ctx, root } = await harness({}, { userQuestions: true })
+    admitSteer(root)
+    ctx.on('user-questions/request', async () => {
+      throw new UserQuestionError('the client went away', 'ASK_CANCELLED')
+    })
+    const humanTurn = openTurn(root, { kind: 'user' })
+    const created = ctx.goals.create(root.agent, { objective: 'dismissed review' })
+    closeTurn(root, humanTurn)
+    openTurn(root, { kind: 'test' })
+
+    const dismissed = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'complete',
+    }, root.agent)
+    expect(dismissed.isError).toBe(true)
+    if (!dismissed.isError) throw new Error('expected goal tool failure')
+    const dismissedBlock = dismissed.content[0]
+    if (dismissedBlock?.type !== 'text') throw new Error('expected text tool failure')
+    expect(dismissedBlock.text).toBe('Error: The user dismissed the goal review to speak instead; '
+      + 'stop here and wait for their message.')
+    expect(ctx.goals.get(root.agent)?.phase).toBe('active')
+  })
+
+  it('lets an in-flight turn cancellation supersede the review with the canonical abort outcome', async () => {
+    const { ctx, root } = await harness({}, { userQuestions: true })
+    admitSteer(root)
+    const midCall = new AbortController()
+    ctx.on('user-questions/request', () => new Promise<never>((_resolve, reject) => {
+      midCall.signal.addEventListener('abort', () => reject(new Error('waterfall aborted')), { once: true })
+    }))
+    const humanTurn = openTurn(root, { kind: 'user' })
+    const created = ctx.goals.create(root.agent, { objective: 'aborted review' })
+    closeTurn(root, humanTurn)
+    const rogueBoundary = root.session.snapshotEvents().length
+    openTurn(root, { kind: 'test' })
+
+    const pending = execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'complete',
+    }, root.agent, root.agent, midCall.signal)
+    await Promise.resolve()
+    midCall.abort()
+    const result = await pending
+    // The ask is bounded by the call's signal: an in-flight turn cancel
+    // surfaces the service's abort text and authorizes nothing.
+    expect(result.isError).toBe(true)
+    expect(result.error?.message).toBe('ask_user_question was aborted before the user answered')
+    expect(ctx.goals.get(root.agent)?.phase).toBe('active')
+    expect(root.session.snapshotEvents()
+      .filter(event => event.type === 'user/message' && event.data.source.kind === 'user'
+        && event.seq > rogueBoundary))
+      .toHaveLength(0)
+  })
+
+  it('never asks when the authority gate passes on direct-human input or an admitted round', async () => {
+    const { ctx, root } = await harness({}, { userQuestions: true })
+    const asked = answerWithLabel(ctx, 'Authorize')
+    const humanTurn = openTurn(root, { kind: 'user' })
+    const created = ctx.goals.create(root.agent, { objective: 'never asked' })
+    const direct = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'complete',
+    }, root.agent)
+    expect(resultGoal(direct)).toMatchObject({ phase: 'complete' })
+    expect(asked).toHaveLength(0)
+    closeTurn(root, humanTurn)
+
+    openTurn(root, { kind: 'user' })
+    const recreated = ctx.goals.create(root.agent, { objective: 'round admitted' })
+    closeTurn(root, 2)
+    openTurn(root, {
+      kind: 'goal', goalId: recreated.id, revision: recreated.revision, round: 1,
+    })
+    const admitted = await execute(ctx, 'update_goal', {
+      goal_id: recreated.id, revision: recreated.revision, action: 'complete',
+    }, root.agent)
+    expect(resultGoal(admitted)).toMatchObject({ phase: 'complete' })
+    expect(asked).toHaveLength(0)
+  })
+
+  it('authorizes blocked symmetrically and the witnessed re-call bypasses the round threshold', async () => {
+    const { ctx, root } = await harness({ blockedAfterConsecutiveRounds: 3 }, { userQuestions: true })
+    admitSteer(root)
+    const asked = answerWithLabel(ctx, 'Authorize')
+    const humanTurn = openTurn(root, { kind: 'user' })
+    const created = ctx.goals.create(root.agent, { objective: 'authorized block' })
+    closeTurn(root, humanTurn)
+    const rogueBoundary = root.session.snapshotEvents().length
+    openTurn(root, { kind: 'test' })
+
+    const first = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'blocked',
+      blocked_reason: 'The credential provider is unreachable.',
+    }, root.agent)
+    expect(first.isError).toBe(false)
+    expect(resultJson(first)['authorization']).toEqual({ status: 'granted', action: 'blocked' })
+    expect(asked).toHaveLength(1)
+    const steerBlock = root.session.snapshotEvents()
+      .find((event): event is SessionEvent<'user/message'> => event.type === 'user/message'
+        && event.data.source.kind === 'user' && event.seq > rogueBoundary)
+      ?.data.content[0]
+    if (steerBlock?.type !== 'text') throw new Error('expected one steered text block')
+    expect(steerBlock.text).toContain('marking goal')
+
+    const second = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'blocked',
+      blocked_reason: 'The credential provider is unreachable.',
+    }, root.agent)
+    expect(resultGoal(second)).toMatchObject({
+      phase: 'blocked',
+      blockedReason: { code: 'model-reported', message: 'The credential provider is unreachable.' },
+    })
+    expect(second.additionalContexts).toBeUndefined()
+  })
+
+  it('survives fiber disposal mid-review and fails later calls cleanly', async () => {
+    const { ctx, fiber, root } = await harness({}, { userQuestions: true })
+    admitSteer(root)
+    let release: ((label: string) => void) | undefined
+    ctx.on('user-questions/request', request => new Promise((resolve) => {
+      release = (label) => {
+        resolve({ answers: request.questions.map(question => ({ id: question.id, selected: [label] })) })
+      }
+    }))
+    const humanTurn = openTurn(root, { kind: 'user' })
+    const created = ctx.goals.create(root.agent, { objective: 'mid-review disposal' })
+    closeTurn(root, humanTurn)
+    openTurn(root, { kind: 'test' })
+
+    const pending = execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'complete',
+    }, root.agent)
+    await Promise.resolve()
+    await fiber.dispose()
+    release?.('Authorize')
+    const settled = await pending
+    expect(settled.isError).toBe(false)
+    expect(resultJson(settled)['authorization']).toEqual({ status: 'granted', action: 'complete' })
+
+    const after = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'complete',
+    }, root.agent)
+    expect(after.isError).toBe(true)
+    expect(after.error?.info?.code).toBe('UNKNOWN_TOOL')
+  })
+
+  it('carries the human decline feedback into the annotated rejection', async () => {
+    const { ctx, root } = await harness({}, { userQuestions: true })
+    admitSteer(root)
+    const asked: AskUserQuestionRequestEvent[] = []
+    ctx.on('user-questions/request', async (request) => {
+      asked.push(request)
+      return {
+        answers: request.questions.map(question => ({
+          id: question.id, selected: ['Deny'], custom: 'too early, keep going',
+        })),
+      }
+    })
+    const humanTurn = openTurn(root, { kind: 'user' })
+    const created = ctx.goals.create(root.agent, { objective: 'declined with feedback' })
+    closeTurn(root, humanTurn)
+    openTurn(root, { kind: 'test' })
+
+    const result = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'complete',
+    }, root.agent)
+    expect(result.isError).toBe(true)
+    if (!result.isError) throw new Error('expected goal tool failure')
+    const block = result.content[0]
+    if (block?.type !== 'text') throw new Error('expected text tool failure')
+    expect(block.text).toContain(DENIED_MESSAGE)
+    expect(block.text).toContain('the human declined authorization; their message: too early, keep going')
+    expect(ctx.goals.get(root.agent)?.phase).toBe('active')
+    expect(asked).toHaveLength(1)
+  })
+
+  it('propagates a goal-service failure during authority resolution instead of asking', async () => {
+    const { ctx, root } = await harness({}, { userQuestions: true })
+    admitSteer(root)
+    const asked = answerWithLabel(ctx, 'Authorize')
+    const humanTurn = openTurn(root, { kind: 'user' })
+    ctx.goals.create(root.agent, { objective: 'resolution failure' })
+    closeTurn(root, humanTurn)
+    openTurn(root, { kind: 'test' })
+
+    // The ask conversion claims exactly the authority rejection; any other
+    // failure inside the authority resolution propagates untouched.
+    ctx.goals.get = () => {
+      throw new Error('goal service read failed')
+    }
+    const result = await execute(ctx, 'update_goal', {
+      goal_id: 'goal-unreadable', revision: 1, action: 'complete',
+    }, root.agent)
+    expect(result.isError).toBe(true)
+    if (!result.isError) throw new Error('expected goal tool failure')
+    const block = result.content[0]
+    if (block?.type !== 'text') throw new Error('expected text tool failure')
+    expect(block.text).toBe('Error: goal service read failed')
+    expect(asked).toHaveLength(0)
   })
 })

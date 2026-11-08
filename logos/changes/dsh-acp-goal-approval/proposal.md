@@ -20,7 +20,7 @@ dspm REQ-D6（userQuestions ACP 化）在回复文档 §4.4 被接受为「按�
 - 影响的技术架构：`core-system-map.md`（goal 授权面）与新增 `core-S54-acp-goal-approval.md`；acp-network-system-map 补记 goal 意图应答（协议方法零新增）。
 - 影响的部署方案：`logos/resources/prd/3-technical-plan/3-deployment/core-01-deployment-plan.md` 与 `acp-network-deployment-plan.md` 的发布物、staging 验证与回滚注意。
 - 影响的 API：`tool-goal` 的 `complete`/`blocked` 工具在授权缺失且 `ctx.get('userQuestions')` 存在时先经 `interaction.ask()` 征求授权（问题指名 goal 标题与操作，选项 Authorize/Deny，intent `{kind:'goal-review', approve, goalId, callId?}`）；应答 Approve → 工具 `agent.steer()` 回一条源为 user 的用户消息进入开放回合并返回指向重调的结构化结果；Deny/取消/无通道 → 既有权威拒绝保持（无通道时立即失败，行为不变）。`AskUserQuestionIntent` 新增 `goal-review` tagged kind（呈现意图，协议与应答编码不变；未知 kind 的 UI 走通用卡片——联合设计契约既有）。该 intent 为宿主内类型（发起方 plan-mode 同层），不跨 ACP wire——桥接在出线前已转换为 `session/request_permission` 选项，双 SDK 零改动。ACP bridge 在 `user-questions/request` 瀑布上新增 goal-review 意图应答者（owned session 匹配，`session/request_permission` 承载 Authorize/Deny 选项词汇）——`session/request_permission` 方法面零新增。见证模型、`GoalService`、`SessionEventMap`、Session format 零改动。
-- 影响的 DB 表：无；零新增会话事件类型（ask 应答循既有 `user-question-reply`，steer 消息即普通 `user/message`），`SessionEventMap` 不变，Session format 维持 4。
+- 影响的 DB 表：无；零新增会话事件类型（ACP 征求卡是 wire 面呈现，不入会话日志；日志面只有注入的普通 `user/message` 与既有工具/完成事件，`user-question-reply` 仅存在于服务 answer() 路径，如 Web），`SessionEventMap` 不变，Session format 维持 4。
 - 影响的编排测试：无。
 - 影响的测试规格：新增 `logos/resources/test/core-S54-test-cases.md`；更新 `logos/resources/test/smoke/acp-network-smoke-test-cases.md`（SMOKE-acp-network-08）；复用 S49/S51 既有用例与 S03 回归 ID。
 - 实现期交付物：`tool-goal`、`user-questions`、`acp` 中英文 README 与 JSDoc 契约更新、keyless recorded-session 快照新场景（固定 steer 消息与工具结果文本）、`docs/upgrade-guide/<发布版本>/acp-goal-approval/` 中英文升级指南条目（版本号随发布期确定）。

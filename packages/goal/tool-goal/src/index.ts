@@ -17,11 +17,15 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import type { GenericCallView } from '@deepseek-ai/dsh-tools'
+import type { GenericCallView, ToolRunContext } from '@deepseek-ai/dsh-tools'
+import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
+import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions/types'
 import {
   completionAuthority,
   goalToolExecution,
   requireDirectHuman,
+  type GoalToolAuthority,
+  type GoalToolExecution,
 } from './authority.ts'
 import { renderWrapupContext } from './wrapup.ts'
 
@@ -69,7 +73,15 @@ type GoalToolValue =
       blockedReason?: { code: string; message: string }
     }
     activation: GoalView['activation']
+    /** Present only when the human authorized the denied operation this call reports. */
+    authorization?: GoalAuthorization
   }
+
+/** The authorization grant one goal tool result reports after a human grant. */
+interface GoalAuthorization {
+  status: 'granted'
+  action: 'complete' | 'blocked'
+}
 
 const GOAL_VALUE_SCHEMA = {
   oneOf: [
@@ -106,6 +118,14 @@ const GOAL_VALUE_SCHEMA = {
           },
         },
         activation: { type: 'string', required: true, enum: ['armed', 'disarmed'] },
+        authorization: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            status: { type: 'string', required: true, const: 'granted' },
+            action: { type: 'string', required: true, enum: ['complete', 'blocked'] },
+          },
+        },
       },
     },
   ],
@@ -154,7 +174,7 @@ function goalRef(goalId: string, revision: number): GoalRef {
 }
 
 /** Stable compact model result; activation is an observation, not replay state. */
-function goalValue(goal: GoalView | undefined): GoalToolValue {
+function goalValue(goal: GoalView | undefined, authorization?: GoalAuthorization): GoalToolValue {
   if (goal === undefined) return { goal: null }
   return {
     goal: {
@@ -169,6 +189,7 @@ function goalValue(goal: GoalView | undefined): GoalToolValue {
       },
     },
     activation: goal.activation,
+    ...authorization === undefined ? {} : { authorization },
   }
 }
 
@@ -181,6 +202,92 @@ const GOAL_OUTPUT = {
 /** Generic, args-only pending presentation shared by the goal tools. */
 function present(title: string, kind: 'read' | 'other', rawInput?: unknown): GenericCallView {
   return { card: 'generic', title, kind, ...rawInput === undefined ? {} : { rawInput } }
+}
+
+/** Stable question identity and option labels of the goal authorization review. */
+const GOAL_REVIEW_ID = 'goal-review'
+const GOAL_REVIEW_APPROVE_LABEL = 'Authorize'
+const GOAL_REVIEW_DENY_LABEL = 'Deny'
+
+/**
+ * Model-visible instruction the tool steers into the open turn after a grant.
+ * Exported because it is a pinned model-visible contract: transcripts and
+ * scenario drivers key on this exact text.
+ * @param action - the authorized terminal operation, `complete` or `blocked`.
+ * @param goal - the live goal view the denied call reported.
+ * @returns the fixed steering text naming the goal and the re-call instruction.
+ */
+export function authorizedSteerText(action: 'complete' | 'blocked', goal: GoalView): string {
+  const operation = action === 'complete'
+    ? `completing goal ${goal.id} ("${goal.objective}")`
+    : `marking goal ${goal.id} ("${goal.objective}") blocked`
+  return `The human authorized ${operation}. Call update_goal again now with the same goal_id, `
+    + 'revision, and action; the human\'s authorization is already part of this turn.'
+}
+
+/**
+ * Ask the human to authorize one authority-denied `complete` or `blocked`.
+ * A grant steers a witnessed `user`-sourced message into the open turn and
+ * returns the unchanged goal marked authorized, so the model's own re-call
+ * passes `completionAuthority` through the direct-human witness. Every other
+ * outcome converges to the existing authority rejection: without a
+ * user-questions channel, or with no goal to review, the original denial is
+ * rethrown untouched; a decline rethrows it annotated; a dismissal (the user
+ * took the turn back to speak) maps to the plan-review turn-back text.
+ */
+async function requestGoalAuthorization(
+  ctx: Context,
+  execution: GoalToolExecution,
+  exec: ToolRunContext,
+  action: 'complete' | 'blocked',
+  denied: HarnessError,
+): Promise<GoalToolValue> {
+  const interaction = ctx.get('userQuestions')
+  const goal = ctx.goals.get(execution.agent)
+  if (interaction === undefined || goal === undefined) throw denied
+  const operation = action === 'complete' ? 'completing' : 'marking blocked'
+  let answer: AskUserQuestionAnswer
+  try {
+    answer = await interaction.ask({
+      questions: [{
+        id: GOAL_REVIEW_ID,
+        header: 'Goal review',
+        question: `Authorize ${operation} goal "${goal.objective}" (${goal.id})?`,
+        detail: goal.objective,
+        options: [
+          { label: GOAL_REVIEW_APPROVE_LABEL, description: `Let the model ${operation === 'completing' ? 'complete' : 'mark blocked'} this goal in the current turn.` },
+          { label: GOAL_REVIEW_DENY_LABEL, description: 'Refuse the operation; the model keeps its existing behavior.' },
+        ],
+        // Presentation only: a capable UI renders the request as a goal
+        // approval decision instead of a generic question, and answers with
+        // one of the labels above either way.
+        intent: {
+          kind: 'goal-review',
+          approve: GOAL_REVIEW_APPROVE_LABEL,
+          goalId: goal.id,
+          callId: exec.callId,
+        },
+      }],
+      agent: execution.agent,
+      signal: exec.signal,
+    })
+  } catch (cause: unknown) {
+    if (cause instanceof UserQuestionError && cause.code === 'ASK_CANCELLED') {
+      throw new Error('The user dismissed the goal review to speak instead; '
+        + 'stop here and wait for their message.')
+    }
+    throw cause
+  }
+  const item = answer.answers.find(entry => entry.id === GOAL_REVIEW_ID)
+  if (item?.selected.length !== 1 || item.selected[0] !== GOAL_REVIEW_APPROVE_LABEL) {
+    const feedback = item?.custom === undefined ? '' : `; their message: ${item.custom}`
+    throw new HarnessError(`${denied.message} (the human declined authorization${feedback})`, denied.code)
+  }
+  execution.agent.steer(createUserMessage({
+    content: [{ type: 'text', text: authorizedSteerText(action, goal) }],
+    source: { kind: 'user' },
+  }))
+  return goalValue(goal, { status: 'granted', action })
 }
 
 /** Register the three Codex-shaped goal tools and their shared policy section. */
@@ -288,7 +395,13 @@ export function apply(ctx: Context, config: Config): void {
           : ctx.goals.resume(execution.agent, ref)
         return Promise.resolve(goalValue(goal))
       }
-      const authority = completionAuthority(ctx, execution)
+      let authority: GoalToolAuthority
+      try {
+        authority = completionAuthority(ctx, execution)
+      } catch (cause: unknown) {
+        if (!(cause instanceof HarnessError) || cause.code !== 'GOAL_TOOL_AUTHORITY_REQUIRED') throw cause
+        return requestGoalAuthorization(ctx, execution, exec, args.action, cause)
+      }
       if (hasText(args.objective) || hasRoundCap(args.max_goal_rounds)) {
         throw new HarnessError(
           'objective and max_goal_rounds are valid only with action edit',
