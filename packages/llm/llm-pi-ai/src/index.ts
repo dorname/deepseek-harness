@@ -52,6 +52,26 @@
  *               max: ultra
  * ```
  *
+ * The composition layer may instead declare the routes as a list — each entry
+ * carries its route in `provider` beside the same profile fields — through
+ * the `providerList` config field. The list is a deployment artifact: it is
+ * not settings-addressable, it normalizes into the same dict pipeline in
+ * declaration order, and it refuses to coexist with a `providers` dict that
+ * names routes.
+ *
+ * ```yaml
+ * - id: llm
+ *   name: '@deepseek-ai/dsh-llm-pi-ai'
+ *   config:
+ *     providerList:
+ *       - provider: openai
+ *         apiKeyEnv: OPENAI_API_KEY
+ *       - provider: acme-gateway
+ *         apiKeyEnv: ACME_GATEWAY_API_KEY
+ *         api: openai-completions
+ *         baseURL: https://gateway.acme.example/v1
+ * ```
+ *
  * @module @deepseek-ai/dsh-llm-pi-ai
  */
 import type {} from '@deepseek-ai/dsh-settings'
@@ -67,7 +87,7 @@ import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { PiAiAdapter } from './adapter.ts'
 import { authContextFrom, credentialStoreFrom } from './auth.ts'
 import { catalogProviderIds } from './catalog.ts'
-import { assertServiceable, Config, resolveProfiles } from './config.ts'
+import { assertServiceable, Config, resolveProfiles, resolveProviderSection } from './config.ts'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { discoverModels } from './discovery.ts'
 import type { StoredModelDiscoveryProfile } from './discovery.ts'
@@ -75,13 +95,14 @@ import { registerPiAiFlows } from './login.ts'
 
 export { PiAiAdapter } from './adapter.ts'
 export type { PiAiAdapterOptions } from './adapter.ts'
-export { Config } from './config.ts'
+export { Config, resolveProviderSection } from './config.ts'
 export type {
   Options,
   PiAiCompatProfile,
   PiAiModality,
   PiAiModelOverride,
   PiAiModelProfile,
+  PiAiProviderListEntry,
   PiAiProviderProfile,
   PiAiReasoningEfforts,
   PiAiThinkingFormat,
@@ -149,11 +170,12 @@ function directoryEntries(
 export function apply(ctx: Context, config: Config): void {
   ctx.inject(['settings'], (child) => { child.effect(() => child.settings.configure({ auto: false }, ctx.fiber)) })
   const settingsNs = ctx.fiber.entry?.options.id ?? NS
-  let lastRaw: ReturnType<Config['providers']['get']> | undefined
+  let lastProviders: ReturnType<Config['providers']['get']> | undefined
+  let lastList: Config['providerList']
   let memoized: ReadonlyMap<string, ResolvedPiAiProviderProfile> | undefined
   /**
    * The resolved profiles for the current configuration, memoized by the raw
-   * snapshot's identity — which is also what makes the adapter's own snapshot
+   * snapshot identities — which is also what makes the adapter's own snapshot
    * stable across operations that observe no change.
    *
    * Catalog diagnostics stay in the snapshot beside serviceable models, so
@@ -161,10 +183,15 @@ export function apply(ctx: Context, config: Config): void {
    * Scalar configuration errors still reject resolution.
    */
   const profiles = (): ReadonlyMap<string, ResolvedPiAiProviderProfile> => {
-    const raw = config.providers.get()
-    if (raw === lastRaw && memoized !== undefined) return memoized
-    const next = resolveProfiles(structuredClone(raw) as import('./config.ts').Options['providers'], 'deferred')
-    lastRaw = raw
+    const providers = config.providers.get()
+    const list = config.providerList
+    if (providers === lastProviders && list === lastList && memoized !== undefined) return memoized
+    const next = resolveProfiles(
+      structuredClone(resolveProviderSection({ providers, providerList: list } as import('./config.ts').Options)),
+      'deferred',
+    )
+    lastProviders = providers
+    lastList = list
     memoized = next
     return next
   }
@@ -174,8 +201,14 @@ export function apply(ctx: Context, config: Config): void {
     if (this !== ctx.fiber) return raw
     const candidate = Config(raw as import('./config.ts').Options)
     assertServiceable(
-      { providers: structuredClone(candidate.providers.get()) } as import('./config.ts').Options,
-      { providers: structuredClone(config.providers.get()) } as import('./config.ts').Options,
+      {
+        providers: structuredClone(candidate.providers.get()),
+        providerList: structuredClone(candidate.providerList),
+      } as import('./config.ts').Options,
+      {
+        providers: structuredClone(config.providers.get()),
+        providerList: structuredClone(config.providerList),
+      } as import('./config.ts').Options,
     )
     return raw
   })

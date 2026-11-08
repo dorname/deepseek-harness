@@ -2,6 +2,10 @@
  * Configuration schema and provider-profile validation for the pi-ai adapter.
  * Profiles are a dict keyed by provider route, so the composition base and a
  * user-settings layer merge per provider and the route set is structural.
+ * The composition layer may instead supply the routes as a list
+ * (`providerList`, each entry naming its route in `provider`); the list
+ * normalizes into the same dict pipeline and cannot coexist with a dict
+ * supply.
  *
  * A route key is not required to name an installed pi-ai provider. When it does,
  * that provider's endpoint, protocol, display name, and model catalog are the
@@ -87,6 +91,17 @@ export type {
   PiAiReasoningEfforts,
   PiAiThinkingFormat,
 } from './catalog.ts'
+
+/**
+ * A provider profile supplied in the composition-level list form.
+ * `provider` names the route — the list counterpart of the dict key — and is
+ * stripped before the profile joins the same resolution pipeline as a dict
+ * entry, so the dict form's own `provider` refusal stays dict-scoped.
+ */
+export interface PiAiProviderListEntry extends PiAiProviderProfile {
+  /** The route this profile serves. */
+  provider: string
+}
 
 /** Configuration for one pi-ai provider route; the `providers` dict key IS the route. */
 export interface PiAiProviderProfile {
@@ -226,10 +241,18 @@ export interface Config {
    * and registers them the moment a settings section supplies profiles.
    */
   providers: Volatile<Record<string, PiAiProviderProfile>>
+  /**
+   * The same routes as a composition-level list; each entry names its route
+   * in `provider`. Not volatile, so the settings document cannot address it:
+   * a deployment artifact declares routes as a list while the live-editable
+   * settings layer keeps the dict. At most one of the two fields may name
+   * routes; {@link resolveProviderSection} enforces that.
+   */
+  providerList?: PiAiProviderListEntry[]
 }
 
 /** Plain options accepted by the provider resolver. */
-export type Options = { [K in keyof Config]?: Config[K] extends Volatile<infer T> ? T : never }
+export type Options = { [K in keyof Config]?: Config[K] extends Volatile<infer T> ? T : Config[K] }
 
 const thinkingBudgets = z.object({
   minimal: z.number(),
@@ -323,7 +346,8 @@ const modelProfile: z<PiAiModelProfile> = z.object({
 /** A {@link modelProfile} whose id lives in the `modelOverrides` dict key. */
 const modelOverride: z<PiAiModelOverride> = z.object(modelFields)
 
-const profile = z.object({
+/** The fields a provider profile carries in either supply form; the route key lives outside them. */
+const profileFields = {
   apiKeyEnv: z.string().role('credential-ref'),
   displayName: z.string(),
   api: z.union(supportedProtocols()),
@@ -346,12 +370,55 @@ const profile = z.object({
   requestImagePixelBudget: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET),
   requestImageMaxBytes: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_MAX_BYTES),
   retryPolicy: RetryPolicySchema,
+}
+
+const profile = z.object(profileFields)
+
+/** A provider profile supplied in the composition-level list form: `provider` names the route. */
+const providerEntry = z.object({
+  provider: z.string().required(),
+  ...profileFields,
 })
 
 /** Runtime schema for {@link Config}. */
 export const Config = z.object({
   providers: z.dict(profile).default({}).volatile(),
+  providerList: z.array(providerEntry),
 })
+
+/**
+ * Resolve the effective route section from the two supply forms. The
+ * settings-editable dict and the composition-level list are exclusive
+ * supplies: both naming routes fails loud at the earliest point that can see
+ * both sources, and list entries normalize into the dict with each entry's
+ * `provider` field as the route key, in declaration order.
+ * @param config - the resolved plugin configuration.
+ * @returns profiles keyed by route.
+ * @throws Error naming the conflicting sources or the malformed list entry.
+ */
+export function resolveProviderSection(config: Partial<Options>): Record<string, PiAiProviderProfile> {
+  const list = config.providerList ?? []
+  const dict = config.providers ?? {}
+  if (list.length > 0 && Object.keys(dict).length > 0) {
+    throw new Error(
+      'llm-pi-ai: providers and providerList both supply routes;'
+      + ' keep the settings-editable dict (providers) or the composition list (providerList), not both',
+    )
+  }
+  if (list.length === 0) return { ...dict }
+  const normalized: Record<string, PiAiProviderProfile> = {}
+  for (const [index, entry] of list.entries()) {
+    if (entry.provider.length === 0) {
+      throw new Error(`llm-pi-ai: providerList entry ${index} needs a non-empty "provider" route key`)
+    }
+    if (entry.provider in normalized) {
+      throw new Error(`llm-pi-ai: providerList declares route "${entry.provider}" more than once`)
+    }
+    const { provider: _route, ...profile } = entry
+    normalized[entry.provider] = profile
+  }
+  return normalized
+}
 
 /**
  * Reject new or changed provider profiles that cannot be served. Unchanged
@@ -362,8 +429,10 @@ export const Config = z.object({
  * @throws Error naming the route and configuration entry that cannot be served.
  */
 export function assertServiceable(config: Options, previous?: Options): void {
-  const changed = Object.fromEntries(Object.entries(config.providers ?? {}).filter(([provider, profile]) =>
-    !deepEqualJson(profile, previous?.providers?.[provider])))
+  const section = resolveProviderSection(config)
+  const previousSection = resolveProviderSection(previous ?? {})
+  const changed = Object.fromEntries(Object.entries(section).filter(([provider, profile]) =>
+    !deepEqualJson(profile, previousSection[provider])))
   resolveProfiles(changed)
 }
 
