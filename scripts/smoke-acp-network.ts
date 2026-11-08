@@ -34,6 +34,14 @@
  *   persistence, and the load-time failure of a both-keys composition.
  *   Staging targets skip it — the default staging composition has no
  *   providerList supply — and never report PASS for it.
+ * - SMOKE-acp-network-08: the goal authorization round-trip (change
+ *   `dsh-acp-goal-approval`). A local server composition drives an
+ *   unauthorized goal completion over the real bridge: the request_permission
+ *   card carries the approve/deny vocabulary, a Deny outcome leaves the goal
+ *   active, and an Authorize outcome steers the witnessed user message whose
+ *   re-call completes server-side. Staging targets skip it — the interactive
+ *   authorization handshake needs the local composition — and never report
+ *   PASS for it.
  *
  * When namespace `dsh-acp-network-staging` is Ready and
  * `/tmp/dsh-acp-network-staging-creds.env` exists, also runs the staging
@@ -176,6 +184,7 @@ function main(): void {
       { id: 'SMOKE-acp-network-05', scenario: 'local plan mode surface' },
       { id: 'SMOKE-acp-network-06', scenario: 'local compaction face' },
       { id: 'SMOKE-acp-network-07', scenario: 'local multi-provider supply face' },
+      { id: 'SMOKE-acp-network-08', scenario: 'local goal authorization round-trip' },
     ] as const
     for (const lane of failedLanes) {
       const outcome: Parameters<typeof report>[1] = {
@@ -216,6 +225,10 @@ function main(): void {
   report('SMOKE-acp-network-07', {
     durationMs: local.durationMs,
     scenario: 'local multi-provider supply face',
+  })
+  report('SMOKE-acp-network-08', {
+    durationMs: local.durationMs,
+    scenario: 'local goal authorization round-trip',
   })
 
   // Staging handshake is advisory here: ledger coverage for 01/02 already
