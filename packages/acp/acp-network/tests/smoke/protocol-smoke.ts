@@ -67,6 +67,8 @@ import BasicCompactionEngine from '@deepseek-ai/dsh-compaction-basic'
 import PlanModeController from '@deepseek-ai/dsh-plan-mode'
 import ApprovalService from '@deepseek-ai/dsh-user-approval'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
+import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai'
+import { closeMockServers, mockServer } from '../../../../llm/llm-pi-ai/tests/mock-server.ts'
 import * as AcpNetworkPlugin from '../../src/index.ts'
 import { reportResult } from '../helpers/reporter.ts'
 
@@ -154,6 +156,28 @@ function textResponse(text: string): StreamChunk[] {
   ]
 }
 
+/** One OpenAI-compatible SSE chat-completion response carrying `text` (the pi-ai wire shape). */
+function sseEvents(text: string): string[] {
+  return [
+    '{"choices":[{"delta":{"role":"assistant","content":""},"index":0,"finish_reason":null}]}',
+    `{"choices":[{"delta":{"content":"${text}"},"index":0,"finish_reason":null}]}`,
+    '{"choices":[{"delta":{},"index":0,"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":1}}',
+    '[DONE]',
+  ]
+}
+
+type ChunkUpdate = { sessionUpdate?: string; content?: { type?: string; text?: string } | null }
+
+/** Assemble the agent text chunks a captured update list carries. */
+function agentText(updates: SessionUpdate[]): string {
+  return (updates as ChunkUpdate[])
+    .filter(update => update.sessionUpdate === 'agent_message_chunk'
+      && update.content?.type === 'text'
+      && typeof update.content.text === 'string')
+    .map(update => update.content!.text)
+    .join('')
+}
+
 function toolCallResponse(name: string, callId: string): StreamChunk[] {
   return [
     { type: 'block-start', index: 0, blockType: 'tool-call' },
@@ -180,16 +204,26 @@ const CONDENSE_PROMPT_B = [
   'Also note for the summary that output tracks the lunar cycle, that tidal-stream arrays are the newer in-water alternative, and that the plant connects to the grid through a substation.',
 ].join(' ')
 
+/** One config option in a new/resume response; SMOKE-07 reads the grouped `model` select. */
+interface ModelConfigOption {
+  id: string
+  type?: string
+  currentValue?: string
+  options?: Array<{ group?: string; options?: { value: string }[]; value?: string }>
+}
+
 interface SmokeClient {
   initialize: (params: { protocolVersion: number }) => Promise<unknown>
   authenticate: (params: { methodId: string; _meta: { token: string } }) => Promise<unknown>
   newSession: (params: { cwd: string; mcpServers: [] }) => Promise<{
     sessionId: string
     modes?: { currentModeId: string; availableModes: { id: string; name: string }[] }
+    configOptions?: ModelConfigOption[]
   }>
   listSessions: (params: { cwd: string }) => Promise<{ sessions: Array<{ sessionId: string; cwd: string }> }>
   resumeSession: (params: { sessionId: string; cwd: string; mcpServers: [] }) => Promise<{
     modes?: { currentModeId: string }
+    configOptions?: ModelConfigOption[]
   }>
   closeSession: (params: { sessionId: string }) => Promise<unknown>
   cancel: (params: { sessionId: string }) => Promise<void>
@@ -828,6 +862,151 @@ async function runSmoke06(url: string, persistenceRoot: string): Promise<void> {
   }
 }
 
+/**
+ * SMOKE-acp-network-07: the multi-provider supply face on the network
+ * transport. The server composition mounts real llm-pi-ai with two routes
+ * from the `providerList` array form over local OpenAI-compatible mock
+ * backends. Covers the grouped configOptions advertisement and the default
+ * pair, the `set_config_option` switch landing on the chosen route, the
+ * selection's persistence across a fresh client + resume, and the load-time
+ * failure of a composition supplying both config keys.
+ */
+async function runSmoke07(): Promise<void> {
+  const alpha = await mockServer([{ events: sseEvents('from-alpha') }])
+  const beta = await mockServer([{ events: sseEvents('from-beta') }, { events: sseEvents('from-beta') }])
+  const persistenceRoot = await mkdtemp(join(tmpdir(), 'dsh-acp-network-smoke07-'))
+  const ctx = new Context()
+  try {
+    process.env.ACP_SMOKE_PI_KEY ??= 'smoke-key'
+    await mountAgentLoopTestDependencies(ctx, { systemPrompt: { personaPrefix: '' } })
+    await ctx.plugin(JsonlSessionPersistence, { root: persistenceRoot, compression: 'none' })
+    await ctx.plugin(TokenMeter)
+    await ctx.plugin(AgentLoop, { agents: [] })
+    await ctx.plugin(LlmPiAi, {
+      providerList: [
+        { provider: 'alpha', apiKeyEnv: 'ACP_SMOKE_PI_KEY', api: 'openai-completions', baseURL: alpha.url, models: [{ id: 'fast' }] },
+        { provider: 'beta', apiKeyEnv: 'ACP_SMOKE_PI_KEY', api: 'openai-completions', baseURL: beta.url, models: [{ id: 'deep' }] },
+      ],
+    })
+    await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 })
+    await ctx.plugin({
+      name: 'acp-network-smoke07',
+      inject: AcpNetworkPlugin.inject,
+      apply: (inner: Context) => {
+        AcpNetworkPlugin.apply(inner, {
+          provider: 'alpha',
+          model: 'fast',
+          secret: SECRET,
+          audience: AUDIENCE,
+          transport: 'websocket',
+          path: '/acp',
+        })
+      },
+    })
+    const url = `ws://127.0.0.1:${ctx.webServer.port}/acp`
+
+    const grouped = (configOptions?: ModelConfigOption[]): { values: string[]; groups: number; current: string | undefined } => {
+      const model = configOptions?.find(option => option.id === 'model')
+      if (model?.type !== 'select') throw new Error('SMOKE-07: the model config option is missing or not a select')
+      const values: string[] = []
+      let groups = 0
+      for (const entry of model.options ?? []) {
+        if (entry.group !== undefined) {
+          groups += 1
+          for (const inner of entry.options ?? []) values.push(inner.value)
+        } else if (entry.value !== undefined) values.push(entry.value)
+      }
+      return { values, groups, current: model.currentValue }
+    }
+
+    const { client, dispose } = await makeClient(url)
+    let sessionId: string
+    const alphaBefore = alpha.requests.length
+    const betaBefore = beta.requests.length
+    try {
+      const created = await client.newSession({ cwd: persistenceRoot, mcpServers: [] })
+      sessionId = created.sessionId
+      const advertised = grouped(created.configOptions)
+      if (advertised.groups !== 2) throw new Error(`SMOKE-07: expected two provider groups, got ${String(advertised.groups)}`)
+      for (const expected of ['["alpha","fast"]', '["beta","deep"]']) {
+        if (!advertised.values.includes(expected)) throw new Error(`SMOKE-07: configOptions is missing ${expected}`)
+      }
+      if (advertised.current !== '["alpha","fast"]') {
+        throw new Error(`SMOKE-07: the default selection is ${String(advertised.current)}`)
+      }
+      console.log('SMOKE-07 grouped configOptions: ok')
+
+      await client.prompt({ sessionId, prompt: [{ type: 'text', text: 'one' }] })
+      if (agentText(client.updates) !== 'from-alpha') throw new Error('SMOKE-07: the default prompt text is wrong')
+      const defaultRouted = alpha.requests.length - alphaBefore
+      if (defaultRouted !== 1 || beta.requests.length - betaBefore !== 0) {
+        throw new Error('SMOKE-07: the default prompt did not route to alpha alone')
+      }
+      console.log('SMOKE-07 default route prompt: ok')
+
+      await client.setSessionConfigOption({ sessionId, configId: 'model', value: '["beta","deep"]' })
+      const seen = client.updates.length
+      await client.prompt({ sessionId, prompt: [{ type: 'text', text: 'two' }] })
+      if (agentText(client.updates.slice(seen)) !== 'from-beta') throw new Error('SMOKE-07: the switched prompt text is wrong')
+      if (alpha.requests.length - alphaBefore !== 1 || beta.requests.length - betaBefore !== 1) {
+        throw new Error('SMOKE-07: the switched prompt did not route to beta alone')
+      }
+      console.log('SMOKE-07 set_config_option switch: ok')
+
+      await client.closeSession({ sessionId })
+    } finally {
+      await dispose()
+    }
+
+    // Selection persistence: a fresh client resumes the closed session and
+    // the switched pair still routes the prompt.
+    {
+      const { client, dispose } = await makeClient(url)
+      try {
+        const resumed = await client.resumeSession({ sessionId, cwd: persistenceRoot, mcpServers: [] })
+        const model = resumed.configOptions?.find(option => option.id === 'model')
+        if (model?.currentValue !== '["beta","deep"]') {
+          throw new Error(`SMOKE-07: the resumed selection is ${String(model?.currentValue)}`)
+        }
+        await client.prompt({ sessionId, prompt: [{ type: 'text', text: 'three' }] })
+        if (!agentText(client.updates).endsWith('from-beta')) throw new Error('SMOKE-07: the resumed prompt text is wrong')
+        if (beta.requests.length - betaBefore !== 2) throw new Error('SMOKE-07: the resumed prompt did not route to beta')
+        console.log('SMOKE-07 resume persistence: ok')
+      } finally {
+        await dispose()
+      }
+    }
+
+    // The conflict composition (both config keys naming routes) fails loud at load.
+    {
+      const conflict = new Context()
+      try {
+        await mountAgentLoopTestDependencies(conflict, { systemPrompt: { personaPrefix: '' } })
+        let mounted = false
+        try {
+          await conflict.plugin(LlmPiAi, {
+            providers: { alpha: { apiKeyEnv: 'ACP_SMOKE_PI_KEY', api: 'openai-completions', baseURL: alpha.url, models: [{ id: 'fast' }] } },
+            providerList: [
+              { provider: 'beta', apiKeyEnv: 'ACP_SMOKE_PI_KEY', api: 'openai-completions', baseURL: beta.url, models: [{ id: 'deep' }] },
+            ],
+          })
+          mounted = true
+        } catch (error) {
+          if (!(error instanceof Error) || !error.message.includes('both supply routes')) throw error
+        }
+        if (mounted) throw new Error('SMOKE-07: the conflict composition mounted instead of failing loud')
+        console.log('SMOKE-07 conflict composition load failure: ok')
+      } finally {
+        await conflict.fiber.dispose()
+      }
+    }
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(persistenceRoot, { recursive: true, force: true })
+    await closeMockServers()
+  }
+}
+
 /** Phase 'persist': create one session, prompt it, close it, and publish its id. */
 async function runPersistPhase(client: SmokeClient): Promise<void> {
   const { sessionId } = await client.newSession({ cwd: PHASE_CWD, mcpServers: [] })
@@ -972,6 +1151,16 @@ async function main(): Promise<void> {
       console.log('\nSMOKE-06 skipped: the compaction face needs the local smoke composition.')
     } else {
       await runSmoke06(url, persistenceRoot)
+    }
+
+    // SMOKE-07 needs the local composition (llm-pi-ai array routes over
+    // local mock HTTP backends); a staging target or the handshake-only mode
+    // has no providerList supply, and that is reported as a skip rather
+    // than a pass.
+    if (STAGING_URL || NO_PROMPT) {
+      console.log('\nSMOKE-07 skipped: the multi-provider face needs the local llm-pi-ai array composition.')
+    } else {
+      await runSmoke07()
     }
 
     console.log('\nAll ACP-over-network smoke checks passed.')

@@ -159,7 +159,7 @@ interface NetworkBridgeClient {
 export interface NetworkBridgeHarness {
   ctx: Context
   client: NetworkBridgeClient
-  adapter: MockAdapter
+  adapter: MockAdapter | undefined
   attachments: MemoryAttachmentStore | undefined
   updates: CapturedUpdate[]
   sessionUpdates: { sessionId: string; update: CapturedUpdate }[]
@@ -178,6 +178,11 @@ export async function makeNetworkBridgeHarness(options: {
   transport?: 'websocket' | 'http' | 'both'
   persona?: string
   persistenceRoot?: string
+  /** Replaces the scripted MockAdapter with a caller-mounted LLM surface (real plugins, mock HTTP routes). */
+  llmMount?: (ctx: Context) => Promise<void>
+  /** The acp-network default provider/model pair; defaults to the scripted adapter's route. */
+  provider?: string
+  model?: string
 } = {}): Promise<NetworkBridgeHarness> {
   const adapter = new MockAdapter(options.script ?? [textResponse('hello')])
   const ctx = new Context()
@@ -189,7 +194,11 @@ export async function makeNetworkBridgeHarness(options: {
   await ctx.plugin(MemoryAttachmentStore)
   const loopFiber = await ctx.plugin(AgentLoop, { agents: [] })
   void loopFiber
-  ctx.llm.registerAdapter(['mock'], adapter)
+  if (options.llmMount === undefined) {
+    ctx.llm.registerAdapter(['mock'], adapter)
+  } else {
+    await options.llmMount(ctx)
+  }
 
   const secret = options.secret ?? 'test-secret'
   const webServerFiber = await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 })
@@ -199,8 +208,8 @@ export async function makeNetworkBridgeHarness(options: {
     inject: AcpNetworkPlugin.inject,
     apply: (inner: Context) => {
       AcpNetworkPlugin.apply(inner, {
-        provider: 'mock',
-        model: 'mock',
+        provider: options.provider ?? 'mock',
+        model: options.model ?? 'mock',
         secret,
         transport: options.transport ?? 'websocket',
         path: '/acp',
@@ -245,7 +254,7 @@ export async function makeNetworkBridgeHarness(options: {
       prompt: (params, opts) => client.request(methods.agent.session.prompt, params, opts),
       cancel: params => client.notify(methods.agent.session.cancel, params),
     },
-    adapter,
+    adapter: options.llmMount === undefined ? adapter : undefined,
     attachments: ctx.get('attachments') as MemoryAttachmentStore | undefined,
     updates,
     sessionUpdates,

@@ -36,8 +36,8 @@ afterEach(async () => {
   vi.unstubAllEnvs()
 })
 
-/** Boot the dormant composition: a bare `llm-pi-ai` row with no config at all. */
-async function loadComposition(): Promise<{ ctx: Context; settingsPath: string }> {
+/** Boot a composition: a bare `llm-pi-ai` row, plus caller-supplied config lines for it. */
+async function loadComposition(piAiConfig: string[] = []): Promise<{ ctx: Context; settingsPath: string }> {
   root = await mkdtemp(join(tmpdir(), 'dsh-pi-composition-'))
   await writeFile(join(root, '.credentials.yaml'), 'version: 1\nrefs:\n  PI_COMPOSITION_KEY: key-from-store\n', { mode: 0o600 })
 
@@ -52,6 +52,7 @@ async function loadComposition(): Promise<{ ctx: Context; settingsPath: string }
     '    debounceMs: 10',
     '- id: llm-pi-ai',
     "  name: '@deepseek-ai/dsh-llm-pi-ai'",
+    ...piAiConfig,
     '',
   ].join('\n'))
 
@@ -266,5 +267,72 @@ describe('llm-pi-ai real dormant composition', () => {
         { role: 'user', content: 'continue' },
       ],
     })
+  })
+})
+
+/** Composition config lines declaring the routes as a providerList. */
+const listConfig = (serverUrl: string): string[] => [
+  '  config:',
+  '    providerList:',
+  '      - provider: deepseek',
+  '        apiKeyEnv: PI_COMPOSITION_KEY',
+  `        baseURL: ${serverUrl}`,
+]
+
+describe('llm-pi-ai real providerList composition', () => {
+  it('boots routes from the list form and withdraws them on entry disposal', async () => {
+    vi.stubEnv('PI_COMPOSITION_KEY', '')
+    const server = await mockServer([{ events: textEvents }])
+    const { ctx } = await loadComposition(listConfig(server.url))
+
+    // The composition, not a settings document, supplied the route.
+    expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['deepseek'])
+    const result = await assemble(ctx, { provider: 'deepseek', model: 'deepseek-flash', messages: [] })
+    expect(result.message.content).toEqual([{ type: 'text', text: 'hello' }])
+    expect(server.headers[0]?.authorization).toBe('Bearer key-from-store')
+
+    // HMR safety: the routes bind to the plugin entry's fiber, not the root.
+    const entry = ctx.configEditor.entries().find(row => row.options.id === 'llm-pi-ai')
+    await entry!.fiber!.dispose()
+    await vi.waitFor(() => { expect(ctx.llm.listProviders()).toEqual([]) })
+  })
+
+  it('rejects a settings write to the list form while the dict form stays writable', async () => {
+    vi.stubEnv('PI_COMPOSITION_KEY', '')
+    const server = await mockServer([{ events: textEvents }])
+    const { ctx } = await loadComposition()
+
+    // The settings write gate refuses the deployment artifact; this is the
+    // rejection the web Models page would surface for the same payload.
+    await expect(ctx.settings.update('llm-pi-ai', {
+      providerList: [{ provider: 'deepseek', apiKeyEnv: 'PI_COMPOSITION_KEY', baseURL: server.url }],
+    })).rejects.toThrow('Config field "providerList" is not volatile')
+
+    // The same route under the dict key is an ordinary settings write.
+    await expect(ctx.settings.update('llm-pi-ai', {
+      providers: { deepseek: { apiKeyEnv: 'PI_COMPOSITION_KEY', baseURL: server.url } },
+    })).resolves.toBeUndefined()
+    await vi.waitFor(() => {
+      expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['deepseek'])
+    }, { timeout: 5000 })
+  })
+
+  it('refuses the settings write and keeps the list routes serving when both channels name routes', async () => {
+    vi.stubEnv('PI_COMPOSITION_KEY', '')
+    const server = await mockServer([{ events: textEvents }])
+    const { ctx } = await loadComposition(listConfig(server.url))
+    expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['deepseek'])
+
+    // The settings write merges the dict beside the list, and the config
+    // editor validates that merged candidate before committing: the write is
+    // refused with the conflict error, and the running references —
+    // therefore the routes — stay untouched.
+    await expect(ctx.settings.update('llm-pi-ai', {
+      providers: { deepseek: { apiKeyEnv: 'PI_COMPOSITION_KEY', baseURL: server.url } },
+    })).rejects.toThrow('both supply routes')
+
+    expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['deepseek'])
+    const result = await assemble(ctx, { provider: 'deepseek', model: 'deepseek-flash', messages: [] })
+    expect(result.message.content).toEqual([{ type: 'text', text: 'hello' }])
   })
 })

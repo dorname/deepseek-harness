@@ -1,7 +1,7 @@
 /**
  * ACP-over-network smoke (`SMOKE-acp-network-01/02/03/04/05`, changes
  * `20261020-1643-acp-over-network`, `dsh-acp-permission-policy`,
- * `dsh-acp-skills-list`, and `dsh-acp-plan-mode`).
+ * `dsh-acp-skills-list`, `dsh-acp-plan-mode`, and `dsh-acp-multi-provider`).
  *
  * - SMOKE-acp-network-01: WebSocket auth + session/new + prompt end-to-end
  *   (local mock LLM via `packages/acp/acp-network/tests/smoke/protocol-smoke.ts`).
@@ -26,6 +26,14 @@
  *   `{ result: null }`, unknown-session error, undeclared-connection silence,
  *   resume through the compacted log). Staging targets skip it — the scripted
  *   compaction needs the local composition — and never report PASS for it.
+ * - SMOKE-acp-network-07: the multi-provider supply face (change
+ *   `dsh-acp-multi-provider`). A local server composition mounts real
+ *   llm-pi-ai with two `providerList` routes over local mock HTTP backends:
+ *   grouped configOptions advertisement, the default pair, the
+ *   `set_config_option` switch landing on the chosen route, resume
+ *   persistence, and the load-time failure of a both-keys composition.
+ *   Staging targets skip it — the default staging composition has no
+ *   providerList supply — and never report PASS for it.
  *
  * When namespace `dsh-acp-network-staging` is Ready and
  * `/tmp/dsh-acp-network-staging-creds.env` exists, also runs the staging
@@ -167,6 +175,7 @@ function main(): void {
       { id: 'SMOKE-acp-network-04', scenario: 'local skills list enumeration' },
       { id: 'SMOKE-acp-network-05', scenario: 'local plan mode surface' },
       { id: 'SMOKE-acp-network-06', scenario: 'local compaction face' },
+      { id: 'SMOKE-acp-network-07', scenario: 'local multi-provider supply face' },
     ] as const
     for (const lane of failedLanes) {
       const outcome: Parameters<typeof report>[1] = {
@@ -203,6 +212,10 @@ function main(): void {
   report('SMOKE-acp-network-06', {
     durationMs: local.durationMs,
     scenario: 'local compaction face',
+  })
+  report('SMOKE-acp-network-07', {
+    durationMs: local.durationMs,
+    scenario: 'local multi-provider supply face',
   })
 
   // Staging handshake is advisory here: ledger coverage for 01/02 already
