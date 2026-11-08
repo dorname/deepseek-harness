@@ -15,5 +15,5 @@
 - [x] 实现单切片：bridge 扩展方法 `session/compact`（SDK 扩展方法注册、参数校验、`ctx.get('compaction')` 缺席 fail-loud、bridge 自铸 CommandId 记入三元组 sourceCommandId、`compactNow` 全包装语义、六失败码经 internal error data.code 携带并复用 /compact 人类文本、caller 取消 → cancelled、`{ result: null }` 无可压缩历史）；initialize handler 捕获 clientCapabilities，`session.compaction` 声明时 `AcpSession.onSessionEvent` 派生 `compaction_update`（start → in_progress、end 无错 → completed 含前置 summary 事件内容块、end 带错 → failed）；交付 UT-S52-01..06、ST-S52-01、keyless 快照、受影响包中英文 README/JSDoc 与 `docs/upgrade-guide/<发布版本>/acp-compaction/` 升级指南；实现 SMOKE-acp-network-06 并接入统一 smoke dispatcher，完成 smoke 覆盖预检。
 
 ## [deploy] 部署任务
-- [ ] 按合并后的部署方案构建带 commit 标识的 dsh 发布物并部署到 staging。（人工确认点：需用户明确授权后执行）
-- [ ] 验证真实 ACP 会话压缩往返（真实模型产历史 → compact → 同步结果 → busy 竞态 → 错误分支 → resume 后摘要生效），声明/未声明 compaction 能力两客户端的通知面核对，并回归既有 prompt/resume、S49/S50/S51 路径，确认上一版发布物回滚路径。
+- [x] 按合并后的部署方案构建带 commit 标识的 dsh 发布物并部署到 staging。（人工确认点：用户已授权，见 logos/resources/verify/s52-deployment-report.md）
+- [x] 验证真实 ACP 会话压缩往返（真实模型产历史 → compact → 同步结果 → busy 竞态 → 错误分支 → resume 后摘要生效），声明/未声明 compaction 能力两客户端的通知面核对，并回归既有 prompt/resume、S49/S50/S51 路径，确认上一版发布物回滚路径。

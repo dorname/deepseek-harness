@@ -66,10 +66,17 @@ async function committedEvents(root: string): Promise<CommittedEvent[]> {
   return events
 }
 
-/** Two prose turns long enough to leave the engine a compactible range. */
+/**
+ * Three prose turns long enough to leave the engine a compactible range.
+ * A shorter shadowed span can lose the engine's shrink invariant to a verbose
+ * real-model summary, which is nondeterministic; three turns keep the span
+ * comfortably above any plausible summary (same reasoning as the SMOKE-06
+ * condense prompts).
+ */
 const PROSE_PROMPTS = [
   'In plain prose (no lists), write about 150 words on how a lighthouse fresnel lens concentrates light into a horizontal beam.',
   'Now write about 150 words of plain prose on how a tidal power station converts rising and falling water levels into electricity.',
+  'Finally, write about 150 words of plain prose on how a solar still distills drinking water from salty or dirty water.',
 ] as const
 
 describe.skipIf(!process.env.DEEPSEEK_API_KEY)('acp e2e: session/compact over the shipped profile (S52)', () => {
@@ -84,10 +91,12 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('acp e2e: session/compact over th
         clientCapabilities: { session: { compaction: {} } },
       })
       const { sessionId } = await agent.client.newSession({ cwd, mcpServers: [] })
-      await expect(agent.client.prompt({
-        sessionId,
-        prompt: [{ type: 'text', text: PROSE_PROMPTS[0] }],
-      })).resolves.toMatchObject({ stopReason: 'end_turn' })
+      for (const prose of PROSE_PROMPTS) {
+        await expect(agent.client.prompt({
+          sessionId,
+          prompt: [{ type: 'text', text: prose }],
+        })).resolves.toMatchObject({ stopReason: 'end_turn' })
+      }
 
       const response = await agent.client.compact({ sessionId })
       const result: AcpTestCompactionResult | null = response.result
@@ -129,22 +138,27 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('acp e2e: session/compact over th
       await expect(first.client.compact({ sessionId: 'unknown-id' })).rejects.toMatchObject({ code: -32602 })
       await expect(first.client.compact({ sessionId })).resolves.toEqual({ result: null })
 
-      await expect(first.client.prompt({
-        sessionId,
-        prompt: [{ type: 'text', text: PROSE_PROMPTS[0] }],
-      })).resolves.toMatchObject({ stopReason: 'end_turn' })
-      await expect(first.client.prompt({
-        sessionId,
-        prompt: [{ type: 'text', text: PROSE_PROMPTS[1] }],
-      })).resolves.toMatchObject({ stopReason: 'end_turn' })
+      for (const prose of PROSE_PROMPTS) {
+        await expect(first.client.prompt({
+          sessionId,
+          prompt: [{ type: 'text', text: prose }],
+        })).resolves.toMatchObject({ stopReason: 'end_turn' })
+      }
 
       // Explicit compaction succeeds and the ordered notification pair arrives.
+      // A mid-test failure under vitest's retry tears the launch down while
+      // these waiters are still registered, and the launcher rejects them at
+      // stream close; isolate that teardown rejection so it cannot surface as
+      // an unhandled rejection while the awaits below still carry the real
+      // outcome to the assertions.
       const inProgress = first.waitForUpdate(
         update => update.sessionUpdate === 'compaction_update' && update.status === 'in_progress',
       )
+      void inProgress.catch(() => undefined)
       const completed = first.waitForUpdate(
         update => update.sessionUpdate === 'compaction_update' && update.status === 'completed',
       )
+      void completed.catch(() => undefined)
       const response = await first.client.compact({ sessionId })
       const result: AcpTestCompactionResult | null = response.result
       expect(result).not.toBeNull()
@@ -160,6 +174,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('acp e2e: session/compact over th
       const toolDone = first.waitForUpdate(
         update => update.sessionUpdate === 'tool_call_update' && update.status === 'completed',
       )
+      void toolDone.catch(() => undefined)
       const longTurn = first.client.prompt({
         sessionId,
         prompt: [{
