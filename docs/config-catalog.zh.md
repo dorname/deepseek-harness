@@ -1757,7 +1757,7 @@ export interface Config extends ProtocolConfig {
 
 - `inject`: `llm`
 - `refs`: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`) · `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/llm/llm-pi-ai/src/config.ts:222`](../packages/llm/llm-pi-ai/src/config.ts)
+- `source`: [`packages/llm/llm-pi-ai/src/config.ts:237`](../packages/llm/llm-pi-ai/src/config.ts)
 
 ```ts config-catalog
 /** Plugin configuration: the provider routes this instance owns. */
@@ -1768,6 +1768,14 @@ export interface Config {
    * and registers them the moment a settings section supplies profiles.
    */
   providers: Volatile<Record<string, PiAiProviderProfile>>
+  /**
+   * The same routes as a composition-level list; each entry names its route
+   * in `provider`. Not volatile, so the settings document cannot address it:
+   * a deployment artifact declares routes as a list while the live-editable
+   * settings layer keeps the dict. At most one of the two fields may name
+   * routes; {@link resolveProviderSection} enforces that.
+   */
+  providerList?: PiAiProviderListEntry[]
 }
 
 /** Configuration for one pi-ai provider route; the `providers` dict key IS the route. */
@@ -1862,6 +1870,17 @@ export interface PiAiProviderProfile {
   requestImageMaxBytes?: number
   /** Provider-owned model-request retry policy; omission uses normal mode with five retries. */
   retryPolicy?: RetryPolicyConfig
+}
+
+/**
+ * A provider profile supplied in the composition-level list form.
+ * `provider` names the route — the list counterpart of the dict key — and is
+ * stripped before the profile joins the same resolution pipeline as a dict
+ * entry, so the dict form's own `provider` refusal stays dict-scoped.
+ */
+export interface PiAiProviderListEntry extends PiAiProviderProfile {
+  /** The route this profile serves. */
+  provider: string
 }
 
 /** One configured model entry: an id plus the catalog fields it overrides. */

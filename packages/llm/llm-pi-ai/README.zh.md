@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-当组合需要通过 pi-ai 的提供方目录、或通过 pi-ai 已安装目录未描述的网关路由模型请求时挂载本插件。`providers` 字典就是整个配置面：每个键都是请求用 `GenerateOptions.provider` 选择的提供方路由名。
+当组合需要通过 pi-ai 的提供方目录、或通过 pi-ai 已安装目录未描述的网关路由模型请求时挂载本插件。`providers` 字典是 settings 可编辑的配置面：每个键都是请求用 `GenerateOptions.provider` 选择的提供方路由名。组合也可以改用 `providerList` 数组声明路由——这是仅组合层的部署工件，见[下文](#supply-routes-from-a-composition-providerlist)。
 
 适配器接受 LLM 服务的[仅供请求使用的 user 输入](../llm/README.zh.md#use-this-package)，并可将其与持久历史混用。user 身份与来源不会进入 pi-ai 内容；assistant 回放元数据和工具调用关联仍由持久消息携带。
 
@@ -90,6 +90,29 @@ kind: "package-reference"
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-llm-pi-ai)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
+<a id="supply-routes-from-a-composition-providerlist"></a>
+
+### 以组合 providerList 供给路由
+
+`providerList` 配置键以数组形式承载同一路由集：每项在 `provider` 字段点名路由，其余字段与 dict 值完全一致，声明顺序即解析后的路由顺序。数组经与等价 dict 相同的管线归一化，因此注册、可配置目录、模型发现与凭据解析行为完全一致。
+
+```yaml
+- name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providerList:
+      - provider: openai
+        apiKeyEnv: OPENAI_API_KEY
+      - provider: acme-gateway
+        displayName: Acme Gateway
+        apiKeyEnv: ACME_GATEWAY_API_KEY
+        api: openai-completions
+        baseURL: https://gateway.acme.example/v1
+        models:
+          - id: acme-think
+```
+
+该列表是部署工件而非 settings 地址：它不进 volatile 形态，settings 写入（web Models 页）会拒绝它，只有组合层——`cordis.yml` 或 profile patch——能改变它。机器生成的部署清单需要在一份工件里表达全部路由时选它；用户活编辑的路由保留 `providers` dict。两键同时点名路由会使插件加载失败；重复或空 `provider` 键的失败消息点名数组条目；dict 值仍拒绝 `provider` 字段。在组合供给的 `providerList` 之旁以 settings 写入 `providers` 会被拒绝并指名冲突，此前路由集继续服务。
+
 ### 登录提供方
 
 pi-ai 提供登录的提供方可以通过 harness 授权 seam 登录：流程提供 OAuth 或交互式密钥提示（密钥键入 pi-ai 自己的登录提示，而非设置表单），得到的凭据存储在 harness 凭据存储的 `llm-pi-ai/<provider id>` 记录中。存储的登录在其路由的 `apiKeyEnv` 覆盖之下完成认证，并在存储的跨进程锁下自行刷新；退出登录即删除存储记录。落在记录文法之外——小写连字符标识符——的手工声明路由键无法登录，因为对它的记录写入会以 `LlmError('UNSTORABLE_PROVIDER_ID')` 拒绝；这类路由改用 `apiKeyEnv` 或提供方 ambient 设置认证。
@@ -106,7 +129,7 @@ profile 的 `models` 列表会替换而非扩展路由的已安装目录；每�
 
 ### 运行时更改配置
 
-每次操作捕获当前 `providers` Config 引用。新增或修改的 provider 配置在表单持久化前验证；未更改的目录故障仍可编辑。路由集合或重试策略变化时原子更新注册；如果其他适配器已拥有所请求的路由，则保留先前路由。
+每次操作捕获当前 `providers` Config 引用。新增或修改的 provider 配置在表单持久化前验证；未更改的目录故障仍可编辑。路由集合或重试策略变化时原子更新注册；如果其他适配器已拥有所请求的路由，则保留先前路由。`providerList` 数组仅在插件挂载时读取：修改它是普通组合变更，会重挂载该条目。
 
 ### 从端点发现模型
 

@@ -1285,7 +1285,7 @@ configOptions 广告当前值（session/new、session/resume、设置回执）
 
 | 组件 | 位置 | 职责 |
 |---|---|---|
-| llm-pi-ai 配置 schema | `packages/llm/llm-pi-ai/src/config.ts` | `providers` 节点接受 dict 与数组双形式（组合层）；数组归一化进 dict 管线；`provider` 字段守卫形态上下文感知（dict 值仍拒绝、数组项即路由键） |
+| llm-pi-ai 配置 schema | `packages/llm/llm-pi-ai/src/config.ts` | `providers`（dict，settings 可写）与 `providerList`（数组，组合专用键）双键承载路由供给；数组经 `resolveProviderSection` 归一化进 dict 管线；`provider` 字段守卫形态上下文感知（dict 值仍拒绝、数组项即路由键） |
 | llm-pi-ai 解析与注册 | `packages/llm/llm-pi-ai/src/index.ts` | 不变：`resolveProfiles` → memoized 快照 → `registerAdapter` / `registerConfigurableProviders` / `registerModelDiscovery`；`assertServiceable` 在归一化后比较 |
 | settings 层 | settings 文档 + web Models 页 | 不变：dict-only 供给、逐键合并、活重配 |
 | llm 注册表 | `packages/llm/llm/src/index.ts` | 不变：多 provider 路由注册与列表面（`listProviders`） |

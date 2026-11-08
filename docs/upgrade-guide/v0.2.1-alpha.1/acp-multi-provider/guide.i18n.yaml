@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-alpha.1/acp-multi-provider/guide.md
+/:
+  en: bab5a33870b715ba
+  zh: 26abb2e50877dd08
+/multi-provider-route-supply-for-llm-pi-ai:
+  en: 3916ab2530842e8e
+  zh: 8e3cf46104e53f6e
+/multi-provider-route-supply-for-llm-pi-ai/change:
+  en: cfaeab2caceed01d
+  zh: de7f83440788a778
+/multi-provider-route-supply-for-llm-pi-ai/migration:
+  en: b9dc61f0f9323620
+  zh: 01d94130dd359732

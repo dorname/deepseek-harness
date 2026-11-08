@@ -1,4 +1,4 @@
-# 变更提案：多供应商路由数组供给（llm-pi-ai 组合面双形态 + 默认路由选择）
+# 变更提案：多供应商路由数组供给（llm-pi-ai 组合面双键形态 + 默认路由选择）
 
 > module: core | created: 2026-11-08
 
@@ -19,16 +19,16 @@ dspm 经 ACP 集成 dsh，REQ-D3 指出 acp-network Config 仅接受单 provider
 - 影响的业务场景：新增 S53「部署配置以数组形态供给多供应商路由」；回归既有 dict 组合、settings 文档活重配、单路由部署与 S03 ACP 会话、S15 压缩、S49 审批策略、S50 技能清单、S51 计划模式、S52 压缩面。
 - 影响的技术架构：`core-system-map.md`（多供应商路由供给形态）与新增 `core-S53-acp-multi-provider.md`；`acp-network-system-map.md` 补记默认路由选择与多路由广告语义（协议面零改动）。
 - 影响的部署方案：`logos/resources/prd/3-technical-plan/3-deployment/core-01-deployment-plan.md` 与 `acp-network-deployment-plan.md` 的发布物、staging 验证与回滚注意（含组合 patch 还原项）。
-- 影响的 API：`llm-pi-ai` 组合配置的 `providers` 节点接受两种形式——dict（现行：映射键即路由键，settings 文档唯一形式）与数组（新增：每项 `{ provider: <路由键>, apiKeyEnv?, baseURL?, api?, models?, modelOverrides?, compat?, headers?, retryPolicy?, … }`）。数组在配置解析入口归一化进既有 dict 管线，归一化后行为与手写等价 dict 逐项一致。冲突 fail-loud：双形式同供、数组内重复路由键、缺失或空路由键、非法档案条目加载期硬失败并指名路由与来源；数组形式与 settings 文档供给并存按既有冲突语义诊断并保持上一有效路由集。acp-network Config（provider/model 必选值对）不变，语义补记为会话起点的默认路由选择。
+- 影响的 API：`llm-pi-ai` 组合配置由两个互补键承载路由供给——`providers`（现行：dict，volatile，settings 文档唯一形式，映射键即路由键）与 `providerList`（新增：数组，组合专用键，settings 写入门拒绝对其写入；每项 `{ provider: <路由键>, apiKeyEnv?, baseURL?, api?, models?, modelOverrides?, compat?, headers?, retryPolicy?, … }`）。数组在配置解析入口（`resolveProviderSection`）归一化进既有 dict 管线，归一化后行为与手写等价 dict 逐项一致。冲突 fail-loud：两键同供、数组内重复路由键、缺失或空路由键、非法档案条目加载期硬失败并指名路由与来源；settings 供给的 `providers` 与组合供给的 `providerList` 并存按既有冲突语义诊断并保持上一有效路由集。acp-network Config（provider/model 必选值对）不变，语义补记为会话起点的默认路由选择。
 - 影响的 DB 表：无；零新增会话事件类型、零新增 wire 类型，`SessionEventMap` 不变，Session format 维持 4。
 - 影响的编排测试：无。
 - 影响的测试规格：新增 `logos/resources/test/core-S53-test-cases.md`；更新 `logos/resources/test/smoke/acp-network-smoke-test-cases.md`（SMOKE-acp-network-07）；复用既有 config / dynamic-config / loader-composition 单元用例与 S03、S49、S50、S51、S52 回归 ID。
-- 实现期交付物：`llm-pi-ai` 中英文 README 与 JSDoc、base bundle cordis.patch.yml 休眠挂载注释、config-catalog 重生成（配置 schema 变化）、`docs/upgrade-guide/<发布版本>/acp-multi-provider/` 中英文升级指南条目（双形态定义、settings dict-only、冲突词表、dict-vs-数组选型说明、dspm 组合示例；版本号随发布期确定）。
+- 实现期交付物：`llm-pi-ai` 中英文 README 与 JSDoc、base bundle cordis.patch.yml 休眠挂载注释、config-catalog 重生成（配置 schema 变化）、`docs/upgrade-guide/<发布版本>/acp-multi-provider/` 中英文升级指南条目（双键定义、settings dict-only、冲突词表、dict-vs-数组选型说明、dspm 组合示例；版本号随发布期确定）。
 
 ## 部署影响
 
 - 是否需要部署：是
-- 部署原因：dspm 需要消费包含配置双形态的新 dsh 版本或镜像及对应 commit，本地源码修改不能形成交付；其部署 patch 的数组节依赖新构建的配置 schema。
+- 部署原因：dspm 需要消费包含配置双键形态的新 dsh 版本或镜像及对应 commit，本地源码修改不能形成交付；其部署 patch 的 providerList 键依赖新构建的配置 schema。
 - 影响环境：staging
 - 是否涉及数据迁移：否
 - 是否需要回滚预案：是；回滚到上一版 dsh 发布物。本变更零持久化数据，回滚无迁移；**回滚须同时还原组合 patch 中的数组节**——旧构建的配置 schema 拒绝数组形式，带着数组节回滚会在加载期失败。该注意项写入升级指南与部署方案。
@@ -37,8 +37,8 @@ dspm 经 ACP 集成 dsh，REQ-D3 指出 acp-network Config 仅接受单 provider
 
 ## 变更概述
 
-1. **数组形态（组合层）**：`llm-pi-ai` 组合配置的 `providers` 节点接受 dict（现行）与数组（新增）两种形式；数组每项携带 `provider` 路由键字段，其余字段与 dict 值完全一致。`providers` 是 volatile 配置节点，有两条供给通道：组合配置（cordis.yml / profile patch，部署工件）与 settings 文档（运行时活编辑，web Models 页即此）——组合供给的变更经 `loader/volatile-update` 热提交，不重挂载。归一化在配置解析入口完成，此后全部既有管线不变——`resolveProfiles` 档案校验与目录解析、memoized 快照、`registerAdapter` 路由注册、`registerConfigurableProviders` 可配置目录、`registerModelDiscovery`、凭据每请求解析——归一化后的行为与手写等价 dict 逐项一致。settings 文档仍仅接受 dict：settings 的逐键合并与活重配语义只对映射成立，web Models 页机制不变；数组是部署工件的静态声明形式。组合供给（本变更交付的数组形态与既有的 dict 形态）是无 PVC、无 settings 导入的 headless fleet 部署的直接供给通道——这正对应 REQ-D3「一份部署工件表达全部路由」的诉求。
-2. **冲突 fail-loud**：数组与 dict 双形式同供、数组内重复路由键、数组项缺失或空 `provider` 字段、数组项档案非法——加载期硬失败并指名路由与来源，不静默降级；数组形式与 settings 文档供给并存属运行时合并冲突，按既有冲突语义以诊断错误失败并保持上一有效路由集。dict 形式中 `provider` 字段仍被拒绝——守卫改为形态上下文感知：dict 值拒绝该字段（迁移守卫不变），数组项该字段即路由键。
+1. **数组形态（组合专用键 `providerList`）**：`llm-pi-ai` 组合配置由 `providers`（dict，现行）与 `providerList`（数组，新增）两个互补键承载路由供给；数组每项携带 `provider` 路由键字段，其余字段与 dict 值完全一致。`providers` 是 volatile 配置节点，有两条供给通道：组合配置（cordis.yml / profile patch，部署工件）与 settings 文档（运行时活编辑，web Models 页即此）——组合供给的变更经 `loader/volatile-update` 热提交，不重挂载。`providerList` 不进 volatile 形态、settings 写入门拒绝对其写入，是部署工件的静态声明键。归一化在配置解析入口（`resolveProviderSection`）完成，此后全部既有管线不变——`resolveProfiles` 档案校验与目录解析、memoized 快照、`registerAdapter` 路由注册、`registerConfigurableProviders` 可配置目录、`registerModelDiscovery`、凭据每请求解析——归一化后的行为与手写等价 dict 逐项一致。组合供给（本变更交付的 `providerList` 数组与既有的 `providers` dict）是无 PVC、无 settings 导入的 headless fleet 部署的直接供给通道——这正对应 REQ-D3「一份部署工件表达全部路由」的诉求。
+2. **冲突 fail-loud**：`providers` 与 `providerList` 同供、数组内重复路由键、数组项缺失或空 `provider` 字段、数组项档案非法——加载期硬失败并指名路由与来源，不静默降级；settings 供给的 `providers` 与组合供给的 `providerList` 并存属运行时合并冲突，按既有冲突语义以诊断错误失败并保持上一有效路由集。dict 形式中 `provider` 字段仍被拒绝——守卫改为形态上下文感知：dict 值拒绝该字段（迁移守卫不变），数组项该字段即路由键。
 3. **acp-network 零代码改动**：provider/model 必选值对语义不变——它是会话起点的默认路由选择；协议面已把全部已注册路由按供应商分组广告为 `set_config_option` 模型选项（model-control 聚合 `llm.listProviders()`），选择经 EpochHeader 持久、resume 恢复。REQ-D3 条目中的「默认 model」由该值对承载；值对指向未注册路由时会话创建 fail-loud（既有行为）。dict-vs-数组的长期选型说明（settings 用 dict、组合两者皆可）作为 §8 决策中的文档说明项交付于升级指南与 README。
 
 模型可见 ⟺ 已记录不变：零新增会话事件、零新增 wire 类型、`SessionEventMap` 与 Session format 不变。

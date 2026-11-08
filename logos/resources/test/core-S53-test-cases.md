@@ -10,7 +10,7 @@
 | ID | 名称 | 对象 | 前置 | 操作 | 期望 |
 |----|------|------|------|------|------|
 | UT-S53-01 | 数组归一化等价性 | config schema + `resolveProfiles` | 同一路由集的数组与 dict 两种声明 | 分别解析并比较 | 归一化结果逐项等价（档案字段、目录条目、路由序）；声明顺序保留；归一化后走既有注册管线 |
-| UT-S53-02 | 冲突 fail-loud 矩阵 | schema / 归一化 / 运行时合并 | 双形式同供；数组内重复路由键；缺失或空 `provider` 字段；非法档案条目；数组+settings 并存 | 分别加载或触发 volatile-update | 自包含冲突加载期硬失败且消息指名路由与来源；数组+settings 合并冲突以诊断错误失败且路由集保持上一有效集；均无静默降级 |
+| UT-S53-02 | 冲突 fail-loud 矩阵 | schema / 归一化 / 运行时合并 | `providers` 与 `providerList` 同供；数组内重复路由键；缺失或空 `provider` 字段；非法档案条目；数组+settings 并存 | 分别加载或触发 volatile-update | 自包含冲突加载期硬失败且消息指名路由与来源；数组+settings 合并冲突以诊断错误失败且路由集保持上一有效集；均无静默降级 |
 | UT-S53-03 | dict 与 settings 回归 | 既有管线 | dict 形式与 settings 供给的既有用例集 | 回归运行 | 解析、活重配、HMR dispose 语义不变；dict 值中 `provider` 字段仍被拒绝（迁移守卫不变） |
 | UT-S53-04 | 真实 Loader 数组组合 | loader-composition | 数组形式组合经真实 Loader 启动 | 启动并检查 `listProviders` 与配置更新/HMR | 多路由注册活；配置更新与 HMR 语义与 dict 组合一致；dispose 后路由移除 |
 

@@ -25,7 +25,7 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
-Mount this plugin when a composition routes model requests through pi-ai's provider catalogs or through gateways that pi-ai's installed catalog does not describe. The `providers` dictionary is the whole configuration surface: each key is the provider route name a request selects with `GenerateOptions.provider`.
+Mount this plugin when a composition routes model requests through pi-ai's provider catalogs or through gateways that pi-ai's installed catalog does not describe. The `providers` dictionary is the settings-editable configuration surface: each key is the provider route name a request selects with `GenerateOptions.provider`. A composition may instead declare the routes as a `providerList` array — a composition-only deployment artifact described [below](#supply-routes-from-a-composition-providerlist).
 
 The adapter accepts the LLM service's [request-only user inputs](../llm/README.md#use-this-package) alongside durable history. User identity and attribution do not enter pi-ai content; assistant replay metadata and tool-call correlation remain attached to durable messages.
 
@@ -90,6 +90,27 @@ Each profile may set a `retryPolicy`; omission uses normal mode with five retrie
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-llm-pi-ai) is the exhaustive source for every accepted field and its JSDoc.
 
+### Supply routes from a composition providerList
+
+The `providerList` config key carries the same routes as an array: each entry names its route in `provider` beside the identical profile fields, and declaration order is the resolved route order. The array normalizes into the same pipeline as an equivalent dict, so registration, the configurable directory, model discovery, and credential resolution behave identically.
+
+```yaml
+- name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providerList:
+      - provider: openai
+        apiKeyEnv: OPENAI_API_KEY
+      - provider: acme-gateway
+        displayName: Acme Gateway
+        apiKeyEnv: ACME_GATEWAY_API_KEY
+        api: openai-completions
+        baseURL: https://gateway.acme.example/v1
+        models:
+          - id: acme-think
+```
+
+The list is a deployment artifact, not a settings address: it is not part of the volatile form, so settings writes (the web Models page) refuse it, and only the composition layer — `cordis.yml` or a profile patch — can change it. Choose it for machine-generated deployment manifests that must express every route in one artifact; keep the `providers` dict for routes a user edits live. Both keys naming routes fails plugin loading; a duplicate or empty `provider` key fails naming the array entry; dict values keep refusing a `provider` field. A settings write of `providers` beside a composition-supplied `providerList` is refused with the conflict named, and the previous route set keeps serving.
+
 ### Sign in to a provider
 
 A provider pi-ai ships a login for can be signed into through the harness authorization seam: the flow offers OAuth or an interactive key prompt (a key is typed into pi-ai's own login prompt, not into the settings form), and the resulting credential is stored in the harness credential store at `llm-pi-ai/<provider id>`. The stored sign-in authenticates its route beneath any `apiKeyEnv` override and refreshes itself under the store's cross-process lock; signing out deletes the stored record. A hand-declared route key outside the record grammar — a lowercase hyphenated identifier — cannot be signed into, because a record write for it refuses with `LlmError('UNSTORABLE_PROVIDER_ID')`; such a route authenticates through `apiKeyEnv` or ambient provider settings instead.
@@ -106,7 +127,7 @@ For self-hosted Chat Completions endpoints, `thinkingTokenBudgetField` selects t
 
 ### Change configuration at runtime
 
-Each operation captures the current `providers` Config reference. New or changed provider profiles are validated before form persistence; unchanged catalog failures remain editable. Route-set or retry-policy changes update registration atomically, preserving previous routes if another adapter owns a requested route.
+Each operation captures the current `providers` Config reference. New or changed provider profiles are validated before form persistence; unchanged catalog failures remain editable. Route-set or retry-policy changes update registration atomically, preserving previous routes if another adapter owns a requested route. The `providerList` array is read at plugin mount only: changing it is an ordinary composition change that remounts the entry.
 
 ### Discover models from endpoints
 

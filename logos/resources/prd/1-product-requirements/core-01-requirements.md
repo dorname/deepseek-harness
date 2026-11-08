@@ -756,7 +756,7 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 - **用户价值**：单实例服务多供应商，一份部署工件表达全部路由，不再需要「每实例单 provider + 切换重排」的供给链；会话级选择与既有协议面一致（← P01/P08）。
 - **优先级**：P1
 - **主路径**：数组在配置解析入口归一化进既有 dict 管线 → 路由注册（适配器、可配置目录、模型发现）与凭据解析全部复用既有实现 → acp-network 会话创建按 provider/model 值对选择默认路由，configOptions 按供应商分组广告全部路由 → `set_config_option` 切换路由与模型，经 EpochHeader 持久、resume 恢复。dict 形式与 settings 文档供给语义不变。
-- **边界**：settings 文档仍仅接受 dict（逐键合并、活重配；web Models 页机制不变），数组为组合层的静态声明形式；数组与 dict 双形式同供、数组内重复路由键、数组项缺失或空路由键、数组项档案非法均加载期 fail-loud（指名路由与来源），数组形式与 settings 供给并存按既有冲突语义诊断并保持上一有效路由集；acp-network 的 provider/model 值对保持默认路由选择语义，指向未注册路由在会话创建时 fail-loud（既有行为）；零新增会话事件与 wire 类型，Session format 不变。
+- **边界**：settings 文档仍仅接受 dict（逐键合并、活重配；web Models 页机制不变），数组经 `providerList` 组合专用键供给——组合层静态声明、settings 写入门拒绝对其写入；`providers` 与 `providerList` 同供、数组内重复路由键、数组项缺失或空路由键、数组项档案非法均加载期 fail-loud（指名路由与来源），settings 供给的 `providers` 与组合供给的 `providerList` 并存按既有冲突语义诊断并保持上一有效路由集；acp-network 的 provider/model 值对保持默认路由选择语义，指向未注册路由在会话创建时 fail-loud（既有行为）；零新增会话事件与 wire 类型，Session format 不变。
 
 #### 验收条件
 ##### 正常：数组组合与 dict 组合等价
@@ -768,7 +768,7 @@ DeepSeek Harness（`dsh`）是一个开源的 **agent harness（代理运行时�
 - **WHEN** `session/new` 后 `set_config_option` 切换到另一路由的模型，prompt 往返，断开重连 `session/resume`
 - **THEN** 切换生效（请求命中被切换路由），resume 后选择保持
 ##### 异常：形态冲突 fail-loud
-- **GIVEN** 双形式同供、数组内重复路由键、缺失或空路由键、非法档案条目、数组+settings 并存各一
+- **GIVEN** `providers` 与 `providerList` 同供、数组内重复路由键、缺失或空路由键、非法档案条目、数组+settings 并存各一
 - **WHEN** 加载配置或触发运行时合并
 - **THEN** 自包含冲突加载期失败并指名路由与冲突来源；数组+settings 合并冲突以诊断错误失败且路由集保持上一有效集；均不静默降级
 ##### 回归：既有供给语义不变
