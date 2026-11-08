@@ -74,6 +74,7 @@ const vitestStatus = run('openlogos vitest suites', 'pnpm', ['exec', 'vitest', '
   'apps/cli/tests/cluster-web-fe-split.spec.ts',
   'apps/cli/tests/cluster-web-fe-be-containers.spec.ts',
   'packages/acp/acp-network/tests/network.spec.ts',
+  'packages/acp/acp-network/tests/multi-provider.spec.ts',
   'packages/bundle/acp-network-app/tests/acp-network-app.spec.ts',
   'packages/llm/llm-deepseek-api-key/tests/discovery.spec.ts',
   'packages/acp/acp/tests/model-control.spec.ts',
