@@ -190,6 +190,7 @@ Client                         AcpBridge.setSessionConfigOption      ApprovalSer
 - 词表与错误：modeId 仅接受 `plan` / `normal`（未知值 invalid params 并给出词表）；未知会话 invalid params；会话关闭中 invalid params；plan-mode 插件缺席 internal error（fail-loud，`modes` 整体省略）。
 - 时序：回合间切换立即提交并紧随更新；回合中切换响应先行、更新随下一个 accepted pre-step 到达；noop 与 cancelled 无更新；resume 广告已提交状态。
 - plan-review 复用既有 `session/request_permission` 回环与 TLS/鉴权面：新增 optionId 词表 `approve` / `keep-planning`（kind 映射 allow_once / reject_once），评审卡片在工具调用卡片之后到达（drainUpdates 排序）；评审之外的问题保持无应答者语义（REQ-D6 范围）。
+goal 完成授权（S54）：bridge 为 owned session 截获 `goal-review` 意图的 userQuestions 请求，经既有 `session/request_permission` 呈现 Authorize/Deny 选项词汇并映射应答（与 plan-review 同构的第二意图应答者）。协议方法零新增；客户端视角是一次普通权限卡片（选项标签指名语义）。Authorize 的回传不经协议面——goal 工具在宿端把应答转换为 witnessed 用户消息后由模型重调完成工具，外部调用仍无法授予完成。
 - 既有 configOptions 面、prompt/resume、审批策略与技能枚举行为不受影响；`modes` 为新增可选字段，旧客户端按可选字段容忍。
 
 ## 会话压缩方法面（S52）

@@ -183,3 +183,9 @@ K8s staging manifests 位于 `deploy/acp-network/k8s/`。
   4. 回归既有 prompt/resume、审批策略（S49）、技能枚举（S50）、计划模式（S51）、压缩面（S52）与 `/compact` 命令路径。
 - 回滚方案不变（disabled route / 缩容 / 轮换 secret），另加组合 patch 还原注意（见 core-01 §十五：旧构建拒绝数组形式配置）；零持久化数据，回滚无迁移。
 - relay 侧（dspm）零新语义：配置面变化对协议帧透明；dspm 客户端无需新增 capability 声明或方法。
+
+### goal 授权卡（S54）
+
+- staging ACP 会话内驱动未授权 goal 完成（mock 模型触发 `complete` 调用即可），验证 `session/request_permission` 携带 Authorize/Deny 选项词汇、Authorize 应答后完成提交且会话日志含注入的源 user 用户消息（SMOKE-acp-network-08；本地通道全量执行，staging 无交互握手按 skip 语义记录，永不报 PASS）。
+- dspm 侧指引：goal 授权卡是普通权限卡片（`session/request_permission`），按既有选项卡片处理；无需 capability 声明；`goal-review` 意图为可选呈现优化——识别后可渲染为 goal 审批卡，不识别则通用选项卡同样可用（应答编码不变）。
+- Deny/取消路径与无通道 fail-fast（headless 组合）纳入回归；plan-review 卡（S51）不受新应答者影响。
