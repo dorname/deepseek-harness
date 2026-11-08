@@ -16,5 +16,5 @@
 - [x] 实现单切片：llm-pi-ai 配置新增 `providerList` 数组键（每项 `{ provider 路由键, ...供应商档案 }`，组合专用、settings 写入门拒绝对其写入），`resolveProviderSection` 在配置解析入口归一化进既有 dict 管线（`resolveProfiles`、memoized 快照、`registerAdapter`、可配置目录、模型发现、凭据解析零改动）；`provider` 字段守卫形态上下文感知（dict 值仍拒绝、数组项即路由键）；冲突 fail-loud——两键同供、数组内重复路由键、缺失或空路由键、非法档案条目加载期硬失败并指名路由与来源，settings 供给的 `providers` 与组合供给的 `providerList` 并存按既有冲突语义诊断并保持上一有效路由集；settings 文档保持 dict-only。交付 UT-S53-01..04（config.spec 7 例 / loader-composition.spec 3 例含真实 settings 写拒绝与冲突诊断；UT-S53-03 由既有回归承载）、ST-S53-01（multi-provider.spec：providerList×两 mock HTTP 路由经网络通道的分组广告、默认值对、切换命中与重启 resume 持久）、SMOKE-acp-network-07 接入 protocol-smoke.ts 与统一 smoke dispatcher（本地通道五段断言；staging/handshake 通道按 skip 语义）、llm-pi-ai 中英文 README 与 JSDoc、base bundle cordis.patch.yml 休眠挂载注释更新、config-catalog 重生成、`docs/upgrade-guide/v0.2.1-alpha.1/acp-multi-provider/` 中英文升级指南（双键形态、冲突词表、选型说明、dspm 组合示例、回滚 patch 还原注意）。
 
 ## [deploy] 部署任务
-- [ ] 按合并后的部署方案构建带 commit 标识的 dsh 发布物并部署到 staging。（人工确认点：需用户明确授权）
-- [ ] 验证数组组合的多路由注册、configOptions 分组广告、跨供应商切换与 resume 持久、冲突矩阵诊断，并回归既有 prompt/resume、S49/S50/S51/S52 路径与 dict/settings 供给，确认上一版发布物回滚路径（含组合 patch 还原注意）。
+- [x] 按合并后的部署方案构建带 commit 标识的 dsh 发布物并部署到 staging。（人工确认点：用户已明确授权 2026-11-08；发布物 355 artifacts @ `2597e763c7`，部署证据见 `logos/resources/verify/s53-deployment-report.md`）
+- [x] 验证数组组合的多路由注册、configOptions 分组广告、跨供应商切换与 resume 持久、冲突矩阵诊断，并回归既有 prompt/resume、S49/S50/S51/S52 路径与 dict/settings 供给，确认上一版发布物回滚路径（含组合 patch 还原注意）。Gate 3.8 PASS 20/0/12（含 SMOKE-acp-network-07）；冲突矩阵五分支独立进程实测；回归 94/94；回滚基线 `d6d9167d29`。
