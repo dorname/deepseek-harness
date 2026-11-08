@@ -1307,3 +1307,16 @@ goal 完成/受阻的授权征求与回传涉及四个组件，授权语义仍�
 | `goal`（GoalService） | 零改动：完成提交仍由模型工具调用驱动，无 id seam 需求 | `goal/src/index.ts:390-400` |
 
 安全模型不变量：授予的唯一形态是根 agent 开放回合内宿端见证的 `source.kind='user'` 消息（`authority.ts:80-84`）；ACP 应答在 goal 工具内转换为该形态，不新增外部完成入口。零新增会话事件类型与协议方法；Session format 维持 4。
+
+## 20. 会话导出面（S55）
+
+会话导出的生产者集中在 session-log-export 一处，桥接只是传输消费者——零生产逻辑复制：
+
+| 组件 | 职责 | 关键锚点 |
+|------|------|----------|
+| `session-log-export`（生产者，零改动） | ZIP 字节流生产者：flush、根日志预读、血缘后代枚举、附件内联/流式、fflate 分条 DEFLATE、`ResponseCapacityGate` 背压、取消 terminate | `archive.ts:347`（entries 生成器）、`archive.ts:545`（streamSessionLogZip）、`archive.ts:416-446`（容量门） |
+| `acp`（bridge，消费新增） | 三扩展方法注册、owned-session 校验、per-connection 游标注册表、分块拉取与 canonical base64、错误词表、Config 校验 | `bridge.ts` 实现表（`session/compact` 同构）、新导出模块 |
+| `attachment`（服务，零改动） | `readImage`（校验内联）/ `readFileStream`（背压流式）被生产者经 ctx.get 消费 | `attachment/src/index.ts:167/:219` |
+| `session-query`（服务，零改动） | `traceSession` 血缘枚举被生产者经 ctx.get 消费 | session-log-export deps（`archive.ts:43-56`） |
+
+工件不变量：ACP 导出与 HTTP `/api/session.export` 是同一生产者的同一工件（根日志 + 血缘 subagent 日志 + 附件，`includeDescendants` 语义一致）——两条传输面共享全部行为契约（分块、代理对安全、fail-loud、取消无截断），差异仅在鉴权（browser-auth vs 连接级 owned-session）与分块承载（chunked 响应 vs base64 read 序列）。
