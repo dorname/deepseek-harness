@@ -71,6 +71,7 @@ kind: "package-reference"
 | `session/set_mode` | 按公布的 `plan`／`normal` 词汇校验并应用一次计划模式选择；派生的 `current_mode_update` 是唯一生效事实。 |
 | `session/skills_list` | dsh 扩展方法（ACP 1.4.0 未定义技能界面）：会话的技能目录，按名字典序排列，每项恰含 `name`、`description` 与解析后的 `modelInvocable`／`userInvocable` 双旗标。 |
 | `session/compact` | dsh 扩展方法（ACP 1.4.0 未定义压缩请求）：显式手动压缩，返回引擎的持久结果——`compactionId`、`summarySeq`、带节点数与 token 数的遮蔽区间以及摘要块——历史过短时返回 `null`；会话有活跃工作时以 `busy` 失败。 |
+| `session/export_begin` / `session/export_read` / `session/export_cancel` | dsh 扩展方法三元组（ACP 1.4.0 未定义导出界面）：begin 打开会话日志的时点 ZIP 快照，read 以配置上限内的 canonical-base64 分块拉取直至 `eof`，cancel 立即释放游标。 |
 | `session/prompt` | 有序文本、资源链接与受支持图片，每个会话一次一个提示词；Agent 空闲且有序更新交付后才结算。 |
 | `session/cancel` / `$/cancel_request` | 提示词所拥有的取消路径；没有进行中的 ACP 提示词时取消自主工作，未知会话 id 则为空操作。 |
 | `session/update` | 已提交 assistant 消息与 thought、通用工具生命周期、配置变化、模式变化与上下文用量，按会话串行交付。 |
@@ -81,6 +82,8 @@ kind: "package-reference"
 `session/skills_list` 是对目标会话的只读目录读取：先解析预设挂载的作用域技能注册表，再回退宿主组合的全局注册表，返回该会话工作区的合并目录，且不施加调用面过滤——双旗标随报文下发，由各客户端自行施加调用策略。未知会话 id 以 `Invalid params` 失败；既未挂载预设技能注册表也未挂载全局技能服务的组合以 internal error 失败并说明缺口。该调用不追加会话事件，重复调用结果一致；技能体不经 ACP 加载，目录也不推送——客户端重拉以观察变化。
 
 `session/compact` 与 `session/update` 的 `compaction_update` 变体把已组合的压缩引擎呈现为显式 dsh 扩展——ACP 1.4.0 两者皆未定义——通过 `initialize` 时声明的 `session.compaction` 客户端能力协商。已声明的连接会收到有序的一对通知——`in_progress`，随后是携带摘要块的 `completed` 或 `failed`——由持久 `compaction/*` 事件派生，且先于响应写入排队；未声明的连接以完全相同的方式执行，但收不到任何压缩更新。响应报告引擎的持久结果，历史不可压缩时为 `null`。会话有活跃工作时调用以携带 `data.code: "busy"` 的 internal error 失败；未知会话 id 以 `Invalid params` 失败；未组合引擎的组合以 internal error 失败并说明缺口。该调用走与自动压缩相同的持久引擎路径，其摘要只经会话日志进入后续轮次。
+
+`session/export_begin`、`session/export_read` 与 `session/export_cancel` 把会话归档呈现为拉式 dsh 扩展三元组——ACP 1.4.0 未定义导出界面。`export_begin` 打开目标会话日志的时点快照（已刷新活跃事件），应答 `exportId` 与规范的 `dsh-session-<sessionId>.zip` 文件名；`includeDescendants: true` 追溯会话谱系，把每份后代日志置于 `subagents/<id>/` 之下，因此相同输入下归档字节与 HTTP `/api/session.export` 下载完全一致。客户端随后拉取 `export_read` 分块：每个应答携带 `exportChunkBytes` 上限内的 canonical base64（默认 262144，加载时校验 16384–4194304 区间；`exportCompressionLevel` 固定 ZIP DEFLATE 级别，默认 6），只有生产者耗尽后才送达 `eof: true`，读取节奏即生产节奏。终态——已交付 `eof`、流中生产者失败（携带净化消息的 `data.code: "export_failed"`）、显式取消或连接拆除——立即释放游标且无 TTL；此后的 read 或 cancel 以 `Invalid params` 与 `data.code: "unknown_cursor"` 应答，根日志缺失在任何字节送达前以 `data.code: "not_found"` 应答，`session/close` 不中止进行中的导出（begin 时点快照保持自洽），同一会话的并发快照相互独立。
 
 `session/set_mode` 与可选的 `modes` 广告把已组合的计划模式控制器呈现在标准界面上。仅当会话组合挂载了 `@deepseek-ai/dsh-plan-mode` 时，`session/new` 与 `session/resume` 才报告 `modes`——`currentModeId` 加上带名称的 `plan`／`normal` 词汇；否则响应整体省略该字段。`session/set_mode` 按该词汇校验 id 并应用；响应不承诺生效——由持久 `plan/mode` 事件派生的 `current_mode_update` 通知是唯一生效事实，且先于响应写入排队。提交时机遵循控制器：轮次间的选择立即提交；轮次中的选择排队到下一次被接受的轮内 pre-step 才提交；重复选择已提交状态会清除反向 pending，但不追加事件。未知 id 以 `Invalid params` 失败并给出词汇；未组合插件的组合以 internal error 失败。计划评审——携带 plan-review intent 的 `exit_plan_mode` 提问——经 `session/request_permission` 通道下发，选项 id 为 `approve`／`keep-planning`；取消结果映射回工具的评审被关闭分支。goal 授权评审——携带 goal-review intent 的 `update_goal` 完成或阻塞提问——在组合了 goal 工具时经同一通道下发，选项 id 为 `approve`／`deny`；`approve` 结果绝不会经 wire 转换 goal——宿主工具 steer 一条有见证的 user 消息，由模型自己的重调执行转换——取消结果映射为工具的交还轮次消息。
 
@@ -118,6 +121,7 @@ kind: "package-reference"
 | [`src/permission-review.ts`](src/permission-review.ts) | 共享评审核心：两个评审面的选项词汇、会话所有权过滤与结果映射 |
 | [`src/goal-approval.ts`](src/goal-approval.ts) | goal 授权面（S54）：经 `session/request_permission` 下发的 `goal-review` intent 应答方，先于计划评审面被认领 |
 | [`src/compaction.ts`](src/compaction.ts) | `session/compact` 面（S52）：能力门控、参数校验、引擎解析、持久结果映射与 `compaction_update` 队列 |
+| [`src/export.ts`](src/export.ts) | `session/export_*` 面（S55）：分块游标注册表、base64 分块与 wire 错误词表 |
 
 ### 准入与提示词结算
 
@@ -184,7 +188,7 @@ kind: "package-reference"
 - **仅一个主 workspace**——附加目录仍不支持。
 - **仅光栅提示词图片**——PNG、JPEG、WebP 与 GIF 要求持久附件存储及确切的图片能力路由。
 - **仅 MCP 工具**——MCP resource 与 prompt 没有 DSH 消费方。
-- **没有 transcript 回放或交互式扩展**——会话删除、fork、`session/load`、命令、计划、终端、客户端文件系统操作与 elicitation 仍不属于此自动化界面。
+- **没有 transcript 回放或交互式扩展**——会话删除、fork、`session/load`、命令、计划、终端、客户端文件系统操作与 elicitation 仍不属于此自动化界面；会话内容只经拉式归档导出三元组离开 bridge。
 
 <a id="dev-note"></a>
 ### 开发备注

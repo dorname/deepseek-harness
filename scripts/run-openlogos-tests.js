@@ -84,6 +84,8 @@ const vitestStatus = run('openlogos vitest suites', 'pnpm', ['exec', 'vitest', '
   'packages/interaction/user-approval/tests/approval.spec.ts',
   'packages/acp/acp/tests/permission-control.spec.ts',
   'packages/acp/acp/tests/permission-roundtrip.spec.ts',
+  'packages/acp/acp/tests/export.spec.ts',
+  'packages/acp/acp-network/tests/export.spec.ts',
 ], { OPENLOGOS_RESULT_FILE: ledgerPath })
 const acceptanceStatus = run('ST-S33-03 acceptance runner', 'node',
   ['--import', 'tsx/esm', 'scripts/fleet-staging/acceptance-st-s33-03.ts'], { OPENLOGOS_RESULT_FILE: ledgerPath })

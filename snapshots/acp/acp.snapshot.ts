@@ -34,6 +34,7 @@ const controllerCases: readonly {
   { name: 'skills-list', hasModelTurn: false },
   { name: 'plan-mode', hasModelTurn: false },
   { name: 'goal-authorization', hasModelTurn: true },
+  { name: 'session-export', hasModelTurn: true },
   { name: 'permission-policy', hasModelTurn: true },
   { name: 'cancel', hasModelTurn: true },
   { name: 'cancel-tool-calls', hasModelTurn: true },

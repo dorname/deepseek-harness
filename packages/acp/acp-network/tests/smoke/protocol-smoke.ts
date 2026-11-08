@@ -40,6 +40,7 @@ import {
   client as createAcpClientApp,
   methods,
   PROTOCOL_VERSION,
+  RequestError,
   type AgentContext,
   type PromptRequest,
   type PromptResponse,
@@ -48,6 +49,7 @@ import {
   type SendRequestOptions,
   type SessionUpdate,
 } from '@agentclientprotocol/sdk'
+import { unzipSync } from 'fflate'
 import { createWebSocketStream } from '@agentclientprotocol/sdk/experimental/ws-client'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -61,6 +63,13 @@ import {
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import SqliteSessionQueryEngine from '@deepseek-ai/dsh-session-query-sqlite'
+import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import type {
+  ImageAttachmentLimits,
+  ImageAttachmentRef,
+  StoredImageAttachment,
+} from '@deepseek-ai/dsh-attachment'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import * as SkillFileSystem from '@deepseek-ai/dsh-skill-filesystem'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
@@ -317,6 +326,15 @@ interface SmokeClient {
       summary: { type: string }[]
     } | null
   }>
+  /** The dsh extension export cursor open; the archive streams over reads. */
+  exportBegin: (params: { sessionId: string; includeDescendants?: boolean }) => Promise<{
+    exportId: string
+    filename: string
+  }>
+  /** The dsh extension export chunk pull; `eof: true` retires the cursor. */
+  exportRead: (params: { exportId: string }) => Promise<{ data: string; eof: boolean }>
+  /** The dsh extension export cursor cancel. */
+  exportCancel: (params: { exportId: string }) => Promise<Record<string, never>>
   /** Session updates in receive order, for the plan-mode and compaction assertions. */
   updates: SessionUpdate[]
 }
@@ -354,6 +372,9 @@ async function makeClient(
     skillsList: params => agent.request('session/skills_list', params),
     prompt: (params, options) => agent.request(methods.agent.session.prompt, params, options),
     compact: params => agent.request('session/compact', params),
+    exportBegin: params => agent.request('session/export_begin', params),
+    exportRead: params => agent.request('session/export_read', params),
+    exportCancel: params => agent.request('session/export_cancel', params),
     updates,
   }
 
@@ -454,6 +475,28 @@ async function runSmoke02ResumeLifecycle(
   return sessionId
 }
 
+/** In-memory attachment bytes for the smoke composition; no image features are exercised. */
+class MemoryAttachmentStore extends AttachmentStore {
+  readonly imageLimits: ImageAttachmentLimits = {
+    maxImageBytes: 1024,
+    maxImagesPerMessage: 4,
+    maxMessageImageBytes: 2048,
+    maxImagePixels: 1024,
+    maxImageDimension: 2000,
+    mediaTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
+  }
+
+  override validateImage(): Promise<void> { return Promise.resolve() }
+
+  saveImage(): Promise<ImageAttachmentRef> {
+    return Promise.reject(new Error('acp-network smoke does not save attachments'))
+  }
+
+  readImage(): Promise<StoredImageAttachment> {
+    return Promise.reject(new Error('acp-network smoke does not read attachments'))
+  }
+}
+
 async function startLocalServer(): Promise<{
   url: string
   dispose: () => Promise<void>
@@ -499,6 +542,12 @@ async function startLocalServer(): Promise<{
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx, { systemPrompt: { personaPrefix: '' } })
   await ctx.plugin(JsonlSessionPersistence, { root: persistenceRoot, compression: 'none' })
+  // In-memory attachment bytes: the archive's media entries read through this
+  // service, mirroring the production attachment-local mount without disk.
+  await ctx.plugin(MemoryAttachmentStore)
+  // The base-bundle session-query mount, so the export trio's lineage traces
+  // resolve exactly as in production (`openAt: never` never opens SQLite).
+  await ctx.plugin(SqliteSessionQueryEngine, { path: ':memory:', openAt: 'never' })
   await ctx.plugin(TokenMeter)
   // Explicit-only compaction for SMOKE-06: the zero retain budget keeps even a
   // one-turn scripted history compactible.
@@ -1194,7 +1243,7 @@ async function runSmoke08(
       if (optionId === undefined) throw new Error('SMOKE-08: unexpected third permission request')
       const toolCallId = expectedToolCalls[requests.length - 1]
       if (request.toolCall?.toolCallId !== toolCallId) {
-        throw new Error(`SMOKE-08: the permission request names ${String(request.toolCall?.toolCallId)}, expected ${String(toolCallId)}`)
+        throw new Error(`SMOKE-08: the permission request names ${request.toolCall?.toolCallId}, expected ${toolCallId}`)
       }
       return Promise.resolve({ outcome: { outcome: 'selected', optionId } })
     },
@@ -1225,6 +1274,92 @@ async function runSmoke08(
     }
     await client.closeSession({ sessionId })
     console.log('SMOKE-08 goal authorization round-trip: ok')
+  } finally {
+    await dispose()
+  }
+}
+
+/**
+ * SMOKE-acp-network-09: the session export trio on the network transport. A
+ * scripted turn drives log events, `session/export_begin` opens a pull cursor
+ * whose reads assemble the same ZIP artifact as the HTTP download route, and
+ * the cancel path leaves no revivable cursor (read and cancel alike answer
+ * `unknown_cursor`).
+ */
+async function runSmoke09(url: string, persistenceRoot: string): Promise<void> {
+  const { client, dispose } = await makeClient(url)
+  try {
+    const { sessionId } = await client.newSession({ cwd: persistenceRoot, mcpServers: [] })
+    const result = await client.prompt({ sessionId, prompt: [{ type: 'text', text: 'hello' }] })
+    assertStopReason('SMOKE-09', result)
+
+    const begun = await client.exportBegin({ sessionId })
+    if (!/^[0-9a-f-]{36}$/.test(begun.exportId)) {
+      throw new Error(`SMOKE-09: export id is not a UUID: ${begun.exportId}`)
+    }
+    if (begun.filename !== `dsh-session-${sessionId}.zip`) {
+      throw new Error(`SMOKE-09: export filename is ${begun.filename}`)
+    }
+    const chunks: string[] = []
+    for (;;) {
+      const response = await client.exportRead({ exportId: begun.exportId })
+      if (Buffer.from(response.data, 'base64').byteLength > 262144) {
+        throw new Error('SMOKE-09: a read chunk exceeded the configured bound')
+      }
+      chunks.push(response.data)
+      if (response.eof) break
+    }
+    if (chunks.length === 0) throw new Error('SMOKE-09: the export delivered no chunks')
+    const entries = unzipSync(Buffer.concat(chunks.map(chunk => Buffer.from(chunk, 'base64'))))
+    const log = Buffer.from(entries['session.v4.jsonl'] ?? '').toString('utf-8')
+    if (!log.includes('"id":"')) throw new Error('SMOKE-09: the archive lacks the session log entries')
+    if (!log.includes('hello')) throw new Error('SMOKE-09: the archive lacks the driven prompt')
+    if (!log.includes('hello from smoke')) throw new Error('SMOKE-09: the archive lacks the scripted reply')
+
+    // The drained cursor is gone: eof retires it for read and cancel alike.
+    const drained = await client.exportRead({ exportId: begun.exportId }).then(
+      () => { throw new Error('SMOKE-09: the drained export read succeeded') },
+      (error: unknown) => {
+        if (!(error instanceof RequestError) || (error.data as { code?: string } | undefined)?.code !== 'unknown_cursor') {
+          throw new Error(`SMOKE-09: drained read error is ${String(error)}`)
+        }
+        return error
+      },
+    )
+    if (drained.code !== -32602) throw new Error(`SMOKE-09: drained read code is ${drained.code}`)
+
+    // Cancel path: `{}` now, then the vocabulary words on both follow-ups.
+    const open = await client.exportBegin({ sessionId })
+    const cancelled = await client.exportCancel({ exportId: open.exportId })
+    if (Object.keys(cancelled).length !== 0) {
+      throw new Error(`SMOKE-09: cancel answered ${JSON.stringify(cancelled)}`)
+    }
+    for (const probe of ['read', 'cancel'] as const) {
+      await (probe === 'read'
+        ? client.exportRead({ exportId: open.exportId })
+        : client.exportCancel({ exportId: open.exportId })
+      ).then(
+        () => { throw new Error(`SMOKE-09: the cancelled ${probe} succeeded`) },
+        (error: unknown) => {
+          if (!(error instanceof RequestError) || (error.data as { code?: string } | undefined)?.code !== 'unknown_cursor') {
+            throw new Error(`SMOKE-09: cancelled ${probe} error is ${String(error)}`)
+          }
+        },
+      )
+    }
+
+    // Unknown sessions reject as invalid params without existence leaks.
+    await client.exportBegin({ sessionId: 'no-such-session' }).then(
+      () => { throw new Error('SMOKE-09: the unknown-session export succeeded') },
+      (error: unknown) => {
+        if (!(error instanceof RequestError) || error.code !== -32602) {
+          throw new Error(`SMOKE-09: unknown-session error is ${String(error)}`)
+        }
+      },
+    )
+
+    await client.closeSession({ sessionId })
+    console.log('SMOKE-09 session export trio: ok')
   } finally {
     await dispose()
   }
@@ -1358,6 +1493,15 @@ async function main(): Promise<void> {
       console.log('\nSMOKE-08 skipped: the goal authorization round-trip needs the local smoke composition.')
     } else {
       await runSmoke08(url, persistenceRoot, localServer.goalPhase)
+    }
+
+    // SMOKE-09 rides the export trio, which is itself a dsh extension: a
+    // staging target without the extension answers method-not-found, so the
+    // lane stays on the local composition and is reported as a skip otherwise.
+    if (STAGING_URL || NO_PROMPT || localServer === undefined) {
+      console.log('\nSMOKE-09 skipped: the session export trio needs the local smoke composition.')
+    } else {
+      await runSmoke09(url, persistenceRoot)
     }
 
     console.log('\nAll ACP-over-network smoke checks passed.')

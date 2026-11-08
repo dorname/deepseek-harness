@@ -30,6 +30,7 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { type GenerateOptions, LlmAdapter, type LlmResolvedModelInfo, type StreamChunk, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import SqliteSessionQueryEngine from '@deepseek-ai/dsh-session-query-sqlite'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
 import * as AcpNetworkPlugin from '../src/index.ts'
@@ -154,6 +155,13 @@ interface NetworkBridgeClient {
   setSessionConfigOption: NonNullable<AcpAgent['setSessionConfigOption']>
   prompt: (params: PromptRequest, options?: SendRequestOptions) => Promise<PromptResponse>
   cancel: NonNullable<AcpAgent['cancel']>
+  /** The dsh extension export trio under test (ACP 1.4.0 has no export method). */
+  exportBegin: (params: { sessionId: string; includeDescendants?: boolean }) => Promise<{
+    exportId: string
+    filename: string
+  }>
+  exportRead: (params: { exportId: string }) => Promise<{ data: string; eof: boolean }>
+  exportCancel: (params: { exportId: string }) => Promise<Record<string, never>>
 }
 
 export interface NetworkBridgeHarness {
@@ -183,6 +191,8 @@ export async function makeNetworkBridgeHarness(options: {
   /** The acp-network default provider/model pair; defaults to the scripted adapter's route. */
   provider?: string
   model?: string
+  /** Forwarded bridge export chunk bound (S55 wire-contract tests). */
+  exportChunkBytes?: number
 } = {}): Promise<NetworkBridgeHarness> {
   const adapter = new MockAdapter(options.script ?? [textResponse('hello')])
   const ctx = new Context()
@@ -190,6 +200,9 @@ export async function makeNetworkBridgeHarness(options: {
   const persistenceRoot = options.persistenceRoot ?? await mkdtemp(join(tmpdir(), 'dsh-acp-network-test-'))
   await mountAgentLoopTestDependencies(ctx, { systemPrompt: { personaPrefix: options.persona ?? '' } })
   await ctx.plugin(JsonlSessionPersistence, { root: persistenceRoot, compression: 'none' })
+  // The base-bundle session-query mount: `openAt: never` keeps exact reads and
+  // lineage traces (session export) available without ever opening SQLite.
+  await ctx.plugin(SqliteSessionQueryEngine, { path: ':memory:', openAt: 'never' })
   await ctx.plugin(TokenMeter)
   await ctx.plugin(MemoryAttachmentStore)
   const loopFiber = await ctx.plugin(AgentLoop, { agents: [] })
@@ -213,6 +226,7 @@ export async function makeNetworkBridgeHarness(options: {
         secret,
         transport: options.transport ?? 'websocket',
         path: '/acp',
+        ...(options.exportChunkBytes === undefined ? {} : { exportChunkBytes: options.exportChunkBytes }),
       })
     },
   })
@@ -253,6 +267,9 @@ export async function makeNetworkBridgeHarness(options: {
       setSessionConfigOption: params => client.request(methods.agent.session.setConfigOption, params),
       prompt: (params, opts) => client.request(methods.agent.session.prompt, params, opts),
       cancel: params => client.notify(methods.agent.session.cancel, params),
+      exportBegin: params => client.request('session/export_begin', params),
+      exportRead: params => client.request('session/export_read', params),
+      exportCancel: params => client.request('session/export_cancel', params),
     },
     adapter: options.llmMount === undefined ? adapter : undefined,
     attachments: ctx.get('attachments') as MemoryAttachmentStore | undefined,

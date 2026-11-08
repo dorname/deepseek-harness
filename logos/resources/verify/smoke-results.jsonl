@@ -33,3 +33,7 @@
 {"id":"SMOKE-core-19","status":"skip","timestamp":"2026-11-08T16:20:29.954Z","duration_ms":0,"scenario":"SIGTERM graceful drain","error":"embedded-postgres binaries unavailable ([STDERR] initdb: error: could not access directory \"/tmp/dsh-storage-pg-mmo30B\": Permission denied\n | Error: Postgres init script failed (code: 1, signal: null). ERROR OUTPUT: initdb: error: could not access directory \"/tmp/dsh-storage-pg-mmo30B\": Permission denied\n)"}
 {"id":"SMOKE-core-23","status":"pass","timestamp":"2026-11-08T16:22:08.355Z","duration_ms":4298,"scenario":"cluster-web same-origin fe-split","cpu_peak_percent":13.32495285983658}
 {"id":"SMOKE-core-24","status":"pass","timestamp":"2026-11-08T16:22:35.488Z","duration_ms":27032,"scenario":"cluster-web frontend/api containers","cpu_peak_percent":11.764705882352944}
+{"id":"SMOKE-core-23","status":"pass","timestamp":"2026-11-08T18:51:58.072Z","duration_ms":7709,"scenario":"cluster-web same-origin fe-split","cpu_peak_percent":79.86022871664548}
+{"id":"SMOKE-core-24","status":"pass","timestamp":"2026-11-08T19:02:10.879Z","duration_ms":612682,"scenario":"cluster-web frontend/api containers","cpu_peak_percent":32.62764632627646}
+{"id":"SMOKE-core-23","status":"pass","timestamp":"2026-11-08T19:18:50.849Z","duration_ms":4281,"scenario":"cluster-web same-origin fe-split","cpu_peak_percent":8.983890954151175}
+{"id":"SMOKE-core-24","status":"pass","timestamp":"2026-11-08T19:24:49.993Z","duration_ms":359045,"scenario":"cluster-web frontend/api containers","cpu_peak_percent":12.313432835820892}

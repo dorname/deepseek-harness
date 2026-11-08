@@ -58,8 +58,10 @@ const WAIT_POLL_INTERVAL_MS = 10
  * `waitForFile` observes a cwd-relative marker; otherwise it waits for the
  * durable turn start. The standalone `waitForFile` holds the next script step
  * behind the same marker.
- * `promptAndWaitForAgentMessage` arms an exact text-chunk waiter before sending
- * the prompt, then keeps the application live until that later update arrives.
+ * `promptAndWaitForAgentMessage` arms an accumulated text-chunk waiter before
+ * sending the prompt — the streamed agent text is concatenated across chunks
+ * and the step resolves when it contains the marker, bounded by the default
+ * wait timeout — then keeps the application live until that later update arrives.
  * `waitForTurnStart` waits for an open durable turn, optionally at or beyond a
  * specified turn number. `waitForTurnEnd` holds the subprocess open until the
  * selected session's latest complete raw-JSONL turn boundary is `turn/end`.
@@ -77,6 +79,11 @@ const WAIT_POLL_INTERVAL_MS = 10
  * it holds the next step behind the terminal `compaction_update` so the
  * captured frame order follows the enqueue order on every run (a no-history
  * call emits no update and must not opt in).
+ * The export ops drive the dsh extension archive trio: `exportBeginAndReadToEof`
+ * opens a cursor on the current session and pulls it to the terminal `eof`,
+ * `exportBeginCancelAndProbe` cancels a fresh cursor and captures the
+ * unknown-cursor rejections, and the two `*ExpectError` variants swallow the
+ * bridge's JSON-RPC errors like `skillsListExpectError`.
  * A standalone `cancel` may also wait for a cwd-relative readiness marker.
  * All wait timeouts default to 10s.
  */
@@ -95,6 +102,10 @@ export type InputStep =
   | { op: 'setSessionModeExpectError'; modeId: string; sessionId?: string }
   | { op: 'compact'; sessionId?: string; waitForTerminal?: boolean }
   | { op: 'compactExpectError'; sessionId: string }
+  | { op: 'exportBeginAndReadToEof' }
+  | { op: 'exportBeginCancelAndProbe' }
+  | { op: 'exportReadExpectError'; exportId: string }
+  | { op: 'exportBeginExpectError'; sessionId: string }
   | {
     op: 'promptAndCancel'
     text: string
@@ -477,10 +488,31 @@ async function runStep(
     case 'promptAndWaitForAgentMessage': {
       const sessionId = getSessionId()
       if (sessionId === undefined) throw new Error('snapshot-harness: promptAndWaitForAgentMessage before newSession')
-      const updateDone = waitForUpdate(update => update.sessionUpdate === 'agent_message_chunk'
-        && update.content.type === 'text' && update.content.text === step.waitForText)
-      await client.prompt({ sessionId, prompt: [{ type: 'text', text: step.text }] })
-      await updateDone
+      // The bridge forwards one update per streamed delta, so accumulate the
+      // agent text across chunks and resolve when the accumulation contains
+      // the marker. The race keeps a never-matching marker a bounded step
+      // failure instead of a hung scenario (update waiters carry no deadline
+      // of their own).
+      let seen = ''
+      const updateDone = waitForUpdate((update) => {
+        if (update.sessionUpdate !== 'agent_message_chunk' || update.content.type !== 'text') return false
+        seen += update.content.text
+        return seen.includes(step.waitForText)
+      })
+      let timer: NodeJS.Timeout | undefined
+      const timeoutDone = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => { reject(new Error(`snapshot-harness: agent text never contained ${JSON.stringify(step.waitForText)}`)) },
+          DEFAULT_WAIT_TIMEOUT_MS,
+        )
+        timer.unref()
+      })
+      try {
+        await client.prompt({ sessionId, prompt: [{ type: 'text', text: step.text }] })
+        await Promise.race([updateDone, timeoutDone])
+      } finally {
+        clearTimeout(timer)
+      }
       return
     }
     case 'promptExpectError': {
@@ -546,6 +578,47 @@ async function runStep(
       // Same swallow-as-expected-result pattern as skillsListExpectError.
       await client.compact({ sessionId: step.sessionId })
         .then(() => { throw new Error('snapshot-harness: expected compact to fail but it succeeded') },
+          () => { /* expected: the bridge returned an error */ })
+      return
+    }
+    case 'exportBeginAndReadToEof': {
+      const sessionId = getSessionId()
+      if (sessionId === undefined) throw new Error('snapshot-harness: exportBeginAndReadToEof before newSession')
+      // Pull-based consumption: the reads themselves drive the producer, and
+      // the terminal `eof: true` retires the cursor, so no update wait applies.
+      const begun = await client.exportBegin({ sessionId })
+      for (;;) {
+        const response = await client.exportRead({ exportId: begun.exportId })
+        if (response.eof) break
+      }
+      return
+    }
+    case 'exportBeginCancelAndProbe': {
+      const sessionId = getSessionId()
+      if (sessionId === undefined) throw new Error('snapshot-harness: exportBeginCancelAndProbe before newSession')
+      const begun = await client.exportBegin({ sessionId })
+      await client.exportCancel({ exportId: begun.exportId })
+      // Cancel is terminal for read and cancel alike; both rejections ARE the
+      // expected protocol result and land in the captured transcript.
+      await client.exportRead({ exportId: begun.exportId })
+        .then(() => { throw new Error('snapshot-harness: expected the cancelled export read to fail but it succeeded') },
+          () => { /* expected: the cursor is gone (unknown_cursor) */ })
+      await client.exportCancel({ exportId: begun.exportId })
+        .then(() => { throw new Error('snapshot-harness: expected the second cancel to fail but it succeeded') },
+          () => { /* expected: the cursor is gone (unknown_cursor) */ })
+      return
+    }
+    case 'exportReadExpectError': {
+      // Same swallow-as-expected-result pattern as skillsListExpectError.
+      await client.exportRead({ exportId: step.exportId })
+        .then(() => { throw new Error('snapshot-harness: expected exportRead to fail but it succeeded') },
+          () => { /* expected: the bridge returned an error */ })
+      return
+    }
+    case 'exportBeginExpectError': {
+      // Same swallow-as-expected-result pattern as skillsListExpectError.
+      await client.exportBegin({ sessionId: step.sessionId })
+        .then(() => { throw new Error('snapshot-harness: expected exportBegin to fail but it succeeded') },
           () => { /* expected: the bridge returned an error */ })
       return
     }

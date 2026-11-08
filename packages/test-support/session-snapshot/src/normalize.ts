@@ -16,6 +16,7 @@ import { sessionHeaderVersion } from './session-files.ts'
 const SESSION_ID = '{{sessionId}}'
 const MESSAGE_ID = '{{messageId}}'
 const USED_TOKENS = '{{usedTokens}}'
+const EXPORT_CHUNK = '{{exportChunk}}'
 const CWD = '{{cwd}}'
 const SYSTEM = '{{system}}'
 const TOOLS = '{{tools}}'
@@ -228,6 +229,16 @@ function scrubValue(
       (value as { sessionUpdate?: unknown }).sessionUpdate === 'usage_update'
       && typeof (value as { used?: unknown }).used === 'number'
     ) out.used = USED_TOKENS
+    // A `session/export_read` result is the only frame carrying `{ data, eof }`:
+    // its base64 is raw archive bytes over log text with run-time clocks, so it
+    // is not stable across record and replay. The snapshot tier asserts the
+    // envelope and eof sequencing; byte-exact archives are covered by the unit
+    // and network suites.
+    if (
+      (value as { eof?: unknown }).eof !== undefined
+      && typeof (value as { data?: unknown }).data === 'string'
+      && ((value as { data?: unknown }).data as string).length > 64
+    ) out.data = EXPORT_CHUNK
     return out
   }
   return value

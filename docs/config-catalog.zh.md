@@ -18,7 +18,7 @@
 
 - `inject`: `agents` · `llm` · `sessionPersistence` · `sessions`
 - `refs`: `AuthenticateRequest` (`@agentclientprotocol/sdk`) · `Stream` (`@agentclientprotocol/sdk`)
-- `source`: [`packages/acp/acp/src/index.ts:84`](../packages/acp/acp/src/index.ts)
+- `source`: [`packages/acp/acp/src/index.ts:106`](../packages/acp/acp/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -51,6 +51,10 @@ export interface AcpConfig {
   model?: string
   /** Maximum summaries returned by one session/list page. */
   sessionListPageSize?: number
+  /** Maximum raw bytes delivered by one session/export_read response. */
+  exportChunkBytes?: number
+  /** DEFLATE compression level (0-9) for session exports. */
+  exportCompressionLevel?: number
 }
 
 /** Validates credentials presented by a network client. Return void if valid. */

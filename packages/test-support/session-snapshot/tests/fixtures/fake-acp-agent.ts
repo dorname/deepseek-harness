@@ -65,6 +65,8 @@ interface Behavior {
   strayBucketFile?: boolean
   /** Delete the sessions root entirely (harvest must yield no logs). */
   deleteSessionsRoot?: boolean
+  /** Serve the `session/export_*` trio: begin mints cursor `export-1`, reads answer eof, cancel retires it. */
+  export?: true
 }
 
 const sessionsRoot = process.env.DSH_SNAPSHOT_SESSIONS_ROOT ?? ''
@@ -87,6 +89,8 @@ let sessionId = ''
 let sessionCwd = ''
 /** The parked prompt request id while `hang-until-cancel` waits for the cancel notification. */
 let parkedPromptId: number | string | null = null
+/** Whether the fake's single export cursor `export-1` has been cancelled. */
+let exportCancelled = false
 /** The transient raw JSONL log that proves the parked turn started durably. */
 let parkedTurnLog: string | undefined
 /** Resolvers for outbound permission responses, keyed by request id. */
@@ -218,6 +222,31 @@ function handleFrame(frame: Record<string, unknown>): void {
     case 'session/prompt':
       void handlePrompt(id as number | string)
       return
+    case 'session/export_begin': {
+      if (behavior.export !== true || params.sessionId === 'unknown-id') {
+        respondError(id as number | string, 'unknown session for export')
+        return
+      }
+      respond(id as number | string, { exportId: 'export-1', filename: `dsh-session-${String(params.sessionId)}.zip` })
+      return
+    }
+    case 'session/export_read': {
+      if (behavior.export !== true || params.exportId !== 'export-1' || exportCancelled) {
+        respondError(id as number | string, 'unknown export cursor')
+        return
+      }
+      respond(id as number | string, { data: 'Zm9vYmFy', eof: true })
+      return
+    }
+    case 'session/export_cancel': {
+      if (behavior.export !== true || params.exportId !== 'export-1' || exportCancelled) {
+        respondError(id as number | string, 'unknown export cursor')
+        return
+      }
+      exportCancelled = true
+      respond(id as number | string, {})
+      return
+    }
     case 'session/cancel':
       if (parkedPromptId !== null) {
         const parked = parkedPromptId

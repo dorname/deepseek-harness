@@ -111,6 +111,15 @@ export interface AcpTestClient {
     modelInvocable: boolean
     userInvocable: boolean
   }[] }>
+  /** The dsh extension export cursor open; the archive streams over reads. */
+  exportBegin: (params: { sessionId: string; includeDescendants?: boolean }) => Promise<{
+    exportId: string
+    filename: string
+  }>
+  /** The dsh extension export chunk pull; `eof: true` retires the cursor. */
+  exportRead: (params: { exportId: string }) => Promise<{ data: string; eof: boolean }>
+  /** The dsh extension export cursor cancel. */
+  exportCancel: (params: { exportId: string }) => Promise<Record<string, never>>
 }
 
 /** A running ACP test process and its captured client-side outputs. */
@@ -264,6 +273,9 @@ export function launchAcpTestAgent(options: AcpTestLaunchOptions): LaunchedAcpTe
     prompt: params => context.request(methods.agent.session.prompt, params),
     cancel: params => context.notify(methods.agent.session.cancel, params),
     skillsList: params => context.request('session/skills_list', params),
+    exportBegin: params => context.request('session/export_begin', params),
+    exportRead: params => context.request('session/export_read', params),
+    exportCancel: params => context.request('session/export_cancel', params),
   }
   // `exit` only reports the parent process's status. Descendants may retain
   // inherited stdout/stderr handles and buffered ACP frames may still be

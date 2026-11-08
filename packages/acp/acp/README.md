@@ -71,6 +71,7 @@ One connection can run several sessions at once, each independent. The calls a c
 | `session/set_mode` | A plan-mode selection validated against the advertised `plan` / `normal` vocabulary; the derived `current_mode_update` is the only effect observation. |
 | `session/skills_list` | A dsh extension method (ACP 1.4.0 defines no skill surface): the session's skill catalog, name-sorted, each entry carrying exactly `name`, `description`, and the resolved `modelInvocable` / `userInvocable` flags. |
 | `session/compact` | A dsh extension method (ACP 1.4.0 defines no compaction request): explicit manual compaction returning the engine's durable result — `compactionId`, `summarySeq`, the shadowed range with node and token counts, and the summary blocks — or `null` when the history is too short; an active turn fails with `busy`. |
+| `session/export_begin` / `session/export_read` / `session/export_cancel` | A dsh extension method trio (ACP 1.4.0 defines no export surface): begin opens a point-in-time ZIP snapshot of the session log, reads pull canonical-base64 chunks under the configured bound until `eof`, and cancel releases the cursor immediately. |
 | `session/prompt` | Ordered text, resource links, and supported images, one prompt at a time per session; settlement follows Agent idle and ordered update delivery. |
 | `session/cancel` / `$/cancel_request` | The prompt-owned cancellation path; without an ACP prompt in flight it cancels autonomous work, while unknown session ids are no-ops. |
 | `session/update` | Committed assistant messages and thoughts, generic tool lifecycle, configuration changes, mode changes, and context usage, serialized per session. |
@@ -83,6 +84,8 @@ Session configuration offers opaque provider/model choices from the live LLM ser
 `session/skills_list` is a read-only catalog read for the addressed session: it resolves the preset-mounted scoped skill registry first, then the host composition's global registry, and returns the merged catalog for the session's workspace without applying invocation filtering — both flags ride the wire so each client applies its own policy. An unknown session id fails with `Invalid params`; a composition that mounts neither the preset skill registry nor the global skill service fails with an internal error naming the gap. The call appends no session event and is cache-consistent across repeated calls; skill bodies are never loaded over ACP, and the catalog is not pushed — clients re-pull to observe changes.
 
 `session/compact` and the `compaction_update` variant of `session/update` expose the composed compaction engine as an explicit dsh extension — ACP 1.4.0 defines neither — negotiated by the `session.compaction` client capability declared at `initialize`. A declared connection receives the ordered pair — `in_progress`, then `completed` carrying the summary blocks, or `failed` — derived from the durable `compaction/*` events and enqueued before the response write; an undeclared connection executes identically and receives zero compaction updates. The response reports the engine's durable result or `null` when no history is compactible. Calling while the session has active work fails with an internal error carrying `data.code: "busy"`; an unknown session id fails with `Invalid params`; a composition without an engine fails with an internal error naming the gap. The call runs the same durable engine path as automatic compaction, and its summary reaches later turns only through the session log.
+
+`session/export_begin`, `session/export_read`, and `session/export_cancel` expose the session archive as a pull-based dsh extension trio — ACP 1.4.0 defines no export surface. `export_begin` opens a point-in-time snapshot of the addressed session's log, live events flushed, and answers `exportId` plus the canonical `dsh-session-<sessionId>.zip` filename; `includeDescendants: true` traces the session lineage and adds each descendant log under `subagents/<id>/`, so the archive bytes equal the HTTP `/api/session.export` download over identical inputs. The client then pulls `export_read` chunks: each response carries canonical base64 within the configured `exportChunkBytes` bound (262144 by default, validated over 16384–4194304 at load; `exportCompressionLevel` pins the ZIP DEFLATE level, 6 by default), and `eof: true` arrives only after the producer is drained, so read pace gates the producer. Terminal states — delivered `eof`, a mid-stream producer failure (`data.code: "export_failed"` with a sanitized message), an explicit cancel, or connection teardown — release the cursor immediately with no TTL; a later read or cancel answers `Invalid params` with `data.code: "unknown_cursor"`, a missing root log answers `data.code: "not_found"` before any byte, `session/close` does not abort an in-flight export because the begin-time snapshot stays self-consistent, and concurrent snapshots of one session are independent.
 
 -----
 
@@ -118,6 +121,7 @@ The decision history lives in the [ACP as an automation-only protocol note](../.
 | [`src/permission-review.ts`](src/permission-review.ts) | Shared review core: option vocabulary, session-ownership filter, and outcome mapping for both review faces |
 | [`src/goal-approval.ts`](src/goal-approval.ts) | Goal-approval face (S54): the `goal-review` intent answerer over `session/request_permission`, claimed before the plan-review face |
 | [`src/compaction.ts`](src/compaction.ts) | `session/compact` face (S52): capability gate, params validation, engine resolution, durable-result mapping, and the `compaction_update` queue |
+| [`src/export.ts`](src/export.ts) | `session/export_*` face (S55): chunked cursor registry, base64 chunking, and the wire-error vocabulary |
 
 ### Admission and prompt settlement
 
@@ -184,7 +188,7 @@ These limits define when this package is a poor fit or needs special operational
 - **One primary workspace** — additional directories remain unsupported.
 - **Raster prompt images only** — PNG, JPEG, WebP, and GIF require a durable attachment store and an exact image-capable route.
 - **MCP tools only** — MCP resources and prompts have no DSH consumer.
-- **No transcript replay or interactive extensions** — session deletion, fork, `session/load`, commands, plans, terminals, client filesystem operations, and elicitation remain outside this automation surface.
+- **No transcript replay or interactive extensions** — session deletion, fork, `session/load`, commands, plans, terminals, client filesystem operations, and elicitation remain outside this automation surface; session content leaves the bridge only through the pull-based archive export trio.
 
 <a id="dev-note"></a>
 ### Dev Note

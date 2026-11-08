@@ -1,0 +1,11 @@
+{
+  "steps": [
+    { "op": "initialize" },
+    { "op": "newSession" },
+    { "op": "promptAndWaitForAgentMessage", "text": "In plain prose (no lists), explain in about 150 words how a stone arch bridge carries weight down to its supports. End your answer with the exact sentence: Bridge archive marker complete.", "waitForText": "Bridge archive marker complete" },
+    { "op": "exportBeginAndReadToEof" },
+    { "op": "exportBeginCancelAndProbe" },
+    { "op": "exportReadExpectError", "exportId": "00000000-0000-0000-0000-000000000000" },
+    { "op": "exportBeginExpectError", "sessionId": "unknown-id" }
+  ]
+}

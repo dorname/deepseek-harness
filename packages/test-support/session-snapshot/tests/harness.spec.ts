@@ -742,6 +742,56 @@ describe('runScenario', () => {
     expect(result.rawStdout).toContain('thinking about it')
   })
 
+  it('promptAndWaitForAgentMessage fails bounded when the marker never arrives', { timeout: 20_000 }, async () => {
+    const { fixtureFile } = await scenario({ prompt: 'respond' })
+    await expect(runScenario(
+      {
+        steps: [...boot, {
+          op: 'promptAndWaitForAgentMessage',
+          text: 'go',
+          waitForText: 'a marker the fake never emits',
+        }],
+      },
+      { agent: AGENT, mode: 'replay', fixtureFile, configPath: AGENT.configPath },
+    )).rejects.toThrow(/agent text never contained/)
+  })
+
+  it('exportBeginAndReadToEof opens a cursor and pulls it to eof', async () => {
+    const { fixtureFile } = await scenario({ prompt: 'respond', export: true })
+    const result = await runScenario(
+      { steps: [...boot, { op: 'exportBeginAndReadToEof' }] },
+      { agent: AGENT, mode: 'replay', fixtureFile },
+    )
+    expect(result.rawStdout).toContain('"exportId":"export-1"')
+    expect(result.rawStdout).toContain('"data":"Zm9vYmFy","eof":true')
+  })
+
+  it('exportBeginCancelAndProbe captures the terminal-cursor vocabulary', async () => {
+    const { fixtureFile } = await scenario({ prompt: 'respond', export: true })
+    const result = await runScenario(
+      { steps: [...boot, { op: 'exportBeginCancelAndProbe' }] },
+      { agent: AGENT, mode: 'replay', fixtureFile },
+    )
+    expect(result.rawStdout).toContain('"result":{}')
+    // Two error frames follow the cancel: the retired read and the retired cancel.
+    expect(result.rawStdout).toContain('unknown export cursor')
+  })
+
+  it('export expect-error ops capture unknown cursor and unknown session frames', async () => {
+    const { fixtureFile } = await scenario({ prompt: 'respond', export: true })
+    const result = await runScenario(
+      {
+        steps: [...boot,
+          { op: 'exportReadExpectError', exportId: '00000000-0000-0000-0000-000000000000' },
+          { op: 'exportBeginExpectError', sessionId: 'unknown-id' },
+        ],
+      },
+      { agent: AGENT, mode: 'replay', fixtureFile },
+    )
+    expect(result.rawStdout).toContain('unknown export cursor')
+    expect(result.rawStdout).toContain('unknown session for export')
+  })
+
   it('waitForTurnEnd holds cancellation open through the persisted closing boundary', { timeout: 20_000 }, async () => {
     const { fixtureFile } = await scenario({
       prompt: 'hang-until-cancel',

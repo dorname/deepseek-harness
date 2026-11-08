@@ -1,7 +1,8 @@
 /**
  * ACP-over-network smoke (`SMOKE-acp-network-01/02/03/04/05`, changes
  * `20261020-1643-acp-over-network`, `dsh-acp-permission-policy`,
- * `dsh-acp-skills-list`, `dsh-acp-plan-mode`, and `dsh-acp-multi-provider`).
+ * `dsh-acp-skills-list`, `dsh-acp-plan-mode`, `dsh-acp-multi-provider`,
+ * `dsh-acp-goal-approval`, and `dsh-acp-session-export`).
  *
  * - SMOKE-acp-network-01: WebSocket auth + session/new + prompt end-to-end
  *   (local mock LLM via `packages/acp/acp-network/tests/smoke/protocol-smoke.ts`).
@@ -42,6 +43,13 @@
  *   re-call completes server-side. Staging targets skip it — the interactive
  *   authorization handshake needs the local composition — and never report
  *   PASS for it.
+ * - SMOKE-acp-network-09: the session export trio (change
+ *   `dsh-acp-session-export`). A scripted turn drives log events, then
+ *   `session/export_begin` opens a pull cursor whose reads assemble the same
+ *   ZIP artifact as the HTTP download route; the drained and cancelled
+ *   cursors answer `unknown_cursor` for read and cancel alike. Staging
+ *   targets skip it — the extension trio needs the local composition — and
+ *   never report PASS for it.
  *
  * When namespace `dsh-acp-network-staging` is Ready and
  * `/tmp/dsh-acp-network-staging-creds.env` exists, also runs the staging
@@ -185,6 +193,7 @@ function main(): void {
       { id: 'SMOKE-acp-network-06', scenario: 'local compaction face' },
       { id: 'SMOKE-acp-network-07', scenario: 'local multi-provider supply face' },
       { id: 'SMOKE-acp-network-08', scenario: 'local goal authorization round-trip' },
+      { id: 'SMOKE-acp-network-09', scenario: 'local session export trio' },
     ] as const
     for (const lane of failedLanes) {
       const outcome: Parameters<typeof report>[1] = {
@@ -229,6 +238,10 @@ function main(): void {
   report('SMOKE-acp-network-08', {
     durationMs: local.durationMs,
     scenario: 'local goal authorization round-trip',
+  })
+  report('SMOKE-acp-network-09', {
+    durationMs: local.durationMs,
+    scenario: 'local session export trio',
   })
 
   // Staging handshake is advisory here: ledger coverage for 01/02 already

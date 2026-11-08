@@ -40,6 +40,28 @@ export {
   type AcpCompactionResult,
 } from './compaction.ts'
 export {
+  beginSessionExport,
+  DEFAULT_EXPORT_CHUNK_BYTES,
+  EXPORT_BEGIN_METHOD,
+  EXPORT_CANCEL_METHOD,
+  EXPORT_READ_METHOD,
+  MAX_EXPORT_CHUNK_BYTES,
+  MIN_EXPORT_CHUNK_BYTES,
+  parseExportBeginRequest,
+  parseExportCursorRequest,
+  sessionExportBeginWireError,
+  sessionExportReadWireError,
+  SessionExportCursor,
+  SessionExportRegistry,
+  unknownExportCursor,
+  type AcpExportBeginRequest,
+  type AcpExportBeginResponse,
+  type AcpExportCancelResponse,
+  type AcpExportCursorRequest,
+  type AcpExportReadResponse,
+  type SessionExportId,
+} from './export.ts'
+export {
   applySessionMode,
   NORMAL_MODE_ID,
   parseSessionModeId,

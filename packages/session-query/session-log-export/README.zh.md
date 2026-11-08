@@ -87,6 +87,8 @@ Header 的更多操作入口使用公共紧凑 Button，点击区域为 28px 正
 
 Host 路由是由该功能拥有的精确 Fetch 路由贡献。Connection 应用 Host/Origin 与浏览器会话检查并桥接流式 `Response`；本包拥有查询校验、活动会话 flush、基于句柄的日志读取与附件读取、ZIP 生成和 HTTP 状态语义。
 
+归档生产者有第二个消费者：仅自动化的 ACP bridge（`@deepseek-ai/dsh-acp`）暴露 `session/export_begin` / `session/export_read` / `session/export_cancel` 这一拉式 dsh 扩展三元组，其 `export_read` 分块以 canonical base64 交付本包 `sessionLogZipEntries` / `streamSessionLogZip` 的字节。生产者代码原样共享，因此相同输入下 ACP 归档与 HTTP 下载完全一致。
+
 </details>
 
 -----

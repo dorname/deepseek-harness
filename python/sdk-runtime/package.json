@@ -93,6 +93,7 @@
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-session-checkpoint-policy": "workspace:*",
     "@deepseek-ai/dsh-session-log-deepseek": "workspace:*",
+    "@deepseek-ai/dsh-session-log-export": "workspace:*",
     "@deepseek-ai/dsh-session-persistence": "workspace:*",
     "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:*",
     "@deepseek-ai/dsh-session-projection": "workspace:*",

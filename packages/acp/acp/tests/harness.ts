@@ -338,6 +338,13 @@ interface BridgeClient {
   skillsList: (params: { sessionId: string } | Record<string, never>) => Promise<{
     skills: { name: string; description: string; modelInvocable: boolean; userInvocable: boolean }[]
   }>
+  /** The dsh extension export trio under test (S55). */
+  exportBegin: (params: { sessionId: string; includeDescendants?: boolean }) => Promise<{
+    exportId: string
+    filename: string
+  }>
+  exportRead: (params: { exportId: string }) => Promise<{ data: string; eof: boolean }>
+  exportCancel: (params: { exportId: string }) => Promise<Record<string, never>>
 }
 
 export interface BridgeHarness {
@@ -497,6 +504,9 @@ export async function makeBridgeHarness(options: {
     cancel: params => client.notify(methods.agent.session.cancel, params),
     compact: (params, options) => client.request('session/compact', params, options),
     skillsList: params => client.request('session/skills_list', params),
+    exportBegin: params => client.request('session/export_begin', params),
+    exportRead: params => client.request('session/export_read', params),
+    exportCancel: params => client.request('session/export_cancel', params),
   }
   return harness
 }

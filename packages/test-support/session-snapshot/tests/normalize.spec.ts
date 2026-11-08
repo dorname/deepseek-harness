@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { describe, expect, it } from 'vitest'
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import { prepareSessionSnapshotFixtureForComparison } from '@deepseek-ai/dsh-llm-replay'
@@ -91,6 +92,17 @@ describe('normalizeStdout', () => {
       used: '{{usedTokens}}',
       size: 1_000_000,
     })
+  })
+
+  it('tokenizes an export_read chunk payload while keeping the empty terminal chunk', () => {
+    const longChunk = Buffer.alloc(8192).toString('base64')
+    const frames = [
+      JSON.stringify({ jsonrpc: '2.0', id: 5, result: { data: longChunk, eof: false } }),
+      JSON.stringify({ jsonrpc: '2.0', id: 6, result: { data: '', eof: true } }),
+    ]
+    const [first, second] = normalizeStdout(frames.join('\n'), ctx).trim().split('\n')
+    expect(JSON.parse(first as string)).toEqual({ jsonrpc: '2.0', id: 1, result: { data: '{{exportChunk}}', eof: false } })
+    expect(JSON.parse(second as string)).toEqual({ jsonrpc: '2.0', id: 2, result: { data: '', eof: true } })
   })
 
   it('scrubs cwd at file URI and chained-punctuation boundaries', () => {

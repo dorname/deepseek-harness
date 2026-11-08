@@ -87,6 +87,8 @@ Both entry paths issue a `HEAD` preflight to the document-relative `api/session.
 
 The Host route is a feature-owned exact Fetch contribution. Connection applies its Host/Origin and browser-session checks and bridges the streaming `Response`; this package owns query validation, live-session flushes, handle-based log reads and attachment reads, ZIP generation, and HTTP status semantics.
 
+The archive producer has a second consumer: the automation-only ACP bridge (`@deepseek-ai/dsh-acp`) exposes `session/export_begin` / `session/export_read` / `session/export_cancel`, a pull-based dsh extension trio whose `export_read` chunks deliver this package's `sessionLogZipEntries` / `streamSessionLogZip` bytes as canonical base64. The producer code is shared unchanged, so an ACP archive equals the HTTP download over identical inputs.
+
 </details>
 
 -----

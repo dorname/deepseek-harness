@@ -1,0 +1,11 @@
+version: 1
+scenario: session-export
+profile: acp
+composition: acp-default
+recording: live
+header:
+  class: session-export
+  pin: true
+  systemPromptSource: permission-policy
+  toolSchemasSource: permission-policy
+permission: workspace-write

@@ -807,9 +807,11 @@ describe('goal tool authorization review (S54)', () => {
     const { ctx, root } = await harness({}, { userQuestions: true })
     admitSteer(root)
     const midCall = new AbortController()
-    ctx.on('user-questions/request', () => new Promise<never>((_resolve, reject) => {
-      midCall.signal.addEventListener('abort', () => reject(new Error('waterfall aborted')), { once: true })
-    }))
+    ctx.on('user-questions/request', () => {
+      return new Promise<never>((_resolve, reject) => {
+        midCall.signal.addEventListener('abort', () => { reject(new Error('waterfall aborted')) }, { once: true })
+      })
+    })
     const humanTurn = openTurn(root, { kind: 'user' })
     const created = ctx.goals.create(root.agent, { objective: 'aborted review' })
     closeTurn(root, humanTurn)

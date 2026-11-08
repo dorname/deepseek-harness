@@ -50,6 +50,7 @@ import {
 import type { ModelSelection } from '@deepseek-ai/dsh-agent'
 import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
 import { ManualCompactionError } from '@deepseek-ai/dsh-compaction'
+import { DEFAULT_SESSION_LOG_COMPRESSION_LEVEL, type SessionLogCompressionLevel } from '@deepseek-ai/dsh-session-log-export'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 // Side-effect type import: declaration-merges the approval waterfall answered below.
@@ -80,6 +81,26 @@ import {
   SKILLS_LIST_METHOD,
   type AcpSkillList,
 } from './skill-list.ts'
+import {
+  DEFAULT_EXPORT_CHUNK_BYTES,
+  MAX_EXPORT_CHUNK_BYTES,
+  MIN_EXPORT_CHUNK_BYTES,
+  beginSessionExport,
+  parseExportBeginRequest,
+  parseExportCursorRequest,
+  sessionExportBeginWireError,
+  sessionExportReadWireError,
+  unknownExportCursor,
+  EXPORT_BEGIN_METHOD,
+  EXPORT_CANCEL_METHOD,
+  EXPORT_READ_METHOD,
+  SessionExportRegistry,
+  type AcpExportBeginRequest,
+  type AcpExportBeginResponse,
+  type AcpExportCancelResponse,
+  type AcpExportCursorRequest,
+  type AcpExportReadResponse,
+} from './export.ts'
 import { AcpSession } from './session.ts'
 
 const DEFAULT_SESSION_LIST_PAGE_SIZE = 100
@@ -95,6 +116,10 @@ export interface AcpConfig {
   model?: string
   /** Maximum summaries returned by one session/list page. */
   sessionListPageSize?: number
+  /** Maximum raw bytes delivered by one session/export_read response. */
+  exportChunkBytes?: number
+  /** DEFLATE compression level (0-9) for session exports. */
+  exportCompressionLevel?: number
 }
 
 /** Runtime-only transport override; production uses stdio or a network plugin. */
@@ -102,6 +127,11 @@ export const Config: Schema<AcpConfig> = Schema.object({
   provider: Schema.string(),
   model: Schema.string(),
   sessionListPageSize: Schema.natural().min(1).default(DEFAULT_SESSION_LIST_PAGE_SIZE),
+  exportChunkBytes: Schema.natural()
+    .min(MIN_EXPORT_CHUNK_BYTES)
+    .max(MAX_EXPORT_CHUNK_BYTES)
+    .default(DEFAULT_EXPORT_CHUNK_BYTES),
+  exportCompressionLevel: Schema.natural().max(9).default(6),
 })
 
 /** Validates credentials presented by a network client. Return void if valid. */
@@ -145,6 +175,9 @@ export class AcpBridge {
   private readonly persistence: Context['sessionPersistence']
   private readonly logger: Context['logger']
   private readonly sessionListPageSize: number
+  private readonly exportChunkBytes: number
+  private readonly exportCompressionLevel: SessionLogCompressionLevel
+  private readonly exports = new SessionExportRegistry()
   private readonly sessions = new Map<SessionId, AcpSession>()
   private readonly activating = new Set<SessionId>()
   private closed = false
@@ -156,6 +189,8 @@ export class AcpBridge {
     this.persistence = ctx.sessionPersistence
     this.logger = ctx.logger
     this.sessionListPageSize = resolveSessionListPageSize(config.sessionListPageSize)
+    this.exportChunkBytes = resolveExportChunkBytes(config.exportChunkBytes)
+    this.exportCompressionLevel = resolveExportCompressionLevel(config.exportCompressionLevel)
 
     ctx.on('session/event', (session, event) => {
       const record = this.sessions.get(session.header.id)
@@ -434,6 +469,38 @@ export class AcpBridge {
         }
       },
 
+      exportBegin: async (params: AcpExportBeginRequest, signal: AbortSignal): Promise<AcpExportBeginResponse> => {
+        assertOpen()
+        requireSession(brandString<SessionId>(params.sessionId))
+        try {
+          return await beginSessionExport(this.ctx, this.exports, params, this.exportCompressionLevel, signal)
+        } catch (error: unknown) {
+          throw sessionExportBeginWireError(error)
+        }
+      },
+
+      exportRead: async (params: AcpExportCursorRequest): Promise<AcpExportReadResponse> => {
+        assertOpen()
+        const cursor = this.exports.get(params.exportId)
+        if (cursor === undefined) throw unknownExportCursor()
+        try {
+          const response = await cursor.read(this.exportChunkBytes)
+          if (response.eof) this.exports.take(params.exportId)
+          return response
+        } catch (error: unknown) {
+          this.exports.take(params.exportId)
+          throw sessionExportReadWireError(error)
+        }
+      },
+
+      exportCancel: (params: AcpExportCursorRequest): AcpExportCancelResponse => {
+        assertOpen()
+        const cursor = this.exports.take(params.exportId)
+        if (cursor === undefined) throw unknownExportCursor()
+        cursor.cancel()
+        return {}
+      },
+
       closeSession: async (params: CloseSessionRequest): Promise<CloseSessionResponse> => {
         assertOpen()
         const sessionId = brandString<SessionId>(params.sessionId)
@@ -479,6 +546,11 @@ export class AcpBridge {
       // dsh extension: ACP 1.4.0 has no compaction request method; execution
       // semantics and every policy stay inside the composed engine (S52).
       .onRequest(COMPACTION_METHOD, parseCompactionRequest, ({ params, signal }) => implementation.compactSession(params, signal))
+      // dsh extension trio: the session archive streams over pull-based chunk
+      // reads; the client's read pace gates the producer (S55).
+      .onRequest(EXPORT_BEGIN_METHOD, parseExportBeginRequest, ({ params, signal }) => implementation.exportBegin(params, signal))
+      .onRequest(EXPORT_READ_METHOD, parseExportCursorRequest, ({ params }) => implementation.exportRead(params))
+      .onRequest(EXPORT_CANCEL_METHOD, parseExportCursorRequest, ({ params }) => implementation.exportCancel(params))
       .onNotification(methods.agent.session.cancel, ({ params }) => implementation.cancel(params))
 
     // Permission requests are a machine policy channel for ACP clients such as
@@ -558,6 +630,7 @@ export class AcpBridge {
       this.closed = true
       approvalOff()
       questionsOff()
+      this.exports.abortAll()
       const records = [...this.sessions.values()]
       quiescing = (async () => {
         const disposals = await Promise.allSettled(records.map(record => record.close('ACP bridge disposed')))
@@ -602,6 +675,7 @@ export class AcpBridge {
   async dispose(): Promise<void> {
     if (this.closed) return
     this.closed = true
+    this.exports.abortAll()
     const records = [...this.sessions.values()]
     const disposals = await Promise.allSettled(records.map(record => record.close('ACP bridge disposed')))
     this.sessions.clear()
@@ -651,6 +725,34 @@ function resolveSessionListPageSize(value: number | undefined): number {
   }
   /* v8 ignore stop */
   return resolved
+}
+
+/** Resolve and validate the deployment-owned export chunk ceiling. */
+function resolveExportChunkBytes(value: number | undefined): number {
+  const resolved = value ?? DEFAULT_EXPORT_CHUNK_BYTES
+  /* v8 ignore start -- Cordis applies the Config schema range; this protects direct apply callers. */
+  if (
+    !Number.isSafeInteger(resolved) ||
+    resolved < MIN_EXPORT_CHUNK_BYTES ||
+    resolved > MAX_EXPORT_CHUNK_BYTES
+  ) {
+    throw new Error(
+      `acp: exportChunkBytes must be an integer between ${MIN_EXPORT_CHUNK_BYTES} and ${MAX_EXPORT_CHUNK_BYTES}`,
+    )
+  }
+  /* v8 ignore stop */
+  return resolved
+}
+
+/** Resolve and validate the deployment-owned export DEFLATE level. */
+function resolveExportCompressionLevel(value: number | undefined): SessionLogCompressionLevel {
+  const resolved = value ?? DEFAULT_SESSION_LOG_COMPRESSION_LEVEL
+  /* v8 ignore start -- Cordis applies the Config schema range; this protects direct apply callers. */
+  if (!Number.isInteger(resolved) || resolved < 0 || resolved > 9) {
+    throw new Error('acp: exportCompressionLevel must be an integer between 0 and 9')
+  }
+  /* v8 ignore stop */
+  return resolved as SessionLogCompressionLevel
 }
 
 /** Decode an opaque keyset cursor without assigning meaning to client metadata. */
