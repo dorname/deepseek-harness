@@ -229,3 +229,96 @@ CLI 的 `detectProposalStep()` / `detectProposalStepViaFlow()` 按以下规则�
 - 若 artifacts / reporter 缺失，应输出当前切片未完成诊断，而不是依赖全量 verify 失败推断。
 - 若本片证据完整但全量失败，应进入 repair / code，保留本片完成事实。
 - driver 更正 artifacts 声明时，不应要求改写 tasks；应重新校验证据并追加 audit。
+
+## [code] 切片与 TEST_SLICE_MANIFEST 映射
+
+### 结构职责
+
+`tasks.md` 的 `[code]` section 继续承载人读任务、父子 checkbox 与实现进度；`TEST_SLICE_MANIFEST.json` 承载机器稳定的 `slice_id`、测试唯一归属、runner selector 和 fingerprint。两者互相校验，但 verify 与宿主不得从 task 自然语言临时重建归属。
+
+### 顶层切片映射
+
+- manifest 的 `slices[]` 数量和顺序必须与 `[code]` 顶层 checkbox 一致。
+- 每个 manifest slice 的 `task_text` 等于对应顶层 checkbox 去除列表/checkbox 语法后的规范化文本。
+- 每个顶层 task 对应唯一 `slice_id`；缩进 checkbox 属于父切片，不生成独立 slice ID。
+- `slice_id` 在 checkbox 勾选、空白格式化和重试时保持稳定；切片语义文本变化必须刷新 task fingerprint 并触发 stale 校验。
+
+### fingerprint
+
+`task_fingerprint` 对 `[code]` section 的规范化结构计算 SHA-256：保留顶层顺序、规范化 task 文本与父子关系；忽略 checkbox 的 checked 状态、行尾空白和无语义空行。这样勾选进度不会使 manifest 失效，重切片或改写语义会使其 stale。
+
+`spec_fingerprint` 由 manifest 声明的测试规格目标及其规范化内容计算，必须覆盖 owned ID 的定义。任何测试新增、删除、重命名或语义内容变化均触发重建；测试结果 JSONL 不参与 fingerprint。
+
+### 完成判定
+
+```text
+slices_planned = code_section_has_real_top_level_tasks ∧ manifest_valid
+slice_task_done(slice) = parent_checked ∧ every(child_checked)
+slice_checkpoint_done(slice) = current_manifest_has_PASS_checkpoint(slice_id)
+ready_for_final = every(slice_task_done) ∧ every(slice_checkpoint_done)
+```
+
+任务完成与 checkpoint 完成是独立事实；前者不能代替后者。父 checkbox 先勾选但 checkpoint 未通过时，OpenLogos 仍以该 slice 为 attempted。
+
+### 恢复约束
+
+恢复模式只能写 manifest，不得修改 `[code]` 文本、顺序、父子结构或 checkbox。若既有 tasks 无法为测试建立唯一归属，slice-planner 必须返回歧义，不能为通过 validator 而偷偷重切。初次规划同时写 tasks 与 manifest；恢复重建只替换 manifest。
+
+### Legacy
+
+单切片代码提案、docs-only 提案和已越过 final 的历史提案可以没有 manifest，并沿用既有 tasks 解析。处于多切片 implement 的历史提案缺 manifest 时，`slices_planned` 不视为完整，进入 `plan-slices` 恢复动作，但保留当前 checkbox。
+
+### launched 初始模板
+
+需要规格与代码的 launched change 初始 tasks 形态为：
+
+```markdown
+# 实现任务
+
+## [delta] 规格变更
+- [ ] 更新需求文档的场景和验收条件
+- [ ] 更新产品设计文档的功能规格
+
+## [code] 代码实现
+```
+
+`[delta]` 行是必须由 change-writer 替换的 scaffold；`[code]` 是代码必需锚点，不得生成 `实现代码变更` 或其它 checkbox。纯规格 change 删除 `[code]`；纯代码 change 保留空 `[code]` 并走 no-delta spec-complete。
+
+### 三个独立谓词
+
+| 谓词 | 适用阶段 | 完成条件 |
+|---|---|---|
+| `tasks_plan_filled` | plan | `[delta]/[deploy]` 无模板残留、目标唯一、部署决定一致 |
+| `tasks_code_required` | plan 及以后 | proposal/tasks/delta 表明需业务代码、测试、runner、reporter 或 UI/driver 实现 |
+| `tasks_code_slices_filled` | spec-complete 后 | `[code]` 至少一个真实切片，非模板占位，引用真实测试 ID |
+
+### 非法状态与修复
+
+- plan 阶段 `[code]` 出现 checkbox：`tasks_code_entry_before_spec_complete`，删除条目但保留代码必需标题。
+- 代码必需但缺 `[code]`：`tasks_code_section_missing`，补空标题。
+- plan scaffold 行未替换：模板残留，plan 不 ready。
+- merge 后空 `[code]`：不是 plan 失败，而是 `plan-slices` 尚未完成。
+
+### 兼容
+
+旧格式 tasks 的 post-plan 前沿保持历史兼容；仍在 writing 的 launched change 按新合同诊断。只读命令不执行 auto-reset；既有 merge/slice auto-reset 边界不变。
+
+## 公共 content staging 与 receipt-only 任务边界
+
+
+### Delta producer
+
+Agent 任务只能要求写入 OpenLogos 投影中对应 slot 的 `staging_path`，并遵守同目录临时文件加 atomic rename。任务不得要求 Agent：
+
+- 自建 staging 根或选择任意 submit file；
+- 读取/写入 canonical target、metadata、receipt、marker、journal；
+- 运行 OpenLogos 或 Git；
+- 生成外部 manifest、commit_paths 或错误分类。
+
+### Driver 完成证据
+
+WorkUnit 完成只证明声明 staging 文件已经生产，不代表 slot 已提交或 merge 完成。Driver 必须等待 quiescent，再调用 submit-content；节点完成只以 OpenLogos 返回结果为准。
+
+### Merge 与代码切片
+
+只有 completed receipt 的双层 hash 和 commit_paths 校验通过，Delta tasks 才能视为已合并；slice-planner 只读取正式已合并测试 ID。failed/aborted、普通 fatal 或 recovery_required 均不能勾选规格完成或规划代码切片。

@@ -31,8 +31,25 @@ pre-commit:
       glob: '{package.json,*/package.json,*/*/package.json,*/*/*/package.json,*/*/*/*/package.json,pnpm-workspace.yaml,*/*/pnpm-workspace.yaml,pnpm-lock.yaml,vendor/README.md,python/*/pyproject.toml,scripts/primary-runtime/lock.json,scripts/gen-third-party-notices.ts,scripts/browser-bundled-externals.ts,scripts/build-exe-for-python-sdk.ts,tsconfig.base*.json,packages/*/*/src/**/*,packages/*/*/tsdown.config.ts,packages/client/tsdown.client.ts,apps/*/src/**/*,apps/*/vite.config.ts}'
       run: node_modules/.bin/tsx scripts/gen-third-party-notices.ts && git add THIRD_PARTY_NOTICES.md
 
+    # OpenLogos CLI owns these trees byte-for-byte (see the managed -text
+    # block in .gitattributes); its packages may ship trailing whitespace,
+    # which `openlogos sync` would restore after any local cleanup. The
+    # whitespace gate therefore excludes managed trees instead of fighting
+    # the sync channel. logos/changes and logos/logos.config.json stay gated.
     - name: whitespace (staged)
-      run: git diff --cached --check
+      run: >-
+        git diff --cached --check -- .
+        ':(exclude).agents/plugins/openlogos'
+        ':(exclude).claude/openlogos'
+        ':(exclude).cursor/skills'
+        ':(exclude).cursor/hooks'
+        ':(exclude).opencode'
+        ':(exclude).zcode'
+        ':(exclude).qoder'
+        ':(exclude).workbuddy'
+        ':(exclude)logos/skills'
+        ':(exclude)logos/spec'
+        ':(exclude)logos/resources/verify'
 
     - name: vendor manifest guard
       run: scripts/check-vendor-manifest.sh

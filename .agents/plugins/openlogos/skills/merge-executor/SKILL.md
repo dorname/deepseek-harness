@@ -9,54 +9,88 @@ description: "Delta merge execution via MERGE_PROMPT.md"
 
 ## 触发条件
 
-- 用户运行完 `openlogos merge <slug>` 后要求 AI 执行合并
+> **0.15.0 起本 Skill 不再「代替 CLI 执行合并」。** `openlogos merge <slug>` 一次调用完成全部合并：解析 `deltas/` 目标集 → 经章节锚合成最终字节（含物质结果复验）→ 一次性原子落盘 → 末步写含结构化 `test_change_set` 的 `SPEC_MERGED`。**不再生成 `MERGE_PROMPT.md`**，也不存在 `openlogos merge-apply`、`MERGE_APPLY_MANIFEST.json` 与 merge 事务（`merge transaction status` / `submit-content --slot` / `seal` / `apply` / `recover` / `abort` / `reopen`）。本 Skill 的职责相应收敛为：**授权前的只读复核、命令失败时的诊断与 delta 修复、成功后的事后点数与提交交接**。
+
+- 用户明确授权执行 `openlogos merge <slug>`
 - 用户提到"执行合并"、"merge"、"把 delta 合进主文档"
-- 用户提到"读取 MERGE_PROMPT.md 并执行"
+- `openlogos merge` 非零退出，用户要求排查并修复
 
 ## 前置依赖
 
-1. `logos/changes/<slug>/MERGE_PROMPT.md` 存在（由 `openlogos merge` 命令生成）
-2. MERGE_PROMPT.md 中引用的 delta 文件和目标主文档均存在
+1. 活跃提案目录 `logos/changes/<slug>/` 存在，`tasks.md` 的 `[delta]` 条目已全部勾选且对应 delta 文件在盘
+2. `logos/.openlogos-guard` 的 `activeChange` 与目标 slug 一致（不一致时命令直接拒绝，不写任何产物）
+3. `SPEC_MERGED` 尚未在场（已在场表示本提案已合并；重新合并须先 `git checkout logos/resources/` 回滚）
+4. 用户已明确授权执行 `openlogos merge`（人类确认点；`--auto` standing 授权由 driver 控制）
 
-如果 MERGE_PROMPT.md 不存在，提示用户先运行 `openlogos merge <slug>`。
+> **不再依赖 `MERGE_PROMPT.md`**：该文件在 0.15.0 不再生成。若在提案目录见到残留，视为历史产物，**不得**据其执行合并。
 
 ## 核心能力
 
-1. 解析 MERGE_PROMPT.md 中的合并指令
-2. 逐个读取 delta 文件，理解 ADDED / MODIFIED / REMOVED 标记
-3. 精准定位主文档中的对应章节并执行合并
-4. 保持主文档的格式和风格一致性
-5. 输出变更摘要
-6. **等待人类确认后停止** — 合并完成后 AI 的职责即结束，不得主动执行 verify、部署、smoke 或 archive
+1. 合并前只读复核：delta 段标记齐备、章节锚在目标主文档中唯一可定位、`[delta]` 目标集与 `deltas/` 实际内容一致（可用 `openlogos change-lint --slug <slug>` 自查，它与 merge 的准入判定同源）
+2. 执行 `openlogos merge <slug>`，读取其结构化输出（`target_count`、`targets`、`test_change_set`）
+3. 失败时按稳定错误码定位并修 **delta**，然后重跑命令——**不得**手工补写任何主文档、marker、counter 或 index，不得绕过命令重试局部文件
+4. 成功后按「事后点数」口径复核落盘结果，并自动 `git commit` 规格文档
+5. **等待人类确认后停止** — 合并完成后 AI 的职责即结束，不得主动执行 verify、部署、smoke 或 archive
 
 ## 执行步骤
 
 ### Step 1: 读取合并指令
 
-读取 `logos/changes/<slug>/MERGE_PROMPT.md`，解析出：
-- 变更提案名称和概述
-- 每个 delta 文件的路径、对应的目标主文档路径、操作类型
+合并指令来自**提案本身**，不来自任何生成的 prompt 文件。读取：
 
-### Step 2: 逐个 Delta 文件执行合并
+- `logos/changes/<slug>/proposal.md`：变更原因、范围与部署影响
+- `logos/changes/<slug>/tasks.md` 的 `[delta]` section：本次应当落盘的目标清单
+- `logos/changes/<slug>/deltas/**`：实际 delta 文件
 
-按 MERGE_PROMPT.md 中列出的顺序，逐个处理 delta 文件：
+目标集是 `deltas/` 的**无逻辑投影**——每个可 merge delta 经权威 `DELTA_TO_RESOURCE` 映射唯一 canonical target，模式按磁盘事实即时判定（目标存在为 MODIFY、缺失为 CREATE）。因此**不需要**、也**不允许**再由 AI 另写一份 planned target 清单。
 
-1. **读取 delta 文件**：理解 ADDED / MODIFIED / REMOVED 标记及内容
-2. **读取目标主文档**：定位需要修改的章节
-3. **执行合并**：
-   - `ADDED`：在主文档的指定位置插入新内容
-   - `MODIFIED`：替换主文档中同名章节的内容
-   - `REMOVED`：从主文档中删除对应章节
-4. **输出摘要**：列出对该文件做了哪些修改
+### Step 2: 预计算整个合并批次
 
-### Step 3: 输出总体变更报告
+**本步骤在 0.15.0 收敛为「合并前只读复核」**：字节合成与落盘由 `openlogos merge` 内部完成，AI 不预计算目标字节、不产出 `MERGE_APPLY_MANIFEST.json`、不写任何正式目标。
 
-所有 delta 处理完毕后，输出：
+复核清单（全部只读）：
+
+1. **段标记**：每个 `.md` delta 都有围栏外的 `ADDED` / `MODIFIED` / `REMOVED` 段标记，且无未替换的模板占位字面量。
+2. **章节锚**：每个段标记的锚在目标主文档中**恰好命中一处**；标题重复时用标题路径锚（`父级标题 > 目标标题`）或序数后缀 `[n]` 唯一定位。锚解析到 0 处或多处会被 fail-closed 拒绝，**不要指望工具猜**。
+3. **单写者**：同一目标的同一章节只允许**一个** `MODIFIED` 块（跨 delta 文件亦然）——顺序应用下后写覆盖前写。
+4. **条目守恒（事前）**：`MODIFIED` 携带整节全量内容，未变更的结构化 ID 原样抄入；删除章节内部分条目时 `MODIFIED` + `REMOVED-ITEMS` 成对出现。
+5. **目标集一致**：`tasks.md` `[delta]` 声明的目标与 `deltas/` 实际文件一一对应（P==T==D，不成立时命令报 `MERGE_TARGET_MISMATCH`）。
+
+任一项不满足**先修 delta**，不要执行 merge——命令会拒绝，但在合并前发现更省一轮。
+
+### Step 3: 受控 apply、总体报告与提交
+
+唯一正式落盘入口是：
+
+```bash
+openlogos merge <slug>
+```
+
+该命令在**单次调用内**顺序完成：崩溃恢复收敛 → `[code]` 提前填充 auto-reset → 与 `change-lint` **同源**的完整准入判定 → 逐目标经 `composeOpenLogosMarkdown` 合成最终字节（章节锚唯一定位、标题层级 rebase、`verifyAgentMaterialOutcome` 物质结果复验）→ 交 `applyBaselineClosureBatch` **一次性原子落盘**（temp + fsync + rename）→ 末步写含结构化 `test_change_set` 的 `SPEC_MERGED`。
+
+**失败语义**：任一步失败**整批回滚**，`logos/resources/`、根 `spec/`、根 `skills/` 保持合并前字节，不写 `SPEC_MERGED`。稳定错误码：
+
+| 错误码 | 触发 | 处置 |
+|---|---|---|
+| `MERGE_NO_ACTIVE_CHANGE` | 无活跃提案或提案目录缺失 | 核对 slug 与 guard |
+| `MERGE_DELTA_INVALID` | 段标记缺失、章节锚解析到 0 或多处、物质结果复验不通过 | 按诊断修 delta 后重跑 |
+| `MERGE_TARGET_MISMATCH` | P==T==D 不成立 | 对齐 `proposal` / `tasks` / `deltas` 三方目标集 |
+| `MERGE_ALREADY_COMPLETE` | `SPEC_MERGED` 已在场 | 需重新合并时先 `git checkout logos/resources/` 回滚 |
+| `MERGE_APPLY_FAILED` | 落盘中途失败（已整批回滚） | 排查 IO/权限后重跑 |
+
+失败时**立即停止**：不得手工补写任何目标或 marker，不得绕过命令重试局部文件，也不得以「删除/改名提案目录内 OpenLogos 拥有的产物」来腾位。修 delta、重跑命令是唯一出路——`git` 工作区就是回滚点。
+
+**成功后的事后点数**（commit 前，强制）：按「合并原则补充：条目守恒与事后点数」一节的结构化口径，对每个被触及的主文档清点实际 ID 集合并与公式对账。不符即报告差异并暂停，不执行 commit。
+
+**下游指纹的自然传导**：重新合并会使 `spec_fingerprint` 变化，既有 `TEST_SLICE_MANIFEST.json` 经 `deriveSliceVerificationState()` 自然判 stale。该判定是**告警而非阻塞**；确需重建时走切片侧既有路径——以相同 `slices.json` 重跑 `openlogos slice plan --file`（根规范 `spec/test-slice-manifest.md` §2.3）。merge-executor 只跟随 `next` 的派生提示，不自行推导清理动作。
+
+命令成功后输出：
 
 ```
 合并完成：
-- [文件路径 1]：新增 x 节，修改 y 节，删除 z 节
-- [文件路径 2]：...
+- [canonical target 1]
+- [canonical target 2]
+test_change_set: C=<changed 数> R=<removed 数>
 ```
 
 然后 AI **自动执行 git commit**（无需用户确认，但需告知）：
@@ -68,41 +102,39 @@ git commit -m "docs({slug}): merge spec deltas"
 
 > 使用 `git add -A` 而非 `git add logos/resources/`，确保本次合并涉及的所有规格文件（包括 spec/、skills/、CLAUDE.md、AGENTS.md 等）都被纳入提交，避免 commit 语义与实际落盘状态不一致。
 
-commit 成功后，写入规格合并完成标记：
-
-```bash
-touch logos/changes/{slug}/SPEC_MERGED
-```
-
-`SPEC_MERGED` 表示 delta 已真实合入主规格。只有该标记存在后，`openlogos status` 才会进入 `coding` 阶段。`MERGE_PROMPT_GENERATED` / `MERGE_PROMPT.md` 只表示合并指令已生成，不能代表主规格已合并。
+`SPEC_MERGED` 已由 `openlogos merge` 作为落盘批次的最后一个目标写入，**禁止再 touch 或手工覆盖**。它表示 delta 已真实合入主规格；只有该标记存在后，`openlogos status` 才会进入 `coding` 阶段。
 
 输出 commit 结果后，提示用户后续步骤：
 
 ```
 ✅ 规格文档已合并并提交。接下来请：
 
-**Step 1：实现代码**
-按更新后的 logos/resources/ 规格实现业务代码 + 测试代码。
+**Step 1：划分 [code] 切片**
+由 slice-planner 基于已合并规格与真实测试 ID 产出 slices.json，
+执行 openlogos slice plan --file <slices.json> 落盘，并在 slice-exit 门确认。
+
+**Step 2：实现代码**
+按更新后的 logos/resources/ 规格逐切片实现业务代码 + 测试代码。
 代码实现完成后 AI 会自动提交代码变更。
 
-**Step 2：运行验收（代码实现完成后）**
+**Step 3：运行验收（代码实现完成后）**
 请在项目根目录运行：
 openlogos verify
-- 验收通过（PASS）→ 无部署任务时可进入归档；有部署任务时进入 Step 3
+- 验收通过（PASS）→ 无部署任务时可进入归档；有部署任务时进入 Step 4
 - 验收失败（FAIL）→ 修复代码后重新运行，无需重走 merge 流程
 
-**Step 3：部署（仅当 tasks.md 存在 [deploy] section）**
+**Step 4：部署（仅当 tasks.md 存在 [deploy] section）**
 验收通过后，由用户明确授权 AI 按部署方案执行部署任务。
 
 AI 必须读取：
 - logos/resources/prd/3-technical-plan/3-deployment/
 - 当前提案 tasks.md 的 [deploy] section
 
-**Step 4：冒烟测试（仅当已部署）**
+**Step 5：冒烟测试（仅当已部署）**
 部署完成后，由用户明确授权运行：
 openlogos smoke
 
-**Step 5：归档提案**
+**Step 6：归档提案**
 verify 通过且无部署任务，或部署完成且 smoke 通过后：
 openlogos archive <slug>
 
@@ -130,7 +162,7 @@ openlogos verify、部署执行、openlogos smoke 和 openlogos archive 均为�
 
 ### 事后点数（合并落盘后、写 SPEC_MERGED 前，强制）
 
-1. **清点时机**：全部 delta 应用完毕、主文档落盘后，`git commit` 与写 `SPEC_MERGED` **之前**。
+1. **清点时机**：legacy 为全部 delta 落盘后、`git commit` 与写 `SPEC_MERGED` 前；on-touch-v1 必须在预计算 manifest 时完成，并由 `merge-apply` 在正式写入前重验，禁止先散写再点数。
 2. **清点口径（结构化）**：按 ID 模式注册表三类，对每个被本次合并触及的主文档清点**结构位置**上的实际 ID 集合——测试 ID 只数测试表 ID 首列、场景 ID 只数 `## SXX:` 标题与场景表行首列、节号只数标题行；散文提及不计。
 3. **对账公式**：
 
@@ -164,16 +196,16 @@ openlogos verify、部署执行、openlogos smoke 和 openlogos archive 均为�
 
 对 `ui_impact:true` 提案的**所有**原型资产（含 legacy/degraded/advisory 情形），落盘**一律不经 merge-executor**：
 
-- **唯一落盘入口 = `commitVerifiedPrototypes()`**（`cli/src/commands/merge.ts` 内的代码级命名函数），是所有 `ui_impact` 原型资产的**唯一落盘入口**，**无第二条绕过它的原型落盘路径**。它按持久化 `PLAN_APPROVED` 原型批准记录 内部选严 / 宽：
-  - **严格模式**（批准记录含 UI 原型批准记录）：**落盘时校验 staged 字节 hash**（把源原型拷入私有 staging → 对 staged 副本算 hash 比对 `PLAN_APPROVED.hashes`，消除 verify→commit 的 TOCTOU 窗口）+ **事务原子提交**（verify-all → stage → 原子 rename 逐文件提交，任一不符即在写入任何文件前 abort、失败回滚，全有或全无、失败零残留）+ **崩溃恢复**（commit journal + 启动前滚/回滚到一致态）。
+- **唯一落盘入口 = `commitVerifiedPrototypes()`**（`cli/src/commands/merge.ts` 内的代码级命名函数），是所有 `ui_impact` 原型资产的**唯一落盘入口**，**无第二条绕过它的原型落盘路径**。它按持久化 `PLAN_APPROVED` provenance 内部选严 / 宽：
+  - **严格模式**（批准记录含 UI provenance）：**落盘时校验 staged 字节 hash**（把源原型拷入私有 staging → 对 staged 副本算 hash 比对 `PLAN_APPROVED.hashes`，消除 verify→commit 的 TOCTOU 窗口）+ **事务原子提交**（verify-all → stage → 原子 rename 逐文件提交，任一不符即在写入任何文件前 abort、失败回滚，全有或全无、失败零残留）+ **崩溃恢复**（commit journal + 启动前滚/回滚到一致态）。
   - **advisory 模式**（legacy/degraded/旧空 marker 且无「曾渲染确认」证据）：仍经**同一入口**落盘，只是**不做严格 hash 校验**、不进严格事务门、不阻断。两模式**同一 owner**，merge-executor 均不经手。
 - **apply-merge 后复核（双保险）**：`apply-merge` 完成后代码复核 resources 中已落盘原型的 hash == `PLAN_APPROVED.hashes`，不符则阻断流程前进（不进 slice/code）。
 - **merge-executor 绝不触碰原型资产**：merge-executor 只应用 markdown 规格 delta；带 hash 绑定的原型资产由上述代码路径落盘并即时校验，其内容 AI（merge-executor）不经手、不自由编辑。
 
-### 3. 严格性以持久化 `PLAN_APPROVED` 原型批准记录 为键，不因会话 capability 缺失降级（F4 R7）
+### 3. 严格性以持久化 `PLAN_APPROVED` provenance 为键，不因会话 capability 缺失降级（F4 R7）
 
-- 进入严格事务门与 fail-closed 的判据，一律以**持久化 `PLAN_APPROVED` 原型批准记录**（`ui_prototype_rendered:true` + `pages` + `hashes`）为准：
-  - 批准记录**含 UI 原型批准记录** ⇒ 所有 merge / 落盘 / 落盘后复核入口**永久 fail closed**：`hashes` 必须存在且完好、逐文件重算匹配；缺失 / 损坏 / 失配一律拒绝（非零退出、不生成 `MERGE_PROMPT`、不写 resources、不写 `SPEC_MERGED`）。
+- 进入严格事务门与 fail-closed 的判据，一律以**持久化 `PLAN_APPROVED` provenance**（`ui_prototype_rendered:true` + `pages` + `hashes`）为准：
+  - 批准记录**含 UI provenance** ⇒ 所有 merge / 落盘 / 落盘后复核入口**永久 fail closed**：`hashes` 必须存在且完好、逐文件重算匹配；缺失 / 损坏 / 失配一律拒绝（非零退出、不生成 `MERGE_PROMPT`、不写 resources、不写 `SPEC_MERGED`）。
   - **当前会话 `logos/.session-capabilities.json` 缺失 / 过期 / 被清理一律不得降级**——「曾渲染确认」的证据已固化在批准记录里，易失会话态无权推翻它（否则构成跨会话降级绕过）。
   - 批准记录明确为 legacy/degraded、或旧空 marker 且无任何「曾渲染确认」证据 ⇒ 才走 F3 向后兼容 advisory：**仍由 `commitVerifiedPrototypes()` 同一入口落盘（advisory 模式、不做严格 hash 校验、不进严格事务门、不阻断），并非 merge-executor 落盘**。
 - `.session-capabilities.json` 仅用于 `plan-exit` **之前**的交互模式选择，**绝不**作为批准后的完整性门降级开关。
@@ -181,32 +213,69 @@ openlogos verify、部署执行、openlogos smoke 和 openlogos archive 均为�
 
 ## 合并原则补充：non-Markdown 整文件 delta 协议（contract-self-description）
 
-`.md` 之外的**规格类整文件 delta**（当前两类：`deltas/spec/flow/*.yaml`、`deltas/spec/schema/*.json`）按本节协议合并。该协议是**确定性文本操作**，不依赖模型对内容的理解：
+`.md` 之外的规格类整文件 delta 按本节协议合并。支持集合固定为：
 
-### 1. 标记行格式（首行，强制）
+- `deltas/spec/flow/**/*.yaml` → `spec/flow/**/*.yaml`；
+- `deltas/spec/schema/**/*.json` → `spec/schema/**/*.json`；
+- `deltas/api/**/*.{yaml,yml,json}` → `logos/resources/api/**/*.{yaml,yml,json}`；
+- `deltas/database/**/*.sql` → `logos/resources/database/**/*.sql`。
 
-- delta 文件**首行必须**是整文件标记行，格式：`## MODIFIED — <目标相对路径>（整文件替换…）` 或 `## ADDED — <目标相对路径>（新文件…）`。
-- `MODIFIED` = 目标文件已存在，整文件替换；`ADDED` = 目标文件不存在，创建（含创建缺失的父目录，如 `spec/schema/`）。
-- **首行缺失或格式非法 → 报错停下**（指出 delta 路径与原因），等待用户修复，不得静默整份覆盖、不得把标记行写进目标。
+其它目录/后缀不得借本协议整文件覆盖；`.md` 仍走章节 marker，page-design 资产/UI 原型仍走各自既有 owner。
 
-### 2. 确定性合并操作
+### 1. 首行控制 marker（强制）
 
-1. 读取 delta 文件全文，**剥离首行标记行**（仅第一行，无论目标类型；YAML 的 `##` 注释行同样剥离——不依赖「注释恰好合法」的巧合）；
-2. 将剩余字节**原样**写入标记行声明的目标路径（`ADDED` 先创建父目录；`MODIFIED` 整文件覆盖）；
-3. 不做任何格式化、转义或内容改写。
+UTF-8 delta 首行必须完整匹配以下二选一（路径中禁止换行、反引号、绝对路径、`..`）：
 
-### 3. 合并后机器校验（强制，纳入合并摘要）
+```text
+## ADDED — <项目根相对 canonical target>（新文件，整文件）
+## MODIFIED — <项目根相对 canonical target>（整文件替换）
+```
 
-- 目标 `spec/schema/*.json`：文件存在且**可直接 `JSON.parse`**；
-- 目标 `spec/flow/*.yaml`：文件存在且可被 YAML 解析器读取；
-- 两类目标的**首行均不得含 delta 标记行**（`## MODIFIED` / `## ADDED` 字样出现在 JSON 目标任意位置、或 YAML 目标首行 → 判合并失败，回报并停下）；
-- 校验失败时不得继续后续 delta，按「冲突时询问」原则处理。
+- `ADDED` 对应 plan `CREATE`，要求目标不存在；`MODIFIED` 对应 plan `MODIFY`，要求目标存在。
+- marker 声明路径必须与 delta 路径经权威 `DELTA_TO_RESOURCE`/closure resolver 映射出的 canonical target **逐字节相等**。例如 `deltas/api/pay.yaml` 只能声明 `logos/resources/api/pay.yaml`；`deltas/database/schema.sql` 只能声明 `logos/resources/database/schema.sql`。
+- 首行缺失、格式非法、操作/mode 不一致、声明 target 漂移、后缀不在支持集、目标存在性漂移或重复 canonical target，均报 `non_markdown_delta_invalid`/既有 mode 违规并在任何写入前停止。
+- 该首行是 delta 控制语法，即使它碰巧可被 YAML 当注释也绝不能进入目标；SQL 不要求也不允许把它当合法语句。
 
-### 4. 适用边界
+### 2. 确定性剥离与整文件预演
 
-- 本协议**仅**适用于 `deltas/spec/flow/*.yaml` 与 `deltas/spec/schema/*.json` 两类规格整文件；`.md` 规格/Skill delta 仍走段标记合并（缺段标记报错，见「段标记收窄」）；`2-page-design/` 资产与 `ui_impact` 原型的既有规则不变（后者仍由 `commitVerifiedPrototypes()` 落盘，merge-executor 不触碰）。
-- `MERGE_PROMPT.md` 生成文本（`cli/src/i18n.ts`）须同步声明本协议（剥首行、整文件写入、合并后 parse 校验）——该实现改动归本提案 `[code]` 切片，验收锚 = S16 测试「merge 后 schema 产物可解析且无标记行」。
+1. 以二进制读取 delta，只把首行按 UTF-8 解码匹配 marker；支持 LF/CRLF，并**剥离 marker 及其唯一行结束符**。若文件只有 marker、payload 为空或 payload 只含空白，失败。
+2. 剩余 payload 字节原样作为目标候选；不格式化、不转义、不改换行、不删除任何其它行。目标任意位置不得残留匹配控制 marker 的行。
+3. `MODIFIED` 是整文件替换，不执行 Markdown 章节合并；`ADDED` 是整文件创建，不覆盖已有文件。
+4. 在内存/私有 staging 中先完成所有目标 payload 构造、hash、类别完整度与语法验证；任何一项失败前不得写任一正式目标。
 
+### 3. 类别语法与最低校验（强制）
+
+**spec/flow YAML**：duplicate-key fail-closed 的 YAML parse 通过，并继续通过 flow schema/normalize 校验。
+
+**spec/schema JSON**：duplicate-key-aware JSON parse 通过，并继续通过对应 JSON Schema meta-schema/项目约束；普通 `JSON.parse` 的 last-wins 不能替代重复键检查。
+
+**API YAML/YML/JSON**：
+
+1. YAML 用 duplicate-key fail-closed parser；JSON 用 duplicate-key-aware parser；
+2. 剥离后的根对象必须是 OpenAPI 3.0.x/3.1.x，包含合法 `openapi`、`info`、`paths`（或该版本允许的等价公开边界）与适用 components；
+3. 通过项目选定的 OpenAPI validator，operationId/引用可解析；CREATE 还执行 baseline-closure 的非空 operation/schema/error/auth/兼容追踪完整度；
+4. 任一 parse/schema/ref/完整度错误报 `non_markdown_delta_invalid` 或 `create_target_incomplete`，不得落盘。
+
+**database SQL**：
+
+1. 方言来自已合并架构/`logos-project.yaml tech_stack.database`；若缺失或无对应 validator，plan 应为 AMBIGUOUS，apply 侧 fail-closed `non_markdown_delta_invalid`，不得用通用字符串检查假装语法通过；
+2. payload 必须能被该方言 parser 完整消费，拒绝尾随不可解析字节、空文件与 TODO/占位；
+3. 有隔离适配器时，在临时空库/事务内执行完整 DDL 并回滚；至少 SQLite CREATE/MODIFY E2E 必须真实执行。无可执行适配器时仍必须有方言 parser，不能降级为只看分号；
+4. CREATE 继续检查表/字段、主外键、约束、索引、迁移/回滚与场景/API 追踪完整度。
+
+### 4. 事务提交、失败回滚与重试
+
+- non-Markdown API/DB 与本批 Markdown MODIFY/CREATE、counter、resource_index、dogfood 同步和 `SPEC_MERGED` 属同一 apply 事务。
+- preflight 全过后把候选写私有临时文件并 fsync；ADDED 再确认目标缺失、MODIFIED 再确认目标 hash/存在性未漂移，然后原子 rename。
+- 任一 rename、后置 parse/执行、counter/index 或 marker 写入失败，恢复全部备份、删除本批新建目标与临时文件，不写 `SPEC_MERGED`；重试依据 journal 收敛，不按“目标已存在”误判成功。
+- 后置校验再次读取正式目标：字节必须等于剥离后的 payload、不得含控制 marker、API 可验证、SQL 可解析/在支持适配器中可执行。合并摘要逐目标记录 mode、canonical target、payload sha256 与 validator 结果。
+
+### 5. 验收锚
+
+- `.yaml`/`.json` OpenAPI 与 `.sql` 各有 ADDED/CREATE、MODIFIED/replace 正例；目标不含控制 marker。
+- marker 缺失/非法、声明 target 漂移、mode/存在性漂移、重复 key、坏 OpenAPI ref、坏 SQL、validator 不可用均在零正式写入时失败。
+- 混合批中最后一个 API/DB 校验或提交失败时，先前 Markdown/API/DB 目标、counter/index 与 `SPEC_MERGED` 全部回滚。
+- 对应规格测试：UT-S35-45、UT-S39-26/27、ST-S35-15、ST-S39-13、SMOKE-core-56。
 
 ## 决策记录 apply 事务所有权（S38，decision-record-capability）
 
@@ -240,9 +309,9 @@ openlogos verify、部署执行、openlogos smoke 和 openlogos archive 均为�
 
 ## 输出规范
 
-- 直接修改 `logos/resources/` 中的主文档（就地编辑）
-- 除写入 `logos/changes/<slug>/SPEC_MERGED` 外，不修改 `logos/changes/` 中的任何文件
-- 合并过程中不创建新文件（除非 delta 指定新增一个全新的文档）
+- `logos/resources/`、根 `spec/`、根 `skills/` 中的主文档一律由 `openlogos merge` 原子落盘；AI **不得**手工编辑主文档、`SPEC_MERGED`、counter 或 `resource_index`
+- 根 `spec/` 与根 `skills/` 是权威源，`logos/spec/` 与 `logos/skills/` 是其副本（由 `openlogos sync` 再生成）——副本**不得**作为 delta 目标，也不得手工编辑
+- 合并过程中不创建新文件（除非 delta 指定新增一个全新的文档，由命令按 CREATE 模式落盘）
 - 合并部署 delta 时，只合并部署方案文档，不执行部署命令
 
 ## 实践经验
@@ -257,6 +326,90 @@ openlogos verify、部署执行、openlogos smoke 和 openlogos archive 均为�
 
 以下提示词可以直接复制给 AI 使用：
 
-- `读取 logos/changes/<slug>/MERGE_PROMPT.md 并执行合并`
+- `请先跑 openlogos change-lint --slug <slug> 只读自查，通过后执行 openlogos merge <slug>；失败按稳定错误码修 delta 后重跑，成功后做事后点数并 git commit 规格文档，最后读回改动原文向我确认。`
 - `帮我把 add-remember-me 的变更合并到主文档`
 - `执行变更合并`
+
+## S39：MODIFY/CREATE 的单目标最终态 apply
+
+### 前置条件修订
+
+目标主文档**不再要求一律已存在**。对 on-touch-v1 提案，merge-executor 必须读取 tasks 模式与共享 closure evaluator：
+
+- `[MODIFY]`：目标在 plan/apply 时都必须存在；
+- `[CREATE]`：目标在 plan/apply 时都必须缺失；
+- 任一存在性漂移、重复 canonical target、未规划 delta 或 CREATE 不完整都必须停止，不得猜测/自动换模式。
+
+现有路径 containment、Markdown marker、UI prototype 专用入口、S37 守恒、decision 编号与 MERGE_PROMPT 前置继续生效。
+
+### 单目标唯一性
+
+apply 前将所有 delta 映射为 canonical target，断言：
+
+```text
+non-skip tasks canonical targets
+== mergeable delta canonical targets
+== planned apply canonical targets
+```
+
+三集合相等且无重复。禁止按扫描顺序 last-wins，也禁止接受“baseline delta + incremental delta”指向同一目标。
+
+### MODIFY apply
+
+沿用既有 ADDED/MODIFIED/REMOVED/REMOVED-ITEMS 语义：
+
+- MODIFIED 整节替换并通过 S37；
+- ADDED 可给既有文件加缺失章节；
+- 同一 target 所有块一次计算新字节、一次原子写入。
+
+### CREATE apply
+
+CREATE 不新增名为 `CREATE` 的 merge marker/操作。Markdown delta 以章节 `ADDED` 承载完整文档；API/DB 非 Markdown delta 使用下方“non-Markdown 整文件 delta 协议”的首行 `ADDED` 控制行：
+
+1. 运行类别最低完整度与语法检查；
+2. 确认最终 target 仍不存在且父目录位于允许根；
+3. Markdown 从 ADDED 块构造目标完整字节；非 Markdown 剥离且仅剥离首行控制 marker，按声明 target 做整文件字节；
+4. 写临时文件、fsync/rename（按项目现有原子写抽象）；
+5. 不允许覆盖、append 半文档或留下空文件。
+
+若目标在 plan 后被创建，返回 `delta_target_mode_mismatch`，整批回滚。
+
+### 事务边界
+
+一次 apply 的事务集合包括：
+
+- 全部 MODIFY/CREATE 目标；
+- 新 scenario/decision 的编号与登记；
+- `scenario_counter`/`decision_counter`；
+- `resource_index`；
+- 根 spec/skills 合并后的 dogfood 同步产物；
+- 最终 `SPEC_MERGED`。
+
+先预计算/备份所有旧字节，再写目标，最后写元数据与 marker。任何失败恢复全部旧字节、删除本事务新建文件、还原 counters/index，不写 SPEC_MERGED。重试必须幂等。
+
+本提案成功 apply 时：S39→F04、scenario next_id=40；D02 落盘、decision next_id=3；新增场景/测试/决策/根规格进入 index。
+
+### 受控生产入口（唯一）
+
+`openlogos merge <slug>` 是 delta 落盘的**唯一入口**。AI 不得逐文件写正式目标，也不得把原子落盘原语当测试工具直接调用。
+
+目标集是 `deltas/` 的**无逻辑投影**（功能规格 §2.71）——命令不读取 proposal 的任何 YAML 声明，因此**不存在**需要 AI 预先枚举的 planned target 清单（`MERGE_APPLY_MANIFEST.json` 与 `openlogos merge-apply` 已随合并事务一并删除）。额外 target 与重复 canonical target 由映射本身排除。
+
+命令内部逐目标核对 MODIFY 的目标存在性、CREATE 的目标缺失性与合成后字节的物质结果；API/DB non-Markdown 目标走各自专用 validator，**禁止**由 AI 提供 prepared bytes 绕过。成功时由落盘批次最后写 `SPEC_MERGED`；validator、合成、metadata 或任一 rename 失败时，正式目标保持全旧、不写 `SPEC_MERGED`，绝不遗留半新资源。
+
+### Effective view 与事后对账
+
+merge-executor 不重新做业务适用性推断，只消费已批准 plan 和共享结构判据。apply 后逐 target 重算预期 hash/结构；CREATE 文档需再次满足类别结构。目标集合、ID 点数、counter 与 resource_index 全部一致才完成。
+
+### 无 JIT/基线旁路
+
+- 不读取或更新 candidate verified/confirmed 字段；
+- 不因 baseline_seed_state/coverage 拒绝 apply；
+- 不创建 baseline marker/gate/task；
+- 不从 seed staging 合并任何内容；
+- 不把 archive delta 当缺失主目标的 fallback 真相源。
+
+### 交付提示
+
+完成 apply 后按既有流程进入 slice/implement；不要在本 Skill 内提前实现代码、执行 verify/deploy/smoke/archive/push。默认模式下每个人类确认点语义保持，全自动 standing 授权仍由 driver 控制。
+

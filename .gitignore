@@ -49,3 +49,8 @@ native/system/test/bin/
 .specstory/
 .octos/
 .octos-workspace.toml
+
+# >>> openlogos managed >>>
+# 由 openlogos 维护，请用 `openlogos ignore` 修改；区块外内容不会被改动
+logos/.openlogos-runtime/
+# <<< openlogos managed <<<

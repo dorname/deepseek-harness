@@ -5,7 +5,10 @@
     "claude-code",
     "opencode",
     "codex",
-    "cursor"
+    "cursor",
+    "zcode",
+    "qoder",
+    "workbuddy"
   ],
   "description": "",
   "documents": {

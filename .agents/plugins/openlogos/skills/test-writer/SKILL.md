@@ -352,3 +352,78 @@ resource_index:
 ```
 
 **不执行此步骤将导致 code-implementor 无法感知测试用例规格，AI 在生成测试代码时无法与用例 ID 对齐，最终 `openlogos verify` 将报告覆盖度不足。**
+
+## S39 delta 模式：触达场景的完整 UT/ST 与唯一测试 delta
+
+### 强制适用
+
+所有 on-touch-v1 触达场景都必须有 UT/ST 规格；测试类别不能 SKIP。API 编排由 test-orchestrator 另行补充，但不能替代本 Skill 的单元/场景测试。
+
+### 输入事实源
+
+读取 effective requirement、feature、scenario、architecture、API、DB 与当前 change 已产 deltas。测试不得基于旧主文档平行猜测。现有测试代码可证明存量覆盖，但不能替代本次新增验收规格。
+
+### MODIFY
+
+- 测试目标存在时，在同一个 canonical target delta 中加入/修改所有相关 UT/ST；
+- MODIFIED 测试表必须携既有 ID 全量结构，遵守 S37；新增章节可同文件 ADDED；
+- 多场景共享测试文件时合并一 task/一 delta；
+- 不把“补历史测试”与“新增测试”拆成两份 delta。
+
+### CREATE
+
+目标缺失时返回完整测试规格，至少包含：
+
+1. 场景/需求来源与测试边界；
+2. 真实且全局不冲突的 `UT-<scenario>-<id>` 与 `ST-<scenario>-<id>`；
+3. 主路径、异常、边界、权限/并发/幂等中适用项；
+4. 输入/fixture、操作、精确期望；
+5. requirement/scenario/API/DB 追溯；
+6. OpenLogos reporter 要求：实现结果写 `logos/resources/verify/test-results.jsonl`；
+7. 覆盖度与不可由其它层替代的说明。
+
+禁止占位 ID、通配族名、TODO、只有标题无表格。真实 ID 必须在 delta 阶段定稿，供 merge 后 slice-planner 使用。
+
+### baseline-on-touch 必测矩阵
+
+- canonical target 去重与 mode；
+- effective view；
+- CREATE 类别完整度；
+- API/DB 适用与 SKIP；
+- seed required/安全 partial/seeded 均不阻断；未终结 journal 无法恢复时必须以 `baseline_commit_in_progress` 在任何资源读取前硬阻断；
+- adopted skip 冲突；
+- AMBIGUOUS 停在现有 plan-exit；
+- 无 JIT/verified/baseline warning 回归；
+- task 每文件立即勾选与 plan/spec/merge 共享判据。
+
+### 输出所有权
+
+本 Skill 返回测试表、真实 ID 清单与 reporter/runner 影响给 change-writer；change-writer 写目标唯一 delta。若新增/修改 smoke 测试，还必须提示部署方案与 runner/reporter/dispatcher 实现影响，不能只补规格。
+
+### 完成检查
+
+- 全部验收/异常分支至少有一个真实 ID；
+- ID 与现有主规格、当前 change 其它 deltas 无冲突；
+- CREATE 文档自足；MODIFY 守恒；
+- 不使用 seed coverage/verified 作为测试通过条件。
+
+## Authority Closure 故障矩阵与追溯
+
+
+### 输入
+
+读取 `spec/authority-closure.md`、项目 Authority Registry 和有效时序图。按 required `fact_id` 生成测试，不复制 owner/writer 表。
+
+### 每 fact 必测
+
+- authority 正常路径；
+- stale projection 与 conflicting old copy；
+- legacy/concurrent writer；
+- response lost + 新进程 restart；
+- projection rebuild 与 freshness；
+- cutover rollback；
+- forbidden reverse inference。
+
+不可发生项必须引用架构不变量形成证据化 SKIP。断言要证明 decision/恢复来自 authority identity/action；投影夹具必须与权威值冲突，restart 必须启动新进程并保留残留。
+
+所有 UT/ST/smoke 使用真实 ID、建立 AC 追溯并接入 OpenLogos reporter。漏任一 required 维度时不得报告覆盖闭合。

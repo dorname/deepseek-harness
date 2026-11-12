@@ -332,11 +332,22 @@ overlay:                         # 按 node id 寻址的操作列表（strategic
 （flow 文件 schema 版本，整数）**互不相关**。内置模板内容版本由 **loader 维护一份内部映射**
 作为唯一来源（不依赖 YAML 内字段，避免隐式复用 schema version）：
 
-- 当前映射：`initial → v1`、`launched → v1`。
+- **唯一来源是 loader 中的该映射本身**。本文档与任何测试 fixture 都**不复制**具体版本枚举——
+  复制品会随 bump 腐化，历史上正是这种复制导致写入端产出的 overlay 一出生就「过期」。
+  需要当前值时读映射，不要读文档里的示例。
 - 该映射是 `openlogos flow show` 输出 `builtin_version` 字段、以及 overlay `@vN` 不匹配告警
   （`FLOW_VERSION_MISMATCH`）比对的**唯一依据**。
+- **写入端同样读该映射**：CLI 为项目写出 overlay（如 GUI UI-first 注入）时，
+  `extends` 必须组装为 `builtin:<lifecycle>@<映射值>`，**禁止硬编码任何字面量版本号**。
+  自检判据：CLI 新写出的 overlay 经 overlay 解析后 `warnings` 不得含 `FLOW_VERSION_MISMATCH`
+  ——写者产出立即触发本进程告警，即为该不变量被破坏。
 - 当内置模板（`spec/flow/*.yaml`）内容发生破坏性变更（增删/改名 node、调整结构等）时，
   **必须同步 bump** loader 中该 flow 的内容版本。
+- **存量 overlay 的迁移**：同步命令遇到内容版本落后的存量 overlay 时，按引用可解析性分流——
+  该 overlay 引用的**全部** node id 在新版本内置模板中仍可解析时，自动提升 `extends`
+  至当前映射值并提示；存在任一失效 node id 时保持原值并保留 `FLOW_VERSION_MISMATCH`。
+  该判据等价于告警文案所问的问题本身，因此迁移之后残留的告警一律指向真正需要人工复核的 overlay。
+  迁移幂等，且只改 `extends` 一个字段，不触碰任何 overlay 操作。
 - **禁止**用文件 `version`（schema 版本）隐式充当内容版本。
 
 ### 10.2 overlay skip 在 resolved 输出的表达
@@ -615,6 +626,7 @@ flow node**，**默认 = 当前前沿节点**，下列为例外：
   1. 向 `GATE_AUTO_PASSED` 追加 `{gate_id:"plan-exit", proposal_step:"ready-to-delta", timestamp}` 审计行；
   2. 写入活跃提案目录的 `PLAN_APPROVED` marker（内容可为空，存在性为准）。
 - **`PLAN_APPROVED` 的派生语义**：**仅当 `tasks.md` 存在 `## [delta]` section 时适用**——存在 `PLAN_APPROVED` 且 `[delta]` section 尚未全部完成时，`proposal_step` 派生为 `delta-writing`，即使还没有任何 delta 文件或 `[delta]` 勾选；此时 `next` / `next --auto` 的前沿是 `spec.write-delta`，`next_node.id == "write-delta"`。**无 `[delta]` section 的纯代码提案（`delta_required==false`）不适用本条、绝不派生 `delta-writing`**：但它仍需按 §12.6 完成 no-delta spec-complete；缺少 `SPEC_MERGED` / `MERGED` 时停在 `spec-complete-required`，不得直连 `plan-slices`。
+- **GUI 原型门前例外优先于 `[delta]` 勾选进度（fix-prototype-plan-approval-state）**：`ui_impact` 为真、可合并 delta **仅**为 `2-page-design/*.html` 原型、且 `PLAN_APPROVED` 不存在时，`[delta]` 无论零勾选、部分勾选还是全部勾选，`proposal_step` 均为 `ready-to-delta`；该判定**先于**「`[delta]` 全部完成 → `ready-to-merge`」与「已勾 → `delta-writing`」两个出口生效。checkbox 只是执行进度，不构成「实际 delta 产出」，更不构成批准。判据细节与不受影响范围见「ordering 例外与 flow-derive 判据」。
 - **审计与授权边界**：`GATE_AUTO_PASSED` 仍是审计日志，默认 `next` 与 `status` 不因历史审计行越过 gate；状态推进只认 `PLAN_APPROVED` 或实际 delta 产出。重复 `next --auto` 不应在同一个 `plan-exit` 固定点追加多条审计，因为第一次放行后前沿已经离开 `ready-to-delta`。
 
 ### 12.5 切片规划子流程派生（split-slice-planner-stage）
@@ -712,7 +724,7 @@ flow node**，**默认 = 当前前沿节点**，下列为例外：
 **（2）auto-reset 触发点（确定性 CLI 动作，不依赖 AI）**
 
 在「进入 slice 段 / 放行 slice-exit」的确定性 CLI 动作上，若检测到 `[code]` 已 `tasks_code_filled` 但非 slice-planner 正常产出，则先清理再继续：
-- **所有代码提案 → `openlogos merge`**（有 delta 时生成/执行真实 merge；无 delta 时执行 no-op merge）。在写入 `SPEC_MERGED` 前，若检测到 `[code]` 已脱模板且不是合法 slice-planner 产物，先执行 auto-reset，再进入 slice 段。此后 `[code]` 恒为空或占位，slice-planner 正常填。
+- **所有代码提案 → `openlogos merge`**（有 delta 时创建/推进合并事务；无 delta 时执行 no-op merge）。在写入 `SPEC_MERGED` 前，若检测到 `[code]` 已脱模板且不是合法 slice-planner 产物，先执行 auto-reset，再进入 slice 段。此后 `[code]` 恒为空或占位，slice-planner 正常填。
 
 **（3）清理动作**
 
@@ -729,7 +741,7 @@ auto-reset 是**命令副作用**，只发生在 `openlogos merge` 这个本就�
 
 **（6）扩展的副作用（显式登记，未破枚举 / 判据 INV）**
 
-- EXT-1：`openlogos merge` 副作用扩展——除生成 `MERGE_PROMPT` / 应用 delta 外，新增「进入 slice 前 auto-reset 提前填充的 `[code]`」，保持 merge 幂等。
+- EXT-1：`openlogos merge` 副作用扩展——除创建 / 推进合并事务（legacy 测试模式为生成 `MERGE_PROMPT`）/ 应用 delta 外，新增「进入 slice 前 auto-reset 提前填充的 `[code]`」，保持 merge 幂等。
 - EXT-2：no-delta merge 副作用扩展——无 delta 代码提案同样经过 `openlogos merge`，因此提前填充兜底统一收敛在 merge 落点，不再需要额外 slice 进入 marker。
 - 不破 `isTasksCodeFilled` 判据、不破 `proposal_step` 闭合枚举（**不新增阻断态**）、不破 A 被动派生。
 
@@ -1092,40 +1104,6 @@ agent dispatch 的完成校验不得只输出 pass/fail。OpenLogos / driver 至
   **无法纯机器证明**——既有 acceptance 口径下的荣誉制 + 令牌追溯限制，如实记录、非遗漏。
 - **[code] 触点**：CLI 子命令 `openlogos check-ui-prototype`（项目根 cwd、自行解析活跃提案、exit 0/非 0）由 implement 阶段实现（本 delta 只定契约）。
 
-### 节点二：`verify-ui-provenance`（merge 前拦漂移）
-
-方法论 GUI overlay 以 `op:add` / `before: generate-merge-prompt` 注入，落在 **merge 之前**（原型落盘 resources 之前拦截漂移）：
-
-```yaml
-- op: add
-  before: generate-merge-prompt   # merge subflow 入口、原型落盘 resources 之前
-  node:
-    id: verify-ui-provenance
-    name: 校验 UI 原型批准记录
-    when: ui_impact
-    produces: null
-    done_when: "cmd:openlogos check-ui-hash-match"   # 运行时资产必为可执行命令；命令内部三分支
-```
-
-- **单 `done_when: cmd:openlogos check-ui-hash-match`，命令内部【三分支】**（正文示意常写作 `cmd:<check-ui-hash-match>`，运行时资产为可执行命令）：
-  仍是**单 `done_when: cmd:`**（无 `fail_when`），不触发 §9.2 决策 B「同节点 done_when/fail_when 均为 cmd:」；作为 overlay-add 单 cmd:，合法。
-  该节点**仅以 `when: ui_impact` 控参与**，故 GUI `ui_impact:true` 但**旧空 `PLAN_APPROVED`（无曾渲染证据）**的 legacy/degraded 提案**仍会进入本节点**；
-  若命令只有「匹配→0 / 缺失失配→非0」两果，空 marker 无 hashes 将**永远无法匹配**、节点永久未 done → advisory 放行不可达（旧面板卡死）。故命令内部按
-  **持久化批准记录（`PLAN_APPROVED`）**分三支（与 merge / 落盘同一批准记录分支、以持久化记录为键，与 F4 R7 一致）：
-  1. **`PLAN_APPROVED` 含 UI 原型批准记录**（`ui_prototype_rendered:true` + `pages` + `hashes`）→ 重算 `2-page-design/` 现值 hash 与固化 `hashes` 比对：
-     **完好且全匹配 → exit 0**（节点 done → 放行前进）；**缺失 / 损坏 / 失配 → 非 0（fail closed 阻断）**。
-  2. **legacy/degraded，或旧空 marker 且无任何「曾渲染」证据**（无 `ui_prototype_rendered`、无 `hashes`）→ **记 advisory 后 exit 0**
-     （节点 done → merge 可达）。**← 新增的第三成功分支**，专解「旧空 marker 永久未 done、advisory 放行不可达」的卡死。
-  3. **部分 / 损坏 原型批准记录**（`ui_prototype_rendered:true` 但缺 / 空 `hashes`）→ **不得**误判为 legacy → **fail closed（非 0）**。
-  即：匹配成功 **或** 合法 legacy（分支 2）都 `exit 0`；失配 / 损坏 / 部分 原型批准记录（分支 1 尾、分支 3）非 0。
-  失配非 0 时节点未 done（active/pending）→ **前向阻断**，remediation 见下方状态转换。
-- **状态转换（诚实边界）**：flow 引擎**前向线性、无跨 subflow 自动回退边**。「退回 plan-exit」**非引擎自动 rewind**——
-  `verify-ui-provenance` 未 done ⇒ 阻断；remediation = **driver / 人工显式重入 plan**（重跑 producer 产原型 + plan-exit 重批，
-  刷新 `PLAN_APPROVED.hashes`）→ 再到该节点时 hash 匹配 `exit 0` → done → 放行。即「失配即卡在未 done + 显式重入刷新」，
-  不假装引擎自动倒转。
-- **与 merge 命令级校验的关系**：本节点只拦 **driver 流**；`openlogos merge <slug>` 直接调用另有命令级 hash gate（见提案 F4 R5，
-  merge.ts 落地），二者互为纵深防御。[code] 触点：CLI 子命令 `openlogos check-ui-hash-match`（项目根 cwd、自行解析活跃提案、内部三分支、exit 0/非 0）由 implement 阶段实现。
-
 ### builtin 不硬编码这两个节点（关键约束）
 
 - **builtin `launched.yaml` 绝不硬编码 `write-ui-prototype` / `verify-ui-provenance`**：若把它们写进 builtin，则它们是
@@ -1145,17 +1123,120 @@ agent dispatch 的完成校验不得只输出 pass/fail。OpenLogos / driver 至
 - **例外仅限 `2-page-design/*.html`**：不涉及 `[code]` 切片与 spec-merge 依赖；其它任何 `deltas/**` 出现即照常判进入 spec。
 - **[code] 触点**：`flow-derive.ts` 识别 plan subflow 新增的 `write-ui-prototype` 节点、不因原型 delta 误判进入 spec
   （与 §8 `ui_impact` 派生逻辑同批落地）。
+- **例外与 `[delta]` 勾选数无关（fix-prototype-plan-approval-state）**：主检测器在 `[delta]` 分支内、**先于**「全部勾选 → `ready-to-merge`」判断，对「`[delta]` 已勾（`checked > 0`）、`ui_impact` 为真、`isPrototypeOnlyDelta` 为真、`PLAN_APPROVED` 不存在」返回 `ready-to-delta`；零勾选仍走既有 `shouldEnterSpec` 分支。由此零勾选、部分勾选、全部勾选（含 `[delta]` 只规划原型且已全部勾选的合法计划）三态一致，原型任务被勾选**不会**把提案送入 `delta-writing` 或 spec 出口 `ready-to-merge`。
+  - **auto 消费顺序**：`next --auto` 只在 `ready-to-delta` 消费 `plan-exit`，**先**写 `GATE_AUTO_PASSED` 审计行与 `PLAN_APPROVED`，**再**离开 plan；批准落盘前不得派发任何非原型 delta 写入（与 guard「`PLAN_APPROVED` 不存在即仅放行原型」同口径）。
+  - **批准后沿用既有完成语义**：`[delta]` 未全部完成为 `delta-writing`，全部完成为 `ready-to-merge`。全部勾选形态被 auto 消费的**那一次**响应仍按 §12.3 R4 窄例外输出 `next_node.id == "write-delta"`（本条不改 R4）；`write-delta` 的 `done_when: section_complete:delta` 此时已满足，下一次 `status` / `next` 重新派生即为 `ready-to-merge`。
+  - **不受影响**：`ui_impact` 为假（含非 GUI 模块）时判据逐字节不变——「`[delta]` 已勾但零 delta 文件」仍为 `delta-writing`；含任何非原型 delta 的提案照常进入 spec；位于 `[delta]` 判定之前的合并 / 验收 / 部署等出口不变；`plan_state.plan_approved` 投影口径（`spec/cli-json-output.md`）不变。
 
 ## baseline-seed 节点（brownfield-adopter S33，command-driven，非 builtin gate）
 
-存量项目「逆向建立现状基线」的 `baseline-seed` **不是 launched flow 的 builtin gate、也不由 flow 引擎驱动**，
-故 builtin `spec/flow/launched.yaml` / `initial.yaml` **不含**该节点、`status`/`next`/`watch`/`flow show` 的 golden **零漂移**。
-其语义作为方法论资产记录于 `spec/flow/overlays/brownfield-baseline.yaml`（该 overlay 的 `overlay:` **有意为空**，不改写 builtin node 序列）。
+存量项目的 `baseline-seed` 是用户或宿主**显式选择的全库扫描加速器**，不是 launched flow 的 builtin gate，也不由 flow 引擎驱动，更不是 adopted 项目进入首个 change 的默认前置步骤。
+故 builtin `spec/flow/launched.yaml` / `initial.yaml` **不含**该节点，`status`/`next`/`watch`/`flow show` 的 proposal flow node 序列保持不变。其方法论语义记录于 `spec/flow/overlays/brownfield-baseline.yaml`；该 overlay 的 `overlay:` 有意为空，不改写 builtin node 序列。
 
-- **触发与派生**：`bootstrap: adopted` 且无活跃提案时，`next`/`status` 按模块级 `baseline_seed_state` 枚举（`required｜partial｜seeded`）派生引导（取代旧 `add-baseline-docs`）：
-  - `required`/`partial` → 引导「逆向建立现状基线 / 完成现状基线」，`command`/`next_node` 指向 `openlogos baseline-seed`（命令级建议 → 省略 `next_node`）。
-  - `seeded` → 展示覆盖率并引导 `openlogos change`。
-- **唯一 producer 边界**：`openlogos adopt` 只写初值 `required`、不启动 AI、不产逆向内容；逆向扫描由 AI 会话/driver（`brownfield-adopter` skill）产出，经 `openlogos baseline-seed`（begin/commit/status）由 CLI 落盘（命令契约见 `spec/logos-project.md`、JSON 见 `spec/cli-json-output.md §3.12`）。
-- **状态写入唯一入口**：`baseline_seed_state` 与逆向目标文件的唯一写入者是 CLI；producer 只写 run 私有 staging。
-- **崩溃一致性**：多文件提交经 commit journal 事务（`prepared→committing→committed`，状态最后写）+ 模块级事务锁 + 恢复门；机器读取入口读目标/算覆盖率前先经门恢复，否则返回 `baseline_commit_in_progress`、不把半新集合当权威。
-- **与 partial 恢复态**：`partial` 是持久化恢复态；无活跃提案时主 `action`/`next_node` 指向 `baseline-seed` 恢复入口；有活跃提案时 `proposal_step`/`next_node` 保持提案真实前沿、partial 恢复以 `baseline_coverage.recovery` advisory 呈现、不阻断 change。
+- **默认动作**：`bootstrap: adopted` 且无活跃提案、恢复门通过时，`required`、安全 `partial`、`seeded` 三态的主 `action`/`next_node` 均指向 `openlogos change <slug>`。`baseline_seed_state` 只描述可选 eager seed 状态，不参与默认入口裁决。
+- **显式可选入口**：用户或宿主明确选择全库扫描时，`required` 可执行 `openlogos baseline-seed begin`，安全 `partial` 可执行 `commit --run-id <id>` 或重新 `begin`，`seeded` 可按需重扫。这些命令只作为 `optional_action`/`baseline_coverage.recovery` 旁路诊断，不覆盖无提案时的 change 主动作。
+- **唯一 producer 边界**：`openlogos adopt` 只写兼容初值 `required`、不启动 AI、不产逆向内容；显式 seed 才由 AI 会话/driver（`brownfield-adopter` skill）写 run 私有 staging，再经 `openlogos baseline-seed`（begin/commit/status）由 CLI 落盘（命令契约见 `spec/logos-project.md`，JSON 见 `spec/cli-json-output.md §3.12`）。
+- **状态写入唯一入口**：`baseline_seed_state` 与逆向目标文件的唯一写入者是 CLI；producer 不直接修改 YAML 或标准 `logos/resources/**`。
+- **安全 partial 与提案前沿**：仅有 open run / 未提交 staging 且无未终结 journal 时，排除 staging 后继续 change；无活跃提案时主动作仍为 change，有活跃提案时保持真实 `proposal_step`/`next_node`。seed 恢复只作非阻断 advisory。
+- **崩溃一致性硬门**：`prepared`/`committing` 等未终结 journal 不是安全 partial。机器入口必须在同一模块锁内、读取 resources/index/coverage 前先恢复；无法恢复时非零返回 `baseline_commit_in_progress`，不输出正常 coverage、seed 状态派生或业务主动作，也不得读取半新集合。
+
+## implement loop 的 checkpoint/final 与 plan-slices 恢复派生
+
+### 激活条件
+
+当 launched 活跃提案满足 `code_required=true ∧ spec_complete=true ∧ slices_planned=true` 且 `[code]` 含两个及以上顶层切片时，切片感知 verify 必须启用。启用后 `TEST_SLICE_MANIFEST.json` 是切片身份与测试归属的机器事实源。
+
+### 前沿优先级
+
+派生顺序必须固定：
+
+1. seed journal 恢复硬门；
+2. proposal/spec/slice 既有前置门；
+3. manifest 有效性；
+4. attempted slice/checkpoint；
+5. final Gate 与 deliver。
+
+manifest 缺失或已知可恢复失效在步骤 3 返回：
+
+```text
+proposal_step: ready-to-implement | coding | verify-failed（保持兼容枚举）
+reason: test-slice-manifest-missing | test-slice-manifest-invalid | test-slice-manifest-stale
+next_node.id: plan-slices
+next_node.skill: slice-planner
+dispatch.idempotent: true
+```
+
+该恢复前沿覆盖普通 code/verify 前沿，但不改写 proposal_step 枚举，不写 gate marker。未知 manifest 主版本或归属歧义返回保守阻塞诊断，不派发覆盖式恢复。
+
+### checkpoint 派生
+
+```text
+confirmed = manifest 中存在当前 manifest_sha256 的 PASS checkpoint 的 slice
+attempted = manifest 顺序中第一个不在 confirmed 的 slice
+mode = attempted 存在 ? slice-checkpoint : final-candidate
+```
+
+checkpoint PASS 后 attempted 前移，属于正常切片推进；checkpoint FAIL 后 attempted 不变，进入同片 repair。`slice_state.current` 可以继续展示任务进度，但 loop 的验收归属必须使用 `attempted_slice_id`，两者不一致时以后者为权威并输出诊断。
+
+### loop 计数
+
+- 只有 checkpoint/final 的真实 Gate FAIL 追加 `LOOP_ITERS`。
+- checkpoint 行必须携 `verify_mode=slice-checkpoint` 与非空 `attempted_slice_id`。
+- manifest recovery、pending、checkpoint PASS 不增加 iteration。
+- checkpoint PASS 之后的新切片拥有独立 repair 归属；`max_iters` 的既有总上限语义保持不变，但诊断同时输出当前 slice 的失败次数。
+- final FAIL 可追加 `verify_mode=final`、`attempted_slice_id=null`。
+
+### 收敛公式
+
+```text
+all_slice_checkpoints_green = every(manifest.slices has current-hash PASS checkpoint)
+final_green = latest final verify result is PASS
+code_slices_green = section_complete:code ∧ all_slice_checkpoints_green ∧ final_green
+```
+
+checkpoint PASS 不再直接等同 `tests_green`；只有 final PASS 可以令 implement loop 出环。`VERIFY_PASS` 缺失时即使所有切片 checkpoint 已通过也不得进入 deliver。
+
+### 重启与幂等
+
+派生只读 manifest、checkpoint、tasks 与 marker；同一磁盘状态输出确定。checkbox 先前移但 checkpoint 未落盘时 attempted 不变；checkpoint 已落盘但响应丢失时重试前移且不重复追加。恢复成功后宿主必须重调 `next`，不得缓存恢复前沿后的预计节点。
+
+### 授权边界
+
+`plan-slices` 恢复不新增人类 gate，也不授权 merge/verify/deploy/smoke/archive/push。`gate:implement:loop-exhausted` 的不可自动放行规则保持不变；宿主恢复重试预算不映射为 loop iteration。
+
+### 谓词收敛
+
+- `proposal_filled` 投影 `plan_package.proposal.filled`。
+- `tasks_delta_filled` 投影 `plan_package.tasks.plan_filled`。
+- `code_required` 投影 `plan_package.tasks.code_required`。
+- `tasks_code_filled` 仅在 spec-complete 后投影 `plan_package.tasks.code_slices_filled`。
+
+flow engine 不读取 Markdown 标题、模板行或 clarification YAML；旧函数只可作为 evaluator wrapper。
+
+### plan 前沿
+
+`plan_package.ready=false` 时 `write-proposal/write-tasks` 至少一个仍 active，`proposal_step=writing`。ready=true 且尚无 Delta/approval 时到达 `plan-exit`，`proposal_step=ready-to-delta`。更高优先级操作错误与历史 marker 规则保持现有顺序。
+
+### dispatch completion 自描述
+
+plan producer 节点的 resolved dispatch 可包含：
+
+```json
+{
+  "completion": {
+    "command": "openlogos change-lint --slug <slug> --format json",
+    "expected": {
+      "/data/pass": true,
+      "/data/plan_package/ready": true
+    },
+    "expected_proposal_step": "ready-to-delta"
+  }
+}
+```
+
+completion 是声明，不由 OpenLogos driver 执行。宿主执行失败时可重派原 producer，但重试预算、WorkUnit 状态与用户展示属于宿主。
+
+### 历史旁路与不变量
+
+存在 `PLAN_APPROVED|SPEC_MERGED|MERGED|VERIFY_PASS` 时按真实后续前沿继续，模板新规则不得使已通过节点重新 active。status/next/flow 派生保持 A 被动、只读与零 marker 副作用。
+

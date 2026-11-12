@@ -1,0 +1,21 @@
+{
+  "type": "merge_complete",
+  "completed_at": "2026-11-12T06:24:59.097Z",
+  "test_change_set": {
+    "schema": "openlogos/test-change-set@1",
+    "change": "enable-zcode-qoder-workbuddy",
+    "module": "core",
+    "source": "semantic-before-after-diff",
+    "changed_test_ids": [],
+    "removed_test_ids": [],
+    "targets": [],
+    "sha256": "sha256:9bcdc4c5d6051cd94865419d8b503cd47a1800cbaa56342b379109f03e8fb100"
+  },
+  "merge_baseline": {
+    "schema": "openlogos/merge-baseline@1",
+    "delta_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "targets": [],
+    "prototypes": []
+  },
+  "amendments": []
+}

@@ -72,10 +72,12 @@ Deployment rules:
 ## Active Skills
 [根据 `logos.config.json` 的 `aiTool` 字段动态生成，并按 OpenLogos 方法论技能与项目专属技能分组]
 
-当 aiTool = "cursor" 时，列出 `.cursor/rules/` 下部署的 OpenLogos `.mdc` 文件：
-- `skills/prd-writer` — `.cursor/rules/prd-writer.mdc`
-- `skills/product-designer` — `.cursor/rules/product-designer.mdc`
-- ...（共 13 项）
+当 aiTool = "cursor" 时，列出 `.cursor/skills/` 下部署的 OpenLogos 原生 Agent Skills：
+- `skills/prd-writer` — `.cursor/skills/prd-writer/SKILL.md`
+- `skills/product-designer` — `.cursor/skills/product-designer/SKILL.md`
+- ...（共 13 项，另含 `disable-model-invocation: true` 的 OpenLogos 显式命令 Skills 与 change-reviewer subagent）
+
+生成内容必须包含固定的 guard 强度说明行：Cursor 下写入门禁为部分强度（`beforeShellExecution` 事前判定 shell 写入 + `afterShellExecution` 事后检查 shell 写入 + `afterFileEdit` 编辑事后检测）；OpenLogos 未接入 `preToolUse`，cursor-agent CLI 与 Cursor IDE 的文件编辑均为事后报告，不得声称 IDE 获得 preToolUse 硬拦（guard-versioned-content-scope C11）。历史 `.cursor/rules/*.mdc` 托管清单已由 Skills 取代，不再生成。
 
 当 aiTool = "claude-code" 或 "other" 时，列出 `logos/skills/` 下部署的 OpenLogos 方法论 `SKILL.md` 文件：
 - `skills/prd-writer` — `logos/skills/prd-writer/SKILL.md`
@@ -189,7 +191,7 @@ OpenLogos 生成内容必须包裹在固定 marker 内：
 
 | 工具 | 指令文件 | OpenLogos Skills 部署位置 | 项目专属 Skills 推荐位置 | 处理方式 |
 |------|---------|--------------------------|--------------------------|---------|
-| **Cursor** | `AGENTS.md`（原生支持） | `.cursor/rules/*.mdc` | 项目自有 Cursor 规则目录 | `init` / `sync` 自动部署 OpenLogos 规则，并通过 managed block 合并根指令文件 |
+| **Cursor** | `AGENTS.md`（原生支持） | `.cursor/skills/<skill>/SKILL.md`（原生 Agent Skills，含 `disable-model-invocation` 显式命令与 change-reviewer subagent） | 用户自有 `.cursor/skills/` 与 `.cursor/rules/` | `init` / `sync` 自动部署 OpenLogos Skills 与 hooks 托管条目，清理历史托管 `.mdc`（用户资产保留），并通过 managed block 合并根指令文件 |
 | **Claude Code** | `CLAUDE.md` | `logos/skills/*/SKILL.md` 或 OpenLogos 官方 Claude 插件 | `.claude/skills/<skill>/SKILL.md` 或项目独立 Claude 插件 | `init` / `sync` 自动部署 OpenLogos 托管资产；项目技能单独分组，不归入 `/openlogos:*` |
 | **Codex** | `AGENTS.md` | `.agents/plugins/openlogos/skills/*` | `.agents/plugins/<project-plugin>/skills/*` 或 repo-scoped local skill | `init` / `sync` 自动维护 repo marketplace 的 `openlogos` 条目；项目插件条目原样保留 |
 | **OpenCode（兼容模式）** | `AGENTS.md` | `logos/skills/*/SKILL.md` | 项目自有 OpenCode 插件或规则 | `init` / `sync` 自动部署，并通过 managed block 合并根指令文件 |
@@ -208,3 +210,160 @@ OpenLogos 生成内容必须包裹在固定 marker 内：
 | `AGENTS.md` | 自然语言 Markdown | AI 助手 | 行为指令、规则、Skill 列表 |
 
 两者互补：AGENTS.md 引导 AI 去读 logos-project.yaml，logos-project.yaml 提供结构化数据。
+
+## ZCode 指令与 Skill 命名空间生成规则
+
+### ZCode 指令入口
+
+- 当 `aiTool` 为 `zcode`，或 `all` 经 Registry 展开包含 ZCode 时，OpenLogos 必须维护项目根现有大小写真实路径的 `AGENTS.md`。
+- ZCode 运行时只以用户级 `~/.zcode/AGENTS.md` 与工作区根 `AGENTS.md` 的组合为前提；OpenLogos 生成内容不得依赖子目录 AGENTS 扫描、include 指令或 CLAUDE.md 持续读取。
+- 根 AGENTS 中的 OpenLogos 内容必须自包含：项目索引入口、语言策略、Why→What→How、Delta/guard、测试 reporter、verify/deploy/smoke/archive/push 确认点均在完整 managed block 中表达。
+
+### 托管片段与用户内容保护
+
+1. ZCode 复用既有 `OPENLOGOS:BEGIN` / `OPENLOGOS:END` 合并 helper，不新增第二套 marker。
+2. 无 marker 的用户 AGENTS 原文保留，并在末尾追加托管片段；完整 marker 只替换内部；不完整 marker fail loud。
+3. `init`、`init --ai-tool zcode`、`adopt`、`sync`、`launch` 必须调用同一合并实现，大小写变体检测和原子回滚语义一致。
+4. `.zcode/config.json`、用户级 AGENTS、托管 marker 外内容不是 OpenLogos owner，任何入口不得覆盖。
+5. 生成文本语言由 `logos.config.json.locale` 决定；用户原文不翻译、不格式化。
+
+### ZCode Skills/Commands/Agents 分组
+
+| 类型 | OpenLogos 归属与位置 | AGENTS 展示规则 |
+|---|---|---|
+| 方法论 Skills | OpenLogos ZCode plugin 的 `skills/<name>/SKILL.md` | 列在“OpenLogos 方法论 Skills”，使用插件可发现名称与实际路径 |
+| Commands | plugin 的 `commands/<name>.md` | 列出用户可调用名称、用途和所需确认点，不伪装成 Skill |
+| Agents | plugin 的 `agents/<name>.md` | 仅列出真实随包 Agent；不得生成不存在的角色 |
+| 项目专属能力 | 当前仓库或其它 ZCode plugin | 单独列为“项目专属”，保留原命名空间，不纳入 OpenLogos owner |
+
+`openlogos` identity/命名空间只表示 OpenLogos 随包方法论资产。未知来源、用户创建或其它 plugin 中的 Skill/Command/Agent 一律视为项目/用户资产，sync 不复制、不重命名、不删除。
+
+### 生命周期生成
+
+- initial：说明完成 Why→What→How 设计与测试规格后才能实现，并展示初始化阶段可用的 OpenLogos 能力。
+- launched 无 guard：明确禁止修改源码，下一动作是创建 change。
+- launched 有 guard：按磁盘 `proposal_step` 输出精确阶段范围；delta-writing 仅允许当前提案 `deltas/**` 和对应 `tasks.md`，ready-to-merge 停止写 delta。
+- adopted + launched：与 launched 指令一致，不因存量接入降低 guard；下一主路径仍可直接 change。
+- launch/sync 后提示 ZCode 开启新 session 获取新指令和 Hook 配置快照；不得声称现有 session 已热更新。
+
+### 一致性与验证
+
+- Registry 为 ZCode AGENTS 生成的唯一入口，禁止在 init/sync/launch/adopt 各自拼接宿主分支。
+- AGENTS 中列出的资产必须与 tarball 内 ZCode plugin 清单一致；缺文件、重复 identity 或非法 frontmatter 阻断部署。
+- 自动化测试覆盖用户内容保留、大小写变体、不完整 marker、双语、initial/launched/adopted 与 `all`。
+- staging smoke 必须由真实 ZCode 新 session 读取根 AGENTS，并确认方法论资产和项目专属资产没有混入同一 owner。
+
+## Qoder CLI 静态记忆与插件资产生成规则
+
+### Qoder 指令入口
+
+- 当 `aiTool=qoder` 或 `all` 展开包含 Qoder 时，OpenLogos 必须维护工作区根现有大小写真实路径的 `AGENTS.md`。
+- Qoder CLI 默认把项目 `AGENTS.md` 作为静态记忆；OpenLogos 托管片段必须自含项目索引、语言策略、Why→What→How、delta/guard、reporter 和人类确认点。
+- OpenLogos 不修改用户级 `~/.qoder/AGENTS.md`、项目 `AGENTS.local.md`、`.qoder/rules/**/*.md` 或自定义 `context.fileName` 配置；这些均属于用户/项目 owner。
+- 虽然 Qoder 可按访问路径补充加载子目录记忆，OpenLogos 关键方法论约束不得依赖先访问特定子目录才生效。
+
+### 托管片段与用户内容保护
+
+1. 复用既有 `OPENLOGOS:BEGIN` / `OPENLOGOS:END` 合并 helper，不新增 Qoder 专用 marker。
+2. 无 marker 时保留用户原文并追加完整片段；完整 marker 只替换内部；残缺、交错或重复 marker fail loud。
+3. init/adopt/sync/launch 调用同一合并与事务实现，大小写变体和回滚语义一致。
+4. 用户级/本地 AGENTS、Qoder rules、settings、其它插件和 marker 外内容永不进入 OpenLogos 删除/格式化计划。
+5. 托管文本语言来自 `logos.config.json.locale`；用户原文不翻译、不重排。
+
+### Qoder Skills、Commands、Agents 分组
+
+| 类型 | OpenLogos 位置 | AGENTS 展示规则 |
+|---|---|---|
+| 方法论 Skills | Qoder plugin `skills/<name>/SKILL.md` | 列为“OpenLogos 方法论 Skills”，名称/描述与真实资产一致 |
+| Commands | plugin `commands/**/*.md` | 列可调用名称、用途和人类确认点，不伪装成 Skill |
+| Agents | plugin `agents/*.md` | 只列真实随包 Agent，不生成不存在角色 |
+| 项目/用户能力 | `.qoder/rules/**`、其它插件或仓库资产 | 独立分组并保留原 owner，不由 sync 重命名/删除 |
+
+### 生命周期内容
+
+- initial：强调完成 Why→What→How 与测试规格后才能实现。
+- launched 无 guard：禁止源码/规格写入，下一主动作是创建 change。
+- launched 有 guard：按磁盘 `proposal_step` 给出精确范围；delta-writing 仅当前提案 deltas/tasks，ready-to-merge 停止写 delta。
+- adopted + launched：与 launched 一致，不因存量接入降低 guard；可直接进入 change。
+- sync/launch 后提示通过新 Qoder CLI session 或受支持的 memory refresh 读取新静态记忆/插件快照；不得声称更新 AGENTS 等同 hard guard。
+
+### 一致性与验证
+
+- Registry 是 Qoder AGENTS/插件资产生成的唯一入口，生命周期命令不拼接 Qoder 分支。
+- AGENTS 列表、plugin manifest 与 tarball 实际组件集合必须一致；缺失、额外、重复 identity 或非法 frontmatter 阻断预检。
+- 自动化覆盖用户内容保留、大小写、残缺 marker、zh/en、initial/launched/adopted、qoder/all 与规则/本地记忆不被修改。
+- staging 由真实 Qoder CLI 新 session 读取根 AGENTS，并证明静态记忆只提供指导，PreToolUse Hook 独立执行硬门禁。
+
+### 权威参考
+
+- Qoder CLI Memory：`https://docs.qoder.com/cli/memory`
+- Qoder Plugin Reference：`https://docs.qoder.com/cli/plugins-reference`
+
+## WorkBuddy 静态指令、会话上下文与原生记忆边界
+
+### 指令入口与三层职责
+
+当 `aiTool=workbuddy` 或 `all` 展开包含 WorkBuddy 时，OpenLogos 按 Adapter capability 部署静态项目指令和原生插件资产。三类上下文必须分离：
+
+| 层 | 内容 | 是否可授权写入 |
+|---|---|---:|
+| 静态项目指令 | 项目索引、语言、Why→What→How、Delta/guard、确认点 | 否 |
+| SessionStart | 从磁盘派生的 lifecycle、slug、`proposal_step`、范围与下一动作 | 否 |
+| PreToolUse | 每次调用重新读取磁盘并作 allow/deny | 是，唯一 hard guard |
+
+`AGENTS.md`、`CODEBUDDY.md` 或宿主可读取的等价静态指令只能作为指导；任何文件名差异由 WorkBuddy Adapter/能力探测封装，不得改变 OpenLogos 方法论内容或被当作 hard guard。
+
+### 托管片段与用户内容保护
+
+1. 复用既有 `OPENLOGOS:BEGIN` / `OPENLOGOS:END` 合并 helper；完整 marker 只替换内部，无 marker 保留用户原文后追加，残缺/交错/重复 marker fail loud。
+2. init/adopt/sync/launch 调用同一事务实现，大小写真实路径、locale 和回滚语义一致。
+3. OpenLogos 只维护自身托管片段和插件 identity；WorkBuddy settings、其它插件、项目自有指令/资产和未知文件不得格式化、重命名或删除。
+4. sync/launch 后提示启动新 WorkBuddy session 获取插件与 SessionStart 快照，不宣称旧会话已热刷新。
+
+### Skills、Commands 与 Agents 分组
+
+| 类型 | OpenLogos 位置 | 展示规则 |
+|---|---|---|
+| 方法论 Skills | WorkBuddy plugin `skills/<name>/SKILL.md` | 列真实随包名称与用途，保持 OpenLogos owner |
+| Commands | plugin `commands/<name>.md` | 列调用名称和人类确认点，不伪装成 Skill |
+| Agents | plugin `agents/<name>.md` | 只列真实随包 Agent，不生成不存在角色 |
+| 项目/用户能力 | 其它插件、项目资产 | 单独分组，保留原 owner，不由 sync 吸收 |
+
+### 原生记忆边界
+
+- WorkBuddy 原生记忆由宿主和用户独占。OpenLogos 不读取正文、不生成条目、不清空、迁移、导入或导出记忆。
+- 原生记忆不得成为 lifecycle、active slug、`proposal_step` 或 allowlist 的事实源，也不得作为身份、授权或 smoke 成功凭据。
+- 自动化与 staging 只能保留不透明的前后证据证明“未触碰”，不得把记忆内容复制进日志、reporter 或提案产物。
+- 静态指令或 SessionStart 与原生记忆冲突时，PreToolUse 基于当前磁盘状态的决策优先。
+
+### 一致性与验证
+
+- Registry 是 WorkBuddy 指令与插件资产生成的唯一入口；生命周期命令不得拼接宿主分支。
+- 静态清单、plugin manifest 与 `0.13.28` tarball 实际组件必须一致；缺失、重复 identity 或非法 frontmatter/Hook 配置阻断预检。
+- UT/ST 覆盖用户内容保留、marker、zh/en、initial/launched/adopted、workbuddy/all 与记忆零写入。
+- staging 由真实 WorkBuddy 5.3.5+ 新 session 证明静态指令和组件可用，同时由 PreToolUse 独立证明 hard guard。
+
+### 权威参考
+
+- WorkBuddy Plugins：`https://www.codebuddy.cn/docs/workbuddy/Plugins`
+- CodeBuddy Plugin Technical Reference：`https://www.codebuddy.cn/docs/cli/plugins-reference`
+- WorkBuddy Memory：`https://www.codebuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Memory`
+
+## Cursor 原生 Skills、hooks 托管条目与部分强度门禁生成规则
+
+当 `aiTool` 含 `cursor` 时，`init` / `adopt` / `sync` / `launch` 除生成 `AGENTS.md` managed block 外，还托管以下资产（完整契约见 `spec/cursor-plugin.md`）：
+
+1. **原生 Agent Skills**：`.cursor/skills/<skill>/SKILL.md`，frontmatter `name` 与目录名一致、`description` 非空；OpenLogos 显式命令 Skills 额外携带 `disable-model-invocation: true`；change-reviewer 以 Cursor subagent 部署。
+2. **hooks 托管条目**：向 `.cursor/hooks.json` 合并写入 `sessionStart`、`beforeShellExecution`、`afterShellExecution`、`afterFileEdit` 四条 OpenLogos 托管条目（以 `cli/src/lib/cursor-adapter.ts` 的 `CURSOR_HOOK_EVENTS` 为准）；只增改托管条目、保留用户条目与未知字段；文件不可解析时 fail loud 零写入。
+3. **托管 `.mdc` 迁移**：历史 `.cursor/rules/<skill>.mdc` 与 `openlogos-policy.mdc` 在 Skills 部署成功后同次执行内清理；清理清单由 OpenLogos Skill 名单静态派生，用户自有 rules 一律保留。
+4. **guard 强度如实呈现**：AGENTS.md 托管段与 CLI 反馈必须声明 Cursor 下写入门禁为部分强度（`beforeShellExecution` 事前判定 shell 写入 + `afterShellExecution` 事后检查 shell 写入 + `afterFileEdit` 编辑事后检测）；OpenLogos 未接入 `preToolUse`，IDE 与 CLI 的文件编辑均只承诺事后报告，不得声称 Cursor IDE 获得完整 `preToolUse` 硬拦，也不得把 Cursor 表述成与 claude-code 等价（capability honesty，D09；guard-versioned-content-scope C11）。
+5. **边界**：OpenLogos 只拥有自身托管 Skills 目录、subagent 文件与 hooks 托管条目；用户 `.cursor/**` 其余内容在任何入口下不读改删。
+
+## 变更管理例外文件清单与保护范围配置（guard-versioned-content-scope）
+
+生成的指令文件（AGENTS.md / CLAUDE.md 托管段，以及各宿主等价的托管指令）中「⛔ 变更管理 → 行为约束 → 唯一例外」一条，必须与 guard 的保护判定保持一致（`spec/pretooluse-guard.md`「版本控制内容保护与事后检查（规范性）」，决策 C14）：
+
+1. 「可不经提案直接修改的非方法论文件」示例**不再包含 `.gitignore`**；示例保留 `README.md` 等仍在硬编码白名单内的文件。
+2. 同一段追加一行：`.gitignore`、`.git/info/exclude` 与 `logos/logos.config.json` 决定 guard 的保护范围，不得直接修改；需要忽略或豁免路径时，直接执行 `openlogos ignore add|remove …` 或 `openlogos exempt add|remove …`（`list` 不受限），由宿主对这次命令弹出原生审批、用户批准后执行；若 guard 提示当前权限模式下宿主不会弹出审批，请用户在终端用 `! <命令原文>` 自行执行，或切换到默认权限模式后重试，不得以对话中的口头同意替代审批。
+3. 中英文模板同口径；en 文案：`` `.gitignore`, `.git/info/exclude` and `logos/logos.config.json` define the guard's protection scope and must not be edited directly. To ignore or exempt a path, run `openlogos ignore add|remove …` or `openlogos exempt add|remove …` directly (`list` is unrestricted); the host will show its native approval prompt for that command and it runs only after the user approves. If the guard reports that the current permission mode will not show an approval prompt, ask the user to run `! <command>` in the terminal or switch to the default permission mode and retry; a verbal "yes" in the conversation never replaces the approval. ``
+4. 生成时机与托管片段合并规则沿用本规范既有「托管片段合并规则」「生成时机」，`openlogos sync` 后存量项目的托管段同步更新，用户段外内容不动。

@@ -317,3 +317,108 @@ resource_index:
 ### 存量项目回填引导
 
 存量项目场景已平铺、无 feature 归属时，引导用户运行 `openlogos feature-backfill`：CLI 生成 `logos/feature-backfill-prompt.md`（打包场景清单 + 现有 feature-specs 文档 + 当前 yaml），AI 据此语义聚类回写 `features[]` / `scenario.feature` / `feature_counter`（幂等、只补未分组、非强制）。
+
+## S39 delta 模式：目标存在则修改，缺失则全量创建
+
+### 触发
+
+change-writer 的 on-touch-v1 闭包判定把某 scenario target 标为 MODIFY/CREATE，并咨询本 Skill 生成内容时启用。当前 change-writer 保持最终 delta 文件所有权；本 Skill 返回内容与校验结果，不得另写第二份同目标 delta。
+
+### 输入
+
+- proposal 中本次 Why/验收；
+- 已合并需求/feature/architecture；
+- 当前 change 的 effective view；
+- 可重算代码/测试/配置现状证据；
+- 拟定 feature/scenario 身份与模式。
+
+不得从代码推断历史 Why，不读取其它 change/archive/partial seed staging。
+
+### MODIFY
+
+目标存在时读取完整被触及章节：
+
+- 已有锚用 MODIFIED，并携整节全量内容遵守 S37；
+- 需要新章节时可在同一 delta 用 ADDED；
+- 多场景共享 overview/traceability 时把所有变更交回同一 target delta。
+
+### CREATE
+
+目标缺失时返回可独立成立的完整场景文档，至少包含：
+
+1. 标题、SXX、feature、来源；
+2. 场景目标与用户价值；
+3. 参与者及职责；
+4. 前置/成功后置条件；
+5. 完整 Mermaid `sequenceDiagram` 主路径；
+6. 步骤说明；
+7. alt/异常/边界用例；
+8. 与 requirement/API/DB/test/decision 的追溯；
+9. 明确非目标与安全边界。
+
+禁止只给 skeleton/TODO。CREATE 仍由 change-writer 写 `## ADDED — ...（全新场景文档）`，不使用 CREATE marker。
+
+### API/DB 派生接口
+
+输出必须明确：
+
+- 哪些交互是 HTTP/RPC/消息边界，供 api-designer 判定；
+- 哪些步骤读写持久化，供 db-designer 判定；
+- 主/异常路径与验收点，供 test-writer/test-orchestrator 生成真实用例。
+
+若无法判断，把具体缺口返回 change-writer 标 AMBIGUOUS；不在 delta-writing 启动 JIT 人工确认。
+
+### 完成检查
+
+- 时序参与者与步骤说明一一对应；
+- API 先有时序来源；异常至少覆盖输入、依赖、并发/幂等或权限中适用项；
+- 无 verified/confirmed/baseline warning 写入；
+- 返回的目标路径与 change-writer 提供的 canonical target 一致。
+
+## 场景 CREATE canonical 结构与兼容校验
+
+### 适用与输出所有权
+
+当 change-writer 依据 on-touch-v1 把场景目标标为 CREATE 并咨询本 Skill 时，返回的完整文档必须遵循 `spec/baseline-closure.md` §17。change-writer 仍是目标唯一 Delta writer；本 Skill 不另写第二份文件。
+
+### canonical 章节与内容门
+
+新场景固定使用：`场景目标`、`参与者`、`前置条件`、`成功后置条件`、`时序图`、`步骤说明`、`异常与边界`、`追溯`。其中步骤标题只能写 `## 步骤说明`，不得为新文档选择同义标题。
+
+步骤说明必须满足：
+
+1. 唯一一个步骤章节；
+2. 至少 3 个非空有序列表项；
+3. 每项有明确主语；
+4. 与 Mermaid `Step N` 主路径一一对应；
+5. 异常只在正常步骤中引用，详细内容放 `异常与边界`。
+
+时序图必须位于合法 `mermaid` fence，声明 `sequenceDiagram`、至少两个适用参与者和至少一条消息；每条消息保持单行并带 `Step N:`。异常/边界与追溯章节都必须包含非空权威正文，不得用注释、代码样例或占位文本满足完整度。
+
+### 兼容读取说明
+
+CLI 为读取存量文档兼容 `步骤说明`、`主路径步骤`、`主路径`、`主流程`、`正常流程`、`main path` 的精确标题。该集合不改变本 Skill 的 canonical 输出，也不允许用“标题或散文包含步骤二字”代替真实有序列表。
+
+### 返回前检查
+
+- 从磁盘或待返回最终文本重读：标题唯一、至少 3 步、列表非空、Mermaid 参与者/消息齐备、异常/追溯非空。
+- 明确 API/RPC/消息与持久化派生结论，供 api-designer/db-designer 判定适用或 SKIP。
+- 给出需求 AC、EX 与真实 UT/ST ID 追溯；不使用通配或占位 ID。
+- 将检查结论交回 change-writer；最终由 change-writer 运行 `openlogos change-lint` 到 exit 0。
+
+## Authority Closure 时序建模
+
+
+### 输入与引用
+
+读取 `spec/authority-closure.md` 和项目 Authority Registry。只使用稳定 `fact_id`；不从代码、路径或参与者名称自造 owner。
+
+### 时序要求
+
+显式画出 command、mutation entry、authority read/write、projection refresh、consumer decision 和 recovery。projection 消息必须携带 generation/version/hash/receipt 等 freshness identity。两个参与者均能直接写 canonical state 或给出最终决定时，停止产出并回退 architecture-designer。
+
+### 异常要求
+
+至少建模 stale projection、conflicting old copy、response lost + restart、legacy/concurrent writer。恢复只读 authority/receipt；目录扫描、mtime、marker 存在性和 stale cache 不得作为 fallback authority。
+
+追溯连接 `fact_id`、AC-01～AC-08 与真实 UT/ST；场景只消费 Registry，不复制 owner 表。

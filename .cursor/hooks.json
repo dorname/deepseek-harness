@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "command": "node .cursor/hooks/openlogos-runtime.cjs session"
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "type": "command",
+        "command": "node .cursor/hooks/openlogos-runtime.cjs shell"
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "type": "command",
+        "command": "node .cursor/hooks/openlogos-runtime.cjs shell-after"
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "type": "command",
+        "command": "node .cursor/hooks/openlogos-runtime.cjs edit"
+      }
+    ]
+  }
+}

@@ -66,38 +66,45 @@ description: "Change proposal writing and impact analysis"
 
 ### Step 4: 生成 proposal.md
 
-按以下模板生成，写入 `logos/changes/<slug>/proposal.md`：
+`openlogos change <slug>` 已经在磁盘上写出完整的 `logos/changes/<slug>/proposal.md` 脚手架。
+**在该文件上原地逐段填写，禁止整篇重写。**
 
-```markdown
-# 变更提案：[变更名称]
+理由：脚手架含若干**不由 lint 强制**的段（当前为「最小实现论证」）。整篇重写会把它们连同正文一起覆盖掉，
+而没有任何检查会报错——这是一个静默丢失。
 
-## 变更原因
-[为什么要做这个变更？来源于哪个需求/反馈/Bug？]
+别把「canonical 段历次都幸存」当作整篇重写安全的证据：那只是 **L0** 在挡着，逼你把它们补回来。
+而这层兜底比你以为的薄——**L7 的「UI/UX 声明段缺失」现已降为警告**（进 `warnings`、不计入 violations、
+不影响退出码、不挡 merge，见功能规格 §2.83.1）；只有该段**在场但结构损坏**（fenced YAML 缺失 / 损坏 /
+非对象、`ui_impact` 非布尔）才 fail-closed 拒绝 merge。它在 20260914 确实硬阻断过一次全自动 run，
+正是那次事故之后被降级的。
 
-## 变更类型
-[需求级 / 设计级 / 接口级 / 部署级 / 代码级]
+所以如今真正被门守住的，只有 **L0 的 6 个 canonical 段**。其余的段——包括曾经硬阻断过的 UI 声明段、
+以及从一开始就不设门的「最小实现论证」——都只能靠「不整篇重写」这条填写规则来保障。
 
-## 变更范围
-- 影响的需求文档：[列表，精确到文件名和章节]
-- 影响的功能规格：[列表]
-- 影响的业务场景：[场景编号列表]
-- 影响的部署方案：[列表]
-- 影响的 API：[端点列表]
-- 影响的 DB 表：[表名列表]
-- 影响的编排测试：[列表]
-- 影响的 smoke 测试：[列表]
+填写规则见本 Skill **§canonical scaffold 保真**（先读脚手架、只替换占位正文、不删段）。此处不再复述，
+也**不要**另写一套等价指令——那就是在制造下一个会漂移的来源。
 
-## 部署影响
-- 是否需要部署：是 / 否
-- 部署原因：[说明为什么需要或不需要部署]
-- 影响环境：[本地 / 测试 / 预发 / 生产 / 无]
-- 是否涉及数据迁移：是 / 否
-- 是否需要回滚预案：是 / 否
-- 是否需要 smoke：是 / 否
+**canonical 必填章节的唯一判据是 `PLAN_SECTION_REGISTRY`（`cli/src/lib/plan-package-contract.ts`）+ change-lint（L0 / L7）。**
+本 Skill 不自列必填章节清单：清单写在文档里就会与脚手架、与判据三方漂移，而「某段是否必填」从来不由文档决定。
+要知道当前必填哪些段，跑 `openlogos change-lint`，别查文档。
 
-## 变更概述
-[用 1-3 段话概述具体改什么]
-```
+**逐段填写要点**（脚手架已给出段名与占位提示，这里只说每段要回答什么、什么算填好）：
+
+- **变更原因** — 为什么要做？来源于哪个需求 / 反馈 / Bug？病灶写到可复现的程度，别停在「不够好」。
+- **最小实现论证** — 三问必答：先检索了哪些既有机制（逐项说为何不够用或如何复用）、为什么不能更小、
+  本提案主动砍掉了什么。**这一段不受任何检查约束，完全靠自律**——它作用在设计发生之前，是防过度设计
+  三批里唯一的事前环节。写不出「砍掉了什么」，通常说明还没想清楚边界。
+- **变更类型** — 需求级 / 设计级 / 接口级 / 代码级，四选一，并在括号里点明判断依据。
+- **变更范围** — 逐类列出受影响的文档 / 场景 / API / DB / 测试 / 代码，精确到文件名与章节；
+  无影响的类别写「无」，不要省略该行。范围必须与 `tasks.md` 的 `[delta]` 目标对账一致（见 Step 5）。
+- **部署影响** — 六个字段全部给出明确布尔或枚举值，它是人工审核依据，也是 `[deploy]` section 的决策源。
+- **UI/UX 变更声明** — GUI 模块必须在场并如实声明 `ui_impact`（判定规则见 Step 6 补充二）。
+- **决策澄清** — 五类 impact 逐项给 status + reason；每条 decision 写清 choice 与 reason，
+  `status: ready` 意味着你认为无待澄清项。
+- **变更概述** — 1-3 段话说清具体改什么，让审阅者不读 delta 也能判断方案是否合理。
+
+按段名给出的要点到此为止——**本步骤不提供、也不得提供任何可整块复制的 proposal 模板**。
+形态来源只有一个：`openlogos change` 写在磁盘上的那份脚手架。
 
 生成 `proposal.md` 后必须先保留部署决策结论，Step 5 生成 `tasks.md` 时必须与该结论一致。
 
@@ -273,6 +280,29 @@ Delta 文件写入 `logos/changes/<slug>/deltas/` 下对应子目录，与合并
 **守恒写作规范（S37，merge-conservation-archive-audit，强制）**：
 
 1. **MODIFIED 必须携带整节全量内容**——它是整章节替换，不是"只写改动的部分"。凡目标章节内未变更的**结构化条目**（测试表 ID 行、场景表行、编号小节），必须原样抄入 MODIFIED 块的对应结构位置；漏抄 = 隐式删除，会被 change-lint L8 与 `openlogos merge` 双侧拒绝。**注意：仅在散文里提及 ID 不算保留**——守恒按结构位置计数（测试表 ID 首列、场景标题/表行首列、标题行节号）。
+
+   **「整节」的边界（lint-modified-sibling-section-collision，强制）**：MODIFIED 的替换范围是**自锚标题起，到目标文档中下一个同级或更高级标题止**——**不是整份文档**。正文里与锚同级或更浅的标题**不会替换兄弟章节**，而是被合成器合法下沉为锚章节的子节（相对子标题写法，合法且被依赖）；原兄弟章节原样保留。因此**整篇改写含多个同级章节的文档时，每个章节各写一个 `## MODIFIED — <章节标题>` 块**，只携带该章节自己的正文——把整份文档塞进一个块，会得到「整份文档的降级副本嵌在首节里 + 其余章节原样保留」的后态，测试规格里每个 ID 都会出现两次。该后态由 `openlogos change-lint` L4 以 `delta_test_id_duplicate` 拒绝（lint 侧与 merge 合成期同一合成器、同一 `buildTestChangeSet`，判据逐字同源；fix_hint 会指向拆块）。标题同名本身**不是**违规——判据是合成后态的 ID 重复。
+
+   ```markdown
+   <!-- 错误：目标文档由五个并列 H2 组成，却只写一个块、正文抄整份文档 -->
+   ## MODIFIED — S09: 模型导入 — 测试用例
+   > 合并说明……
+   ## 一、单元测试用例
+   | ID | … |
+   ## 二、场景测试用例
+   …
+
+   <!-- 正确：每个 H2 各一个同锚 MODIFIED 块，锚文本与目标标题逐字一致 -->
+   ## MODIFIED — S09: 模型导入 — 测试用例
+   > 合并说明……（只含导言节自己的正文）
+
+   ## MODIFIED — 一、单元测试用例
+   | ID | … |
+
+   ## MODIFIED — 二、场景测试用例
+   …
+   ```
+
 2. **删除整个章节**用既有 `REMOVED — <唯一章节锚>`（语义不变，整节删除；该节 ID 随节显式删除）。
 3. **删除章节内部分条目**必须成对写：`MODIFIED — <章节锚>` 携带删除后剩余的全量内容 + `REMOVED-ITEMS — <同一章节锚>` 逐行点名被删 ID，固定语法：
 
@@ -307,29 +337,31 @@ change-flow-redesign 把前段流程拆为 `plan{写提案, 划分tasks}` → `s
 
 对已 `launched` 的 **GUI 产品项目**（网站 / 桌面应用 / 移动 App），当本次变更触及界面时，change-writer 在**提案阶段**（plan 节点、`plan-exit` 门**前**）就用 `ui-ux-pro-max` 设计系统产出界面原型，使用户在批准提案时（**面板已渲染原型的前提下**）连界面一起确认，避免「批准后自动实现才发现界面不对」的高成本返工。**复用现有 `plan-exit`（批准方案）门——不新增门态、不新增确认标记、不新增 `ui/` 目录。** 非 GUI 项目（纯 CLI / API / 纯后端服务 / Skills）整个特性不启用，本节全部跳过、流程零改动。
 
-> 本节只定义 change-writer 侧的 **producer 产出职责与可交付要求**；driver 在 plan 节点**派发** change-writer 产原型（producer dispatch）、面板渲染原型、批准时写 原型批准记录 均归 runlogos 关联 change `ui-ux-first-panel`，本节不含其实现。
+> 本节只定义 change-writer 侧的 **producer 产出职责与可交付要求**；driver 在 plan 节点**派发** change-writer 产原型（producer dispatch）、面板渲染原型、批准时写 provenance 均归 runlogos 关联 change `ui-ux-first-panel`，本节不含其实现。
 
 ### ① 触发条件：先判 `product_type`，再判本次是否动界面（去循环依赖）
 
 判定在 **plan 阶段由 change-writer 执行**，分两层，**依据是「提案意图 + 已规划的 `[delta]` 目标」，而非扫描尚不存在的 delta 文件内容**（plan 阶段无 delta 可扫，「先 delta 还是先原型」构成循环依赖，故不扫 delta 内容）：
 
-1. **先判 `product_type` 是否 ∈ GUI**：从 `logos/logos-project.yaml` 的 `product_type` / `tech_stack` 读取。
-   - ✅ GUI 类：Web 应用 / 移动应用 / 桌面应用（Electron / Tauri / SwiftUI / Jetpack Compose / Qt / WPF / GTK 等）/ 混合型中含 GUI 交付物的部分。
-   - ❌ 非 GUI 类：纯 CLI / Library / AI Skills / 纯 API 服务 / 纯后端服务（`service`：常驻 worker / 定时循环任务 / 消息消费者等，无对外接口）—— 整节跳过、`ui_impact` 恒为 `false`、不注入声明段。
+1. **先判 `product_type` 是否 ∈ GUI——唯一依据 = `logos/logos-project.yaml` 中本提案所属模块的 `product_type` 字段**（fix-ui-declaration-source-skew-and-missing-degate）：
+   - **与 change-lint L7 同源**：L7 按 `product_type ∈ {web, desktop, mobile}` 激活（模块归属经同一 proposal-context resolver 语义解析，见功能规格 §2.30）。change-writer 读**同一个 yaml 字段**、得同一个结论——producer 判定与门判定单源，不存在漂移空间。
+   - **禁止自由裁量**：不得按提案语义、变更内容、`tech_stack` 观感或对代码库的印象改判项目类型。`product_type: desktop`（或 web / mobile）项目里的「纯 CLI 判据修复」提案**仍然是 GUI 项目的提案**——「本次没动界面」表达为 `ui_impact: false`，**绝不**表达为「把项目当作非 GUI、整节跳过」。
+   - **判定映射**：`product_type ∈ {web, desktop, mobile}` → GUI 类，进入第 2 层判定；其余取值（`cli` / `library` / `api` / `service` / skills 等）→ 非 GUI 类，整节跳过、`ui_impact` 恒为 `false`、不注入声明段。
+   - **严禁删除脚手架结构必填段（GUI 模块）**：`openlogos change` 的 proposalTemplate 已为 GUI 项目生成「UI/UX 变更声明」段（默认 `ui_impact: false`）——产物侧本无缺口。**填写 `proposal.md` 时该段必须在场并如实声明**：本次不动界面就保留段并如实写 `ui_impact: false`；仅 `product_type` 非 GUI 的模块才允许该段不存在。（脚手架全部段的保真要求见 §canonical scaffold 保真；`proposal.md` 本就不得整篇重写，故本条不以「整篇重写时」为前提。）
 2. **再判本次是否动界面**（仅当 `product_type ∈ GUI`）：
    - **依据 = 提案意图 + `tasks.md` 已规划的 `[delta]` 目标是否命中 `2-page-design/`，或命中含交互变更的 feature-specs delta**。命中即**强制判为「动了界面」**（`ui_impact:true`）。
    - **窄例外（命中 `2-page-design/` 时）**：仅当目标为**页面原型产物**（`.html`，或含 `pages` 声明）才强制 `ui_impact:true`；若目标是**纯 CLI 体验文本规格**（`.md` 且**无** `pages` 声明），不强制 `ui_impact:true`。
    - **不扫描尚不存在的 delta 内容**（去循环依赖）。
    - 可选多 agent 复核默认**关**，可由 driver 派发。
 
-判定容错优先流程平滑：作为增益功能，判错代价可控（顶多多画一次或退回重设），不追求绝对严谨。
+**删段的真实后果（20260914 事故实证，替代已被证伪的「判错代价可控」断言）**：change-lint L7 按 yaml `product_type` 激活并检查声明段在场性；agent 按提案语义误判「非 GUI」而删掉脚手架段后，全自动 run 的 `openlogos merge` 曾被 `ui_declaration_missing` 在 spec-exit 后挡停——producer 已出环、重驱确定性复撞、需要人工补段才能恢复。判定源不同源导致的删段不是「顶多多画一次或退回重设」，而是无人值守链路的硬停等人。缺段现已由 L7 降为**警告** + 消费侧派生 `ui_impact:false` 安全默认（防线纵深，见功能规格 §2.83），但警告仍是流程噪音且丢失「如实声明」的语义——**规则是不删段，降门只是删了之后的兜底**。声明段在场但写坏（fenced YAML 缺失 / 损坏 / 非对象、`ui_impact` 非布尔）仍 fail-closed 拒绝 merge：脚手架已提供合法骨架，写坏必有因。
 
 ### ② change-writer 作为 plan 节点 producer，被 driver 在 plan-exit 门前 dispatch 产原型
 
 - 原型产出是 **plan 节点门前的普通内容生成**，授权状态与「写 `proposal.md` / `tasks.md`」**完全相同**——**不新增授权、不新增门**。唯一人类确认点仍是 `plan-exit`。
 - driver 在 plan 节点判定 `ui_impact:true` 且**前置能力就绪**时，**派发 change-writer（用 ui-ux-pro-max）在 `plan-exit` 前产出原型**（producer dispatch）。这属既有 plan 节点执行范围，driver 实现归 runlogos `ui-ux-first-panel`。
 - change-writer 的写入由 guard 的 **plan 阶段写入 allowlist（仅放行 `deltas/prd/2-product-design/2-page-design/*.html`）** 授权；其余 `deltas/**` 在 plan 阶段仍禁止写入，越界路径被 guard 拒。
-- `--auto` 下 `plan-exit`（`skippable:true`）自动放行，但原型已在门前产出、原型批准记录 已记录。
+- `--auto` 下 `plan-exit`（`skippable:true`）自动放行，但原型已在门前产出、provenance 已记录。
 
 ### ③ ui-ux-pro-max 生成步骤（调用设计系统）
 
@@ -503,3 +535,398 @@ AI 只负责驱动内容修改。半自动 / 手动下不得在未获明确授�
 **delta 产出的 L4 提醒**：每个 `.md` delta 必须含 ADDED/MODIFIED/REMOVED（或搭配 REMOVED-ITEMS）段标记**且**已把模板占位字面量（如 `[新增章节标题]`、`[新增的完整内容]`）替换为真实内容——只要正文中残留任一**独占一行**的占位字面量（含「真实内容 + 未替换占位行」的混合形态）即命中模板骨架，会被 lint 与 merge 同时拒绝；行内代码/代码围栏中的引用不受影响。
 
 **delta 产出的 L8 提醒（S37 条目守恒）**：每个触及带稳定 ID 条目规格的 `.md` delta，其 MODIFIED 块必须在**结构位置**携带目标章节全量既有 ID 条目（散文提及不算保留）；删整节走 REMOVED，删部分条目走「MODIFIED 剩余全量 + REMOVED-ITEMS 同锚点名」成对写法；标题重复时用标题路径锚（` > ` 连接父级）。既有 ID 未保留、未点名、未随整节删除 → `delta_implicit_id_removal`；点名越界 / 拼写不存在 → `delta_removed_unknown_id`；锚解析 0 或多命中 → `delta_section_anchor_unresolvable`。lint exit 2、merge 拒绝生成 MERGE_PROMPT。全新文档 delta 不受守恒约束。交付前按「守恒写作规范」第 5 条自查一遍 ID 去处。
+
+## S39：按触达目标形成规格闭包（baseline-on-touch）
+
+> 本节在 launched change 的 Step 2、Step 5、Step 6 强制生效；权威契约见 `spec/baseline-closure.md`。它替代“用户先单独建全局基线”的默认工作方式，但不删除显式可选的 brownfield seed。
+
+### Step 2 扩展：先识别触达场景，再枚举目标
+
+1. 从 proposal 意图提取用户可观察行为、验收与非目标。
+2. 读取 `logos-project.yaml`、resource_index 及关联需求/feature/scenario；必要时只读代码、测试、配置、路由、DDL 与 committed seed。
+3. 绑定已有 feature/scenario；不存在稳定身份时规划新 scenario。
+4. 对每个场景按 Why → What → How 枚举：requirement、feature、architecture、scenario sequence、API、DB、UT/ST、API orchestration、deployment/smoke。
+5. 每个类别记录适用性证据；API 必须从时序派生，API 适用则编排测试适用。
+6. 代码/测试只证明现状；本次意图来自 proposal。无法判断的产品选择标 `AMBIGUOUS`，不猜测。
+
+adopted 项目的 `baseline_seed_state` 任意值都不构成 change 前置门；但在读取 resources/index/coverage 或运行 EvidenceScanner 之前，必须先在同一模块锁内检查并恢复未终结 seed commit journal。只有恢复成功、确认不存在未终结 journal，或仅有可排除的 open run/未提交 staging 时才能执行本步骤；无法恢复硬报 `baseline_commit_in_progress`。历史自动 `skip_phases` 仅豁免 Initial 完整性，不能永久屏蔽本次实际适用目标。
+
+### Step 5 扩展：闭包声明与一目标一 task
+
+proposal 必须写：
+
+```yaml
+baseline_closure:
+  policy: on-touch-v1
+  schema_version: 1
+  unit: canonical-merge-target-path
+  delta_cardinality: exactly-one-per-non-skip-target
+  effective_view: merged-resources-plus-current-change-deltas
+  ambiguity: block-before-existing-plan-exit
+  standalone_baseline_required: false
+  jit_confirmation: disabled
+  touched_scenario_ids: [S05, S39]
+  targets:
+    - category: scenario
+      scenario_ids: [S05]
+      mode: MODIFY
+      delta_path: "deltas/prd/3-technical-plan/2-scenario-implementation/core-S05-next-guidance.md"
+      reason: "本案改变 next 的 adopted 默认动作。"
+      evidence: ["target_exists: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S05-next-guidance.md"]
+      missing_evidence: []
+```
+
+这是唯一持久计划源；人读矩阵只能由它投影。`touched_scenario_ids` 必须独立列全，不能从 targets 反推；每个 target 固定含 `category/scenario_ids/mode/delta_path/reason/evidence/missing_evidence`。字段/模式组合、排序、重复 key 与逐场景强制/条件维度完备规则严格遵循 `spec/baseline-closure.md` §5.1–5.3。
+
+目标判定：
+
+- 文件存在 → `[MODIFY]`；同 delta 可组合 MODIFIED/ADDED。
+- 文件缺失 → `[CREATE]`；同路径 delta 用 ADDED 产完整文档。
+- 不适用 → target 写 `SKIP + delta_path:null + 非空 reason/evidence + missing_evidence:[]`，不创建 checkbox。
+- 信息不足 → target 写 `AMBIGUOUS + delta_path:null + 非空 missing_evidence`；保持 plan 未完成。
+
+把 delta path 映射为 canonical target 后去重。多个场景命中同 target 必须聚合为一条 task，禁止“建立基线”与“实现增量”两条任务。每条 task 指向精确文件，不能只写目录。
+
+写完 proposal/tasks 后对账：`P = proposal 非 SKIP/AMBIGUOUS targets`、`T = tasks [delta] canonical targets`，plan 必须 `P==T` 且无重复；delta 全部产出后再令 `D = deltas canonical targets`，spec 必须 `P==T==D`。不得只比较数量，也不得从 T/D 倒算 SKIP/AMBIGUOUS。
+
+`[code]` 继续只保留空标题；不得因闭包规划提前切片。不新增 `[baseline]` section。
+
+### Step 6 扩展：按 effective view 产一份最终态 delta
+
+严格顺序：需求/feature → 架构/场景 → API/DB → 测试/编排 → 部署/smoke → 根 specs/skills/decision。每一项开始前读取：
+
+```text
+已合并 target + 当前 change 同 target 的唯一 delta = effective view
+```
+
+不得叠加其它 change、archive 或 baseline-seed staging。
+
+读取 effective view 前必须先通过 seed journal 恢复门；恢复失败时不得读取可能半新的标准 resources/index，也不得以“seed 证据不可用”降级继续写 proposal/tasks/delta。
+
+内容生产规则：
+
+- scenario：可咨询 scenario-architect，必须有目标、参与者、前后置、Mermaid 时序、步骤、异常/边界、追溯。
+- API：可咨询 api-designer，只能从 effective scenario 派生，CREATE 必须是完整合法接口规格。`.yaml|.yml|.json` 目标使用整文件最终态：第一行必须是与 plan mode、canonical target 完全一致的 `## ADDED — <target>（新文件，整文件）` 或 `## MODIFIED — <target>（整文件替换）` 控制行，其后才是完整 OpenAPI payload；不得再包 Markdown 章节 marker。
+- DB：可咨询 db-designer，按持久化证据生成完整 schema/DDL、约束、索引、迁移/回滚。`.sql` 目标同样使用上述 ADDED/MODIFIED 首行控制行与完整方言 payload，禁止片段 DDL。
+- tests：可咨询 test-writer；所有触达场景有真实 UT/ST ID 与 reporter。
+- orchestration：API 适用时咨询 test-orchestrator，含调用链、fixture、断言、cleanup、reporter。
+
+专业 Skill 只返回内容/检查结论，当前 change-writer 保持最终文件写入所有权；不得让多个 agent 各写一份同目标 delta。
+
+### 完成纪律
+
+1. 创建/更新一个 delta 文件；
+2. 立即回到 tasks，把该精确条目 `[ ]` 改 `[x]`；
+3. 从磁盘读回文件关键片段与 task 勾选；
+4. 再处理下一个目标；
+5. `[delta]` 全勾后执行项目允许的结构门并交回 merge 授权点。
+
+若当前工作单元明确禁止运行 CLI，则不得违反；应完成等价静态检查并把命令门留给 driver。
+
+### CREATE 最低完整度
+
+遵循 `spec/baseline-closure.md` 类别表。文件非空或“有标题”不算完整；禁止 TODO/占位/“后续补充”。CREATE 是计划模式，不得写 `## CREATE` marker；Markdown CREATE 用 ADDED 章节，API/DB non-Markdown CREATE 用可剥离的 ADDED 首行控制行。writer 必须在交付前验证控制行 target/mode、剥离后 YAML/JSON/OpenAPI 或方言 SQL 语法，并确认 payload 非空。
+
+### 无 JIT 红线
+
+禁止输出或写入：
+
+- “该区域未确认，是否确认”的 advisory；
+- `verified:true`、confirmed_by/at/evidence；
+- verify `baseline_warnings`；
+- baseline 专用 gate/marker/section/task；
+- 同目标双 delta。
+
+真实信息不足只在既有 plan-exit 前以 AMBIGUOUS 一次性列出，不建立逐区域确认流程。
+
+## Step 1 补充：Plan 阶段决策澄清协议（clarification@1）
+
+> 本节替代“信息不足最多追问 2 轮”的固定轮次策略。目标不是多问，而是只问必须由人决定的高影响事项，并按依赖逐个收敛。适用于 launched 变更的 `write-proposal`；不新增 flow node 或 gate。
+
+### 1. 先查事实，禁止把可查询事项反问用户
+
+开始提问前依次读取：
+
+1. `logos/logos-project.yaml`、`logos/logos.config.json` 与活跃 guard；
+2. 相关 PRD、产品设计、架构、场景、API、DB、部署、测试和决策记录；
+3. 相关代码、依赖版本、运行配置、Secret/ServiceAccount 声明；
+4. 可观测的 Git、CI、测试、发布和运行状态。
+
+已有模块/owner/契约/环境/版本/测试等事实由 Agent 自己查询。只有事实和项目政策不足以唯一决定、且答案会改变范围或风险边界的事项才能进入用户未决队列。提问时应附已查证事实，避免让用户重复提供仓库信息。
+
+### 2. 建立结构化影响声明
+
+在 proposal 的 `## 决策澄清` 中写入：
+
+```yaml
+schema: openlogos/clarification@1
+mode: adaptive
+status: pending
+impacts:
+  data: {status: none, reason: "<事实或政策依据>"}
+  compatibility: {status: none, reason: "<事实或政策依据>"}
+  security_privacy: {status: none, reason: "<事实或政策依据>"}
+  public_release: {status: none, reason: "<事实或政策依据>"}
+  external_commitment: {status: none, reason: "<事实或政策依据>"}
+decisions: []
+unresolved: []
+defaults: []
+```
+
+五类 impact 的 status 只能是 `none|required`，reason 必须非空：
+
+- `none`：无需本次用户选择；可能没有影响，也可能已有事实/政策唯一确定。
+- `required`：仍存在必须由用户选择的高影响方案，必须建立或匹配 `source:user` 决定。
+
+部署不在 impacts 重复声明；从 proposal“是否需要部署”派生。需要部署时必须加入 deployment 类决定，内容至少覆盖目标环境、部署方式、回滚和成功/smoke 证据。目标环境可由环境登记表的 `proposal_default_env` 提供（`source: policy`），其余三项须有用户回答或覆盖实际情况的已批准依据，规则见第 3 节「部署决定与提案默认部署环境」。
+
+### 3. 高影响分类与必问触发
+
+决策类别闭合为：
+
+```text
+product, ownership, data, compatibility, security_privacy,
+deployment, release, external_commitment, acceptance
+```
+
+以下条件命中时必须由用户决定：
+
+| 条件 | 必须匹配的决定 |
+|---|---|
+| `data=required` | `category:data, source:user` |
+| `compatibility=required` | `category:compatibility, source:user` |
+| `security_privacy=required` | `category:security_privacy, source:user` |
+| proposal 需要部署 | `category:deployment, source:user`；目标环境可按下文「部署决定与提案默认部署环境」取登记表默认值（`source:policy`） |
+| `public_release=required` | `category:release, source:user` |
+| `external_commitment=required` | `category:external_commitment, source:user` |
+
+产品目标/成功信号、责任归属/唯一 writer/跨模块契约、验收证据/明确不做范围虽然不在固定 impacts 五类中，出现真实歧义时同样必须进入 unresolved。不得用 `--auto`、recommendation、policy/repository_fact 来源或低风险 defaults 代替 required 的 user 决定。唯一例外是部署决定中的目标环境与已有已批准依据的部署事项，见下文。
+
+本地部署与公开发布必须分开：确认安装到本机或生产环境，不等于允许 npm publish、Git tag、GitHub Release、官网开放或 push；反向亦然。
+
+#### 部署决定与提案默认部署环境（proposal-default-environment）
+
+登记表 `logos/environments.yaml` 顶层的 `proposal_default_env` 是用户事先做出的部署目标决定（D15）。proposal 需要部署时按以下步骤形成 deployment 决定：
+
+1. **先判断是否需要部署**：按变更内容判断，默认值不参与。纯文档、纯规格类变更仍判为无需部署。
+2. **读结构化事实**（只读、不要求活跃提案、不进入部署前置检查）：先执行 `openlogos env list --format json` 取得 `proposal_default_env`；目标环境确定后再执行 `openlogos env show <id> --format json`，取 `environment.deploy`（该环境配置了 `deploy` 时出现，即登记表实际引用：`mode`、`script`、`provider`、`workflow`、`trigger_script`、`status_script`、`plan_section` 等）、`current_ref`，以及配置了门禁时的 `promote_from`、`require_approval`。只用这些 JSON 字段，不解析登记表原文；`environment.deploy` 不存在即该环境未配置 `deploy`。
+3. **目标环境**（按顺序取第一个成立的）：
+   - 用户在本次需求中明确说了目标环境，或明确说「这次不部署」：按用户原话，`source: user`；
+   - JSON 含 `proposal_default_env`：目标环境取该值，`source: policy`，reason 写明「登记表 proposal_default_env」，**不再询问目标环境**；
+   - 无该字段、无登记表，或命令报 `ENV_REGISTRY_INVALID`：维持必问（登记表非法时同时提示用户先修复）。
+   有登记表时，proposal「部署影响」的「影响环境」写环境 id。
+4. **部署方式、回滚、smoke 证据逐项判断**。依据只认已合并规格与结构化配置（它们合并时已经过 plan-exit 人工批准）；本提案自己新写或要实质修改的部署方案、smoke 命令**不算依据**，该项视为缺依据：
+
+   | 事项 | 有依据（可免问）的条件 | 必须提问的情况 |
+   |---|---|---|
+   | 部署方式 | `environment.deploy.mode` 为 script：`environment.deploy.script` 所指受保护脚本；为 ci：`environment.deploy.workflow`（或 `trigger_script` / `status_script`）所指受保护工作流或脚本；为 agent：`environment.deploy.plan_section` 所写标题在已合并部署方案（`logos/resources/prd/3-technical-plan/3-deployment/`）中有同名章节；`environment.deploy` 不存在：已合并部署方案有该环境的部署步骤 | agent 方式的 `environment.deploy.plan_section` 在已合并部署方案中没有同名章节；未配置 `deploy` 且已合并方案没有该环境的部署步骤 |
+   | 回滚 | `environment.deploy` 存在且 `current_ref` 非 null：本次部署成功后可用 `openlogos deploy --rollback` 回到该版本；`environment.deploy` 存在而 `current_ref` 为 null：已合并部署方案写明首次部署失败处置；`environment.deploy` 不存在：已合并部署方案有该环境的实际回滚或失败处置步骤 | 配置了 `deploy` 但 `current_ref` 为 null 且没有首次部署失败处置；**未配置 `deploy`（即使 `current_ref` 非 null）且已合并方案没有该环境的回滚步骤**——`openlogos deploy` 对未配置 `deploy` 的环境报 `DEPLOY_NOT_CONFIGURED`，不得以 `current_ref` 推导 CLI 回滚 |
+   | smoke 证据 | `logos/logos.config.json` 配置了 `smoke.command`，或存在默认 dispatcher `scripts/run-smoke.js`：以 `openlogos smoke --env <id>` 实际运行的结果为证据 | 两者都没有（smoke 只会汇总已有结果，不产生本次新结果） |
+
+   有依据的项在 decision 的 reason 中逐项写明引用（`environment.deploy` 中的实际引用、对应的已合并部署方案章节标题、`current_ref` 值、smoke 命令来源）；缺依据的项**合并为一个问题**，按第 5 节「一次只问一个决定」提问，回答以 `source: user` 记录。四项都有依据时整条部署决定零提问。
+5. **门禁提示**（取自 `env show` 的 `require_approval`、`promote_from`）：目标环境 `require_approval` 为 true 时，在「部署影响」注明部署会停在等待审批；配置了 `promote_from` 时，注明需先在上游以同一 commit 通过 smoke，否则部署停在晋级未满足。不得为通过门禁而改选环境。
+6. **授权边界不变**：默认值不构成部署执行授权，也不构成公开发布授权（release 仍单独判定）。
+7. **不得改动该字段**：change-writer 不写入、不修改、不删除 `proposal_default_env`；用户想设置或修改默认环境时，提示其直接编辑登记表（不需立案）。
+
+### 4. 构造依赖有序的未决队列
+
+优先级：
+
+1. 产品目标、成功信号和硬边界；
+2. 责任归属、唯一 writer 和跨模块契约；
+3. 数据、迁移、兼容与版本语义；
+4. 权限、安全、隐私、成本和不可逆承诺；
+5. 部署、发布、生效、失败与回滚语义；
+6. 验收证据和明确不做范围；
+7. 可逆内部实现细节（记录 default，不提问）。
+
+每个尚未满足的条件性必选类别必须恰有一个同类别 unresolved；不能只写 `required` 而不生成完整问题，也不能为同一类别生成两个候选当前项。每个未决事项使用 proposal 局部 CXX，含 category、depends_on、question、impact、recommendation、recommendation_reason 和至多两个真实 options。
+
+写盘前执行稳定拓扑排序：先按 depends_on 建图；每一层可用项按 `product -> ownership -> data -> compatibility -> security_privacy -> deployment -> release -> external_commitment -> acceptance` 排序，同类别按 CXX 数字升序。每项依赖只能在 decisions 或数组前序项中，`unresolved[0]` 的依赖必须全部在 decisions。CLI 只读队首，不会替 Agent 跳项或排序；若队首依赖未满足，提案 invalid。
+
+### 5. 一次只问一个决定
+
+每轮对用户只输出：
+
+- 当前 CXX 的一个问题；
+- 为什么影响后续方案；
+- 推荐答案与具体理由；
+- 必要时 1～2 个真实备选及代价。
+
+不要输出批量问题清单。用户回答后保存“决策 ID + 用户原文答案”，将当前项移入 decisions，写 `source:user`、选择理由、影响范围和主要被否方案，再根据答案生成/修正后续问题。
+
+### 6. 每轮立即持久化
+
+proposal 是唯一事实源。每次事实扫描、用户回答或队列变化后立即更新 impacts/decisions/unresolved/defaults；不能只把结论留在聊天上下文。重开会话时先读取现有 CXX，已确认项不重问，编号不重用。
+
+若发现已确认决定互相冲突，新增最上游冲突解决项并保持 pending，不得私自覆盖用户原文。只有满足 S38 升格判据的长期不变量/跨组件取舍才另产 DXX；普通 CXX 不污染长期决策目录。
+
+### 7. 完成与预算耗尽
+
+只有同时满足下列条件才写 `status: complete` 并继续生成 tasks：
+
+1. impacts 结构完整合法；
+2. 每个 required 类别都有匹配 `source:user` 决定；
+3. 每个尚未满足的 required 类别恰有一个内容完整的同类别 unresolved；
+4. 需要部署时已有完整的 deployment 决定：目标环境来自用户回答或登记表 `proposal_default_env`，部署方式、回滚与 smoke 证据来自用户回答或按第 3 节「部署决定与提案默认部署环境」判定为有依据；
+5. unresolved 为空且 decisions 无冲突；
+6. proposal 已明确目标、范围、契约、部署影响、回滚和验收证据；
+7. 可逆实现细节已记录 defaults；
+8. `provided` 模式的用户决定已通过事实/政策一致性检查。
+
+轮次预算由宿主/运行环境控制，不使用固定“最多 2 轮”。预算耗尽仍未收敛时，必须持久化当前 decisions 与剩余 unresolved，保持 `status: pending`，一次性汇报剩余数量并停在 write-proposal；不得循环刷问，也不得带猜测生成完整 proposal/tasks。
+
+### 8. 简单直通与模式
+
+- `adaptive`：默认；事实扫描后没有高影响未决则 `impacts=none+reason`、`unresolved=[]`、`status=complete`，零额外问答。
+- `deep`：用户明确要求深入澄清时完整走高影响树，但仍只问真实决策。
+- `provided`：用户给出完整决定时不主动追加问题，但必须做结构、事实与冲突校验。
+
+不使用 `auto` 作为澄清模式名，避免与 `next --auto` 执行授权混淆；不使用 `off`，避免被误解为跳过一致性检查。
+
+### 9. OpenLogos / RunLogos 边界
+
+OpenLogos 定义 proposal 结构、完成谓词、CLI JSON、fail-closed 和测试；change-writer 负责事实扫描与准确持久化。RunLogos 等宿主负责暂停/恢复、一次展示一个决定、把用户原文交回 Agent及真实行为评测。宿主只消费 `plan_state.clarification`，不得另建权威状态或自行解析 proposal 判完成。
+
+### 10. 交付前自检
+
+- [ ] 五类 impacts 字段、status、reason 完整。
+- [ ] 每个 required 类别均有匹配 user 决定或当前 unresolved。
+- [ ] 每个未满足 required 类别恰有一个同类别完整 unresolved；不存在 required+空队列或重复类别项。
+- [ ] deployment 与 release 分开判定。
+- [ ] 需要部署且登记表有 `proposal_default_env` 时，目标环境未向用户重复询问；部署方式、回滚、smoke 证据逐项核对了依据，表中「必须提问的情况」均未被免问；未改动 `proposal_default_env`。
+- [ ] CXX 唯一、依赖存在且无环；队列已稳定拓扑排序，队首依赖全部已确认。
+- [ ] 每个 unresolved 有影响、推荐和理由，当前仅展示一项。
+- [ ] complete 时 unresolved 为空且必选类别全满足。
+- [ ] `--auto` 未被写成用户答案或方案来源。
+- [ ] 方案决策未与 merge/verify/deploy/smoke/archive/push 执行授权混淆。
+
+## S39 场景 CREATE canonical 模板与结构 lint 收据
+
+### 强制适用
+
+proposal 的 `baseline_closure.targets` 中只要存在 `category: scenario, mode: CREATE`，Step 6 写该唯一 Delta 时必须应用本节。专业 scenario-architect 只返回内容与检查结论，当前 change-writer 仍持有 canonical delta 文件所有权。
+
+### canonical 输出模板
+
+Markdown CREATE 继续使用一个 `## ADDED — <真实标题>` Delta 段；段内必须是可独立成立的完整场景文档，新写入章节固定为：
+
+````markdown
+# SXX：场景名称
+
+## 场景目标
+<非空目标与用户价值>
+
+## 参与者
+- <至少两个适用参与者及职责>
+
+## 前置条件
+<非空前置条件>
+
+## 成功后置条件
+<非空成功状态>
+
+## 时序图
+
+```mermaid
+sequenceDiagram
+    participant A as Actor
+    participant B as System
+    A->>B: Step 1: 触发动作
+```
+
+## 步骤说明
+
+1. **参与者 A** 执行与时序 Step 1 对应的动作。
+2. **参与者 B** 校验输入并执行核心行为。
+3. **参与者 B** 返回可验证结果并形成成功后置条件。
+
+## 异常与边界
+### EX-1.1：明确异常
+- **触发条件**：<可复现条件>
+- **期望响应**：<精确结果>
+- **副作用**：<无或明确补偿>
+
+## 追溯
+- 需求：SXX-AC-XX
+- 测试：UT-SXX-XX、ST-SXX-XX
+````
+
+模板中的尖括号与示例 ID 只用于说明 Skill 规则，实际 Delta 必须替换为当前场景真实内容、真实 ID，不得原样落盘。
+
+### 写入与读取兼容边界
+
+- writer 只输出 `## 步骤说明`，不得选择 `主流程` 等同义标题作为新格式。
+- CLI 读取兼容 `步骤说明`、`主路径步骤`、`主路径`、`主流程`、`正常流程`、`main path`；这是 `spec/baseline-closure.md` §17 的受控集合，writer 不另建正则或扩展模糊别名。
+- 步骤章节唯一且至少 3 个非空有序列表项，并与 Mermaid Step 主路径逐项对应。
+- Mermaid 必须位于 `mermaid` fence，含 `sequenceDiagram`、至少 2 个 participant/actor 与 1 条消息。
+- 异常/边界和追溯必须有非空权威正文；fence、HTML 注释或样例中的文字不能补足缺口。
+
+### Step 6 完成收据
+
+全部 Delta 文件落盘并逐项勾选后，必须在项目根执行 `openlogos change-lint --slug <slug> --format json`。只有 exit 0 且 `data.pass=true` 才能向 driver/用户报告完成，并在交付摘要记录 slug、执行时间、exit code、pass 值。
+
+exit 2 时逐条消费 `code/path/message/fix_hint`，只修当前提案被指向的产物后重跑；不得把红灯交给 merge 兜底。该收据不写新 marker，不替代后续独立 merge 授权。RunLogos 是否在 WorkUnit 完成屏障再次强制 lint 属 companion change，不改变本 Skill 自检义务。
+
+### canonical scaffold 保真
+
+填写 proposal/tasks 前必须先读取 `openlogos change` 已生成的两个文件。
+
+**对 `proposal.md`**：保留 CLI scaffold 的**全部段**——canonical 标题、section 顺序、机器区块，
+以及**不受 lint 强制的非 canonical 段**（如「最小实现论证」）同样不得删除、省略或留空壳；
+只替换占位正文。允许新增详细设计章节，但不得删除、改名、合并或翻译任何既有段。
+**禁止整篇重写 `proposal.md`**：重写必然丢掉不设门的段，而没有检查会告诉你。
+
+**对 `tasks.md`**：本条**不约束 section 的增删**。`tasks.md` 按本次变更的实际范围增删
+`[delta]` / `[code]` / `[deploy]`，规则以 `spec/tasks-spec.md` 为准——纯规格 change 删除 `[code]`，
+纯代码 change 保留空 `[code]` 并走 no-delta spec-complete。把「全部段不得删除」误用到 `tasks.md`，
+会禁掉这些合法删除并导致流程路由错误。
+
+### plan 阶段 `[code]` 红线
+
+需要代码的 change 在 plan 阶段只保留空 `## [code]` 标题，不写任何 checkbox。真实切片仍由 merge 后 slice-planner 基于已合并规格与真实测试 ID 生成。CLI 初始模板若含旧行 `- [ ] 实现代码变更`，change-writer 必须删除该精确模板行并保留空标题。
+
+### 写后读回
+
+每次修改 proposal/tasks 或 Delta 后，必须从磁盘读回受影响片段；不得以内存草稿或工具成功消息代替实际字节。读回发现 canonical 标题、目标路径或 marker 漂移时立即修复。
+
+### plan 交付双检查
+
+proposal/tasks 完成后，在项目根依次运行：
+
+```bash
+openlogos change-lint --slug <slug> --format json
+openlogos next --format json
+```
+
+只有 lint exit 0、`data.pass=true`，且 next 的活跃模块 `plan_state.plan_ready=true`、`proposal_step=ready-to-delta` 时，才能报告“方案待批准”。若 lint exit 2，逐条消费 issues/violations；若两命令结论不同，报告 OpenLogos 合同缺陷而非选择性相信其中一个。
+
+### Delta 交付门保持
+
+用户批准 plan 后只执行 `[delta]`；全部 Delta 落盘、逐项读回并勾选后重新运行 change-lint 到 exit 0。不得自动执行 merge，必须等待明确授权。
+
+### 资产版本边界
+
+检测到项目 sync stamp 的 Plan 合同版本或托管资产 hash 落后于 CLI 时，先提示运行 `openlogos sync` 并重开 Agent session。不得把同 semver 的不同 Skill 字节当作等价，也不得覆盖项目自有 Skill。
+
+## Authority Closure 影响分析与提案门
+
+
+### 规范与职责
+
+先完整读取 `spec/authority-closure.md`。change-writer 负责当前 change 的 `authority_impact`，不拥有项目 Registry，也不得复制 AC 规范。
+
+### Step 2 扩展：判定适用性
+
+检查共享 fact/完成谓词、cache/index/marker/receipt/view、owner/writer/mutation/recovery/cutover 变化，以及消费者是否可能扫描文件/mtime/存在性重算决定。满足任一触发即 required；纯文案/纯视觉/机械局部变更可 not_applicable，但须非空事实证据。
+
+### proposal 结构
+
+required 分支引用稳定 `fact_id` 和 Registry/当前 CREATE authority target，列出 change、projections、freshness、retired shadow sources、forbidden fallbacks、cutover 四项与真实测试 ID，`unresolved` 必须清零。not_applicable 不得带空 facts 或伪造 cutover。
+
+### 交付门
+
+- 缺声明、引用不存在、旧 writer 未停止、cutover 无 exit、测试 ID 不真实或 shadow source 未退休：不得报告 plan ready。
+- authority impact 与 baseline closure 正交；前者回答谁裁决，后者回答改哪些目标。
+- Delta 继续 P=T=D、一目标一文件、写后读回、逐文件勾选。
+- merge 前 `[code]` 留空；全部 Delta 后运行 change-lint，只报告就绪并等待 merge 明确授权。

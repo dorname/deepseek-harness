@@ -23,7 +23,7 @@ OpenLogos CLI 的 `status`、`next`、`verify`、`smoke`、`detect`、`deploy-do
 
 ```jsonc
 {
-  "command": "<command-name>",   // "status" | "next" | "verify" | "smoke" | "detect" | "deploy-done" | "module list" | "flow show" | "watch"
+  "command": "<command-name>",   // "status" | "next" | "verify" | "smoke" | "detect" | "deploy-done" | "deploy" | "approve" | "module list" | "flow show" | "watch"
   "version": "<cli-version>",
   "timestamp": "<ISO-8601>",
   "data": { ... }
@@ -147,17 +147,17 @@ status / next 的 `data.modules[]` 新增**可选字段 `features`**，承载 mo
   零候选时 `baseline_candidates_total: 0`（**键仍在场**,区分"零候选"与"旧实现无键")。**首轮 backfill（候选尚未登记进 `scenarios[]`）计数与旧行为一致**——已登记去重只在候选已有同 module 同 name 登记条目时减少计数,不影响真·新增候选。
 - **`--module` 口径(回应 F5)**：传 `--module` 只纳入该 module 候选、未注册 → 错误码 `MODULE_NOT_FOUND`(与 `feature list` 一致);无 `--module` 按 `modules[]` 顺序聚合全项目;`baseline_candidates_total` 恒等于过滤后最终纳入数。
 - **降级(回应 F6，唯一行为)**：索引 stale → 锁内从权威文档重算(成功、照常纳入);**权威章节解析失败 → 走通用错误 envelope、错误码 `BASELINE_PROVENANCE_INVALID`、非零退出、不写/不覆盖 prompt**（不以 `baseline_candidates_total=0` 冒充非存量零候选、不走 warning 成功)。
-- **红线**：本命令仍**只生成 prompt、不改 `logos-project.yaml`、不改 `## 逆向基线来源` 章节、不触发覆盖率副作用**;逆向候选进 `scenarios[]`（含 scenario 取号/计数器推进）与 feature 分配由 AI 按 prompt 回写,且**不改动 逆向基线来源 `verified`**（导航 ≠ 可信度）。
+- **红线**：本命令仍**只生成 prompt、不改 `logos-project.yaml`、不改 `## 逆向基线来源` 章节、不触发覆盖率副作用**;逆向候选进 `scenarios[]`（含 scenario 取号/计数器推进）与 feature 分配由 AI 按 prompt 回写,且**不改动 provenance `verified`**（导航 ≠ 可信度）。
 - **status/next 契约不变**：status/next 仍只读 `scenarios[]`、不吞逆向候选;条件版本（§1.4）不变。
 
-### 1.5.1 feature-backfill 错误 envelope 富化：触发文件路径 + 分类（逆向基线扫描与索引重算）
+### 1.5.1 feature-backfill 错误 envelope 富化：触发文件路径 + 分类（provenance-scan-canonical-recompute）
 
 扩展 §1.5：`feature-backfill` 报 `BASELINE_PROVENANCE_INVALID` 时，通用错误 envelope（§6）的 `error` 对象**新增两字段**（向后兼容 = 新增字段；错误码语义、非零退出、「不写/不覆盖 prompt」红线均不变）：
 
-- **`paths`**（`string[]`，键恒在场，可为空数组）：本次判定为 逆向基线来源 迹象、导致失败的文件**相对项目根路径**清单，确定性排序（按路径升序）。
+- **`paths`**（`string[]`，键恒在场，可为空数组）：本次判定为 provenance 迹象、导致失败的文件**相对项目根路径**清单，确定性排序（按路径升序）。
 - **`reason`**（`string` 闭合枚举）：失败原因分类——
   - `unparseable`：权威/约定目标 `## 逆向基线来源` 坏 fenced YAML（解析失败）；
-  - `unclassifiable-evidence`：有 逆向基线来源 / `baseline_index` 迹象，但无 committed run manifest 且无约定命名文件（`<module>-scenario-candidates.md`），不可定类。
+  - `unclassifiable-evidence`：有 provenance / `baseline_index` 迹象，但无 committed run manifest 且无约定命名文件（`<module>-scenario-candidates.md`），不可定类。
 
 错误形态示例：
 
@@ -165,6 +165,7 @@ status / next 的 `data.modules[]` 新增**可选字段 `features`**，承载 mo
 {
   "error": {
     "code": "BASELINE_PROVENANCE_INVALID",
+    "message": "reverse baseline provenance section invalid/unparseable for module(s): core. reason=unparseable; paths=[logos/resources/reference/x.md]",
     "paths": ["logos/resources/reference/x.md"],
     "reason": "unparseable"
   }
@@ -172,7 +173,7 @@ status / next 的 `data.modules[]` 新增**可选字段 `features`**，承载 mo
 ```
 
 - **与扫描侧 canonical 采信（core-06 §一.A / feature-specs §2.27.10）配合**：格式合法但 hash 失配的编造/示例 key 在候选采信阶段即被排除、**不再进入本错误路径**（此前会误报）。进入本路径者必为真实坏结构或真不可定类，`paths` 直指问题文件。
-- **消费方约定**：`reason` 遇未知值 → 保守分支（当作一般 逆向基线来源 失败处理）；`paths` 缺失 → 视为空清单（旧实现无该字段）。
+- **消费方约定**：`reason` 遇未知值 → 保守分支（当作一般 provenance 失败处理）；`paths` 缺失 → 视为空清单（旧实现无该字段）。
 ---
 
 ## 2. `openlogos detect --format json`
@@ -405,8 +406,8 @@ openlogos status --format json  # JSON 格式
 | `modules[].active_change.deployment_decision_conflict` | boolean | 是 | `proposal.md` 与 `[deploy]` section 是否冲突 |
 | `modules[].active_change.deployment_decision_conflict_reason` | string \| null | 否 | 冲突原因摘要；无冲突时为 null |
 | `modules[].suggestion` | string | 是 | 针对该模块的下一步建议（本地化文本） |
-| `modules[].baseline_seed_state` | string | 否（非 adopted 模块省略；**adopted 模块恒输出**） | brownfield-adopter（S33）：`required｜partial｜seeded`；`bootstrap=adopted` 模块**无条件输出**（含活跃提案与 `baseline_commit_in_progress` 降级分支）——explicit 显式值优先，yaml 缺省（legacy）时经共享 helper `effectiveBaselineSeedState` 派生（有候选+open run→`partial`、有候选无 open run→`seeded`、无候选→`required`，见架构 core-06 §4.1）；**无 `unknown` 取值、无「缺省 → 字段缺失」路径**（baseline-seed-legacy-default-unify）。不新增 `baseline_seed_state_source` 字段 |
-| `modules[].baseline_coverage` | object | 否 | S33 现状基线覆盖率；仅 `bootstrap=adopted` 且基线派生可用时输出（不随 `baseline_seed_state` 的恒输出扩展），`status`/`next` 字段一致。见 §3.12 |
+| `modules[].baseline_seed_state` | string | 否（非 adopted 模块省略；adopted 模块在**恢复门通过后的正常成功 envelope** 中恒输出） | brownfield-adopter（S33）：`required｜partial｜seeded`。正常路径 explicit 优先；yaml 缺省时经共享 helper `effectiveBaselineSeedState` 派生（有候选+open run→`partial`、有候选无 open run→`seeded`、无候选→`required`），无 `unknown`。若未终结 journal 无法恢复，命令返回 `baseline_commit_in_progress` 操作错误 envelope，在调用 helper 或读取候选前停止；错误态不输出正常 `data.modules[]`，也不承诺派生本字段。不新增 `baseline_seed_state_source` 字段 |
+| `modules[].baseline_coverage` | object | 否 | S33 现状基线覆盖率；仅 `bootstrap=adopted`、恢复门通过且基线派生可用的正常成功 envelope 输出，`status`/`next` 字段一致。见 §3.12 |
 | `active_proposals` | array | 是 | 活跃变更提案列表 |
 | `active_proposals[].name` | string | 是 | 提案目录名 |
 | `active_proposals[].has_proposal` | boolean | 是 | 是否存在 proposal.md |
@@ -420,6 +421,8 @@ openlogos status --format json  # JSON 格式
 | `yaml_diagnostics` | object \| null | 否 | `logos-project.yaml` 的解析诊断；存在可恢复/不可恢复错误时返回 |
 | `yaml_diagnostics.parse_status` | string | 是 | `"recovered"` 或 `"error"`；`recovered` 表示已从 AST 恢复可用的 `modules` 等数据 |
 | `yaml_diagnostics.messages` | string[] | 是 | 诊断消息摘要 |
+
+以上“必填/恒输出”约束只适用于正常成功 envelope。`baseline_commit_in_progress` 使用 §6 通用错误 envelope：`error.data` 只可携从最小安全元数据取得的 `module`、`run_id`、`journal_phase` 与修复提示，不得为补齐正常字段读取 resources/index/coverage。
 
 **step_meta 与步骤注册表（contract-self-description）**
 
@@ -469,7 +472,7 @@ openlogos status --format json  # JSON 格式
 
 ### 3.12 现状基线覆盖率字段（baseline_coverage，brownfield-adopter S33）
 
-`bootstrap=adopted` 且无活跃提案的模块下，`status`/`next --format json` 在 `modules[].baseline_coverage` 输出现状基线覆盖率对象（`next` 挂 `modules[].baseline_coverage`，legacy 无 `modules[]` 才回退顶层 `baseline_coverage`）。字段：
+`bootstrap=adopted` 模块在 journal 恢复门通过、覆盖率派生可用的正常成功响应中，`status`/`next --format json` 通过 `modules[].baseline_coverage` 输出现状 seed 的机器信息（`next` 挂 `modules[].baseline_coverage`；legacy 无 `modules[]` 才回退顶层）。该对象不决定业务主动作。字段：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -479,16 +482,17 @@ openlogos status --format json  # JSON 格式
 | `tombstones` | number | `denominator` 内的 tombstone 数（仍计入；纯机器字段，不进人读引导语） |
 | `source` | string | `derived-index`（用了 `baseline_index` 派生索引）｜`documents`（直接从文档权威章节重算） |
 | `freshness` | string | `fresh｜stale｜unknown`；索引 `source_hash` 与文档实时聚合 hash 不符时为 `stale`，此时不输出貌似精确的计数结论 |
-| `recovery` | object | **仅 `state==partial` 且存在活跃提案时出现**：结构化恢复 advisory `{ available:true, entry:"openlogos baseline-seed commit --run-id <id>", run_id }`——不改写 `proposal_step`、不阻断 change |
-| `commit_in_progress` | boolean | 仅恢复门无法取模块锁（提交进行中）时置 `true`：机器消费者**不把当前集合当权威**（不据其算覆盖率/报 seeded） |
+| `recovery` | object | 仅安全 `partial`（只有 open run/未提交 staging，已确认无未终结 journal）且存在可执行重试时可出现：`{ available:true, entry:"openlogos baseline-seed commit --run-id <id>", run_id }`；无可提交 run 时 `entry` 可指向重新 `begin`。有无活跃提案均只作非阻断 advisory，不改写顶层 action/next_node/proposal_step |
 
-**partial 与活跃提案的优先级**：**无活跃提案**时 partial 主 `action`/`next_node` 指向 `openlogos baseline-seed` 恢复入口；**有活跃提案**时 `action`/`next_node`/`proposal_step` 保持该提案真实前沿，partial 恢复仅作 `recovery` advisory、不阻断 change。**只读已合并主文档**：覆盖率从各产物 `## 逆向基线来源` 章节实时聚合（可再经 `logos-project.yaml` 的 `baseline_index` 缓存加速 + 新鲜度对账），merge 前的未合并 delta 不计入；机器读取入口读前先经恢复门（取模块锁 + 检测未终结 journal → 先恢复，否则 `baseline_commit_in_progress`）。
+**默认动作与提案优先级**：恢复门通过后，无活跃提案时 `required`、安全 `partial`、`seeded` 的主 `action`/`next_node` 均指向 `openlogos change <slug>`；有活跃提案时保持该提案真实 `action`/`next_node`/`proposal_step`。seed begin/commit 仅为显式可选旁路。覆盖率只读已合并主文档的 `## 逆向基线来源`；未合并 delta 和 staging 不计入。
+
+**事务硬门**：`prepared`/`committing` 等未终结 journal 不是正常 `partial` 分支。机器读取入口必须在同一模块锁内、读取任何 resources/index/coverage 或调用 legacy 状态 helper 之前先恢复；无法恢复时非零返回 `baseline_commit_in_progress` 通用错误 envelope，不输出正常 `modules[]`、`baseline_seed_state`、`baseline_coverage`、change/seed action，也不得读取半新集合。
 
 > 注（drop-baseline-confirmation）：人工确认机制删除后，`verify --format json` **不再输出** `data.baseline_warnings`——`verify` 对 `verified:false` 逆向 spec 既不产软告警、也不硬失败（grandfather 豁免存量代码，verify 从不因逆向候选 fail）。
 >
-> 注（drop-coverage-human-verified）：覆盖率退化为**纯逆向候选计数**——`human_verified`（分子）、`human_verified_delta`、`coverage`（比值）三字段**已删**（此前 drop-baseline-confirmation 冻结保留，现干净删除）。因该形态尚未对用户发布、无兼容负担，`spec/schema/*.json` 与 golden 均不含 `baseline_coverage`，故 schema / golden / `contract.version` 均**无改动**。
+> 注（drop-coverage-human-verified）：覆盖率退化为**纯逆向候选计数**——`human_verified`（分子）、`human_verified_delta`、`coverage`（比值）三字段**已删**。因该形态尚未对用户发布、无兼容负担，`spec/schema/*.json` 与 golden 均不含 `baseline_coverage`，故 schema / golden / `contract.version` 均无改动。
 >
-> 注（plain-baseline-guidance）：覆盖率**仅作 JSON 机器字段**——`status`/`next` 的**人读引导语不再展示覆盖率行**（seeded 只提示「现状基线已建立；可正常发起 openlogos change」），`tombstone`/`逆向候选` 等内部记账概念不向用户暴露。`baseline_coverage` JSON 字段表**不变**。
+> 注（plain-baseline-guidance）：覆盖率仅作 JSON 机器字段；`status`/`next` 人读不展示覆盖率行，`tombstone`/`逆向候选` 等内部记账概念不向用户暴露。
 
 ### 3.13 `openlogos baseline-seed --format json`（brownfield-adopter S33）
 
@@ -853,19 +857,19 @@ implement（code/verify）子流程的 resolved loop 定义满足 `max_iters > 1
 
 - **模式选择（plan-exit 之前）** 才读 `capabilities`：
   - `capabilities.ui_prototype_render == true`（会话就绪）→ **渲染确认模式**：面板渲染原型，批准即构成 UI 视觉确认，
-    要求写入绑定 `pages` / `hashes` 的 `PLAN_APPROVED` 逆向基线来源。
+    要求写入绑定 `pages` / `hashes` 的 `PLAN_APPROVED` provenance。
   - `capabilities` 缺失 / `ui_prototype_render == false`（旧面板 / openlogos-CLI-only）→ **降级模式**：
     不 claim「UI/UX 确认已前移」，给 advisory 提示、不阻断。
 - **这是 `logos/.session-capabilities.json` 与本 `capabilities` 段的唯一合法用途**——只用于 plan-exit **之前**选择交互模式。
 
 - **强制语义（plan-exit *之后*：merge / 落盘 / 落盘后复核）绝不读会话 capability**，一律以持久化
-  `PLAN_APPROVED` 逆向基线来源 为准：
-  - `PLAN_APPROVED` 含 UI 原型批准记录（`ui_prototype_rendered:true` + `pages` + `hashes`，即该批准曾走渲染确认路径）
+  `PLAN_APPROVED` provenance 为准：
+  - `PLAN_APPROVED` 含 UI provenance（`ui_prototype_rendered:true` + `pages` + `hashes`，即该批准曾走渲染确认路径）
     ⇒ 所有 merge / 落盘 / 落盘后复核入口**永久 fail closed**：`hashes` 必须存在且逐文件重算匹配；
     缺失 / 损坏 / 失配一律拒绝。**当前会话 `capabilities` 段缺失 / `.session-capabilities.json` 被清理一律不得降级**——
     「曾渲染确认」的证据已固化在批准记录里，易失会话态无权推翻它。
   - 仅当批准记录明确为 legacy/degraded、或旧空 marker 且无任何「曾渲染确认」证据时，才走 F3 向后兼容 advisory 放行。
-- **反例（明令禁止）**：不得以「消费 merge 时 `capabilities` 段缺失」为由，对已含 UI 原型批准记录 的 `PLAN_APPROVED`
+- **反例（明令禁止）**：不得以「消费 merge 时 `capabilities` 段缺失」为由，对已含 UI provenance 的 `PLAN_APPROVED`
   放行漂移原型——这构成跨会话降级绕过（渲染会话写 `hashes` → 原型被改 → 新 CLI-only 会话 merge 放行「确认 vX、实现 vY」）。
 
 ### (5) JSON 字段示例
@@ -1117,9 +1121,13 @@ openlogos verify --format json  # JSON 格式
 |----|------|
 | `null` | 门禁通过 |
 | `"failed_cases"` | 存在失败的测试用例 |
+| `"pre_run_failed"` | 预跑命令（`pre_run_command`，或两阶段 `regression` / `incremental` 任一段）以非零状态退出，且账本中无失败用例（verify-smoke-guard-fixes-0-15-20） |
+| `"result_ledger_inconsistent"` | 结果账本不自洽（见 `consistency`） |
 | `"incomplete_coverage"` | 存在未覆盖的测试用例 |
 | `"checklist_incomplete"` | 设计时覆盖度校验未完全确认 |
 | `"ac_trace_incomplete"` | 验收条件追溯未完全通过 |
+
+**优先级**（FAIL 时取第一个命中者，功能规格 §2.75.1，按预跑命令是否失败分两支）：预跑命令任一段非零退出时为 `failed_cases` → `pre_run_failed`（有失败用例取前者，否则一律取后者）；预跑命令全部成功或未配置时保持既有顺序 `result_ledger_inconsistent` → `failed_cases` → `incomplete_coverage`，与修改前逐字一致。`pre_run_failed` 命中时，`consistency` 与 `uncovered_cases` 等诊断照常输出，不作为主原因。`checklist_incomplete` / `ac_trace_incomplete` 为历史取值，§2.75 收敛后不再产生，消费方遇到时按 FAIL 处理即可。
 
 ### 4.5 预跑状态兼容规则
 
@@ -1131,8 +1139,9 @@ openlogos verify --format json  # JSON 格式
 - `sandbox_mode="always"` 时，若无法隔离、沙箱副本存在逃逸 symlink 或无法启用运行期写保护则必须失败。
 - 沙箱写入审计豁免沙箱内一次性依赖目录（规范化后存在完整路径段严格等于 `node_modules`）；豁免生效时以 `sandbox.infos` 输出一条信息级说明，`sandbox.status` 不因此改变。
 - 覆盖不足且 `pre_run.mode="none"` 时，必须输出局部测试诊断和配置建议。
-
----
+- **预跑命令失败**：单阶段或两阶段任一段非零退出时，对应 `pre_run.commands[]` 条目 `status="fail"`、`exit_code` 如实记录，门禁 FAIL（`gate.reason` 见 §4.4 优先级）。
+- **输出尾部字段**（additive，仅 `--format json`）：`pre_run.commands[]` 每个实际执行的条目增加 `stdout_tail: string` 与 `stderr_tail: string`——各为该段命令输出的末尾最多 80 行且不超过 8 KiB（截断落在完整 UTF-8 字符边界），已去除 ANSI 控制序列，不做内容脱敏；无输出时为空字符串；`status="skipped"` 的条目不出现这两个字段。截获不得提前终止子进程或改变其退出码；沙箱与非沙箱执行同一口径。文本模式不截获、不出现这两个字段。
+- 输出尾部只出现在 JSON 输出中，**不写入** `acceptance-report.md`（报告只记失败阶段与退出码）。
 
 ## 5. `openlogos smoke --format json`
 
@@ -1194,12 +1203,15 @@ openlogos smoke --env production --format json
 | `summary.defined_count` | number | 是 | smoke 用例规格中定义的用例数 |
 | `summary.executed_count` | number | 是 | smoke 结果中实际执行的用例数 |
 | `gate.result` | string | 是 | `PASS` 或 `FAIL` |
-| `gate.reason` | string \| null | 是 | 失败原因，如 `failed_cases` / `incomplete_coverage` / `smoke_runner_missing` / `smoke_reporter_missing` / `smoke_cases_uncovered` |
+| `gate.reason` | string \| null | 是 | 失败原因，如 `failed_cases` / `incomplete_coverage` / `smoke_runner_missing` / `smoke_reporter_missing` / `smoke_cases_uncovered` / `required_cases_skipped`；优先级 `failed_cases` → 覆盖预检诊断码 → `required_cases_skipped` → `incomplete_coverage` |
 | `changed_cases` | string[] | 是 | 当前活跃提案新增或修改的 `SMOKE-*` 用例 ID；无活跃提案或无 smoke 变更时为空 |
 | `diagnostics` | array | 是 | smoke 覆盖预检诊断；每项包含 `code`、`message`、可选 `case_ids` / `runner_paths` / `result_path` |
 | `runners` | string[] | 是 | 静态发现的 `scripts/smoke-*` runner 路径 |
 | `failed_cases` | array | 是 | 失败 smoke 用例 |
 | `uncovered_cases` | array | 是 | 未覆盖 smoke 用例 ID |
+| `skipped_cases` | string[] | 是 | 全部以 `skip` 结束的 smoke 用例 ID |
+| `required_skipped_cases` | array | 否 | 本提案变更用例（`changed_cases`）中非平台不可执行的 skip，每项 `{id, detail}`；非空时 `gate.reason` 为 `required_cases_skipped`（无更高优先级原因时）；为空时不出现 |
+| `platform_skipped_cases` | array | 否 | 本提案变更用例中以 `reason_code:"platform-unavailable"` 且 `detail` 非空放行的 skip，每项 `{id, detail}`，供审计；为空时不出现（verify-smoke-guard-fixes-0-15-20） |
 | `sandbox.mode` | string | 是 | smoke 沙箱模式：`"off"`、`"auto"` 或 `"always"` |
 | `sandbox.root` | string | 是 | 沙箱根目录 |
 | `sandbox.isolated` | boolean | 是 | 本次执行是否实际隔离 |
@@ -1220,8 +1232,8 @@ openlogos smoke --env production --format json
 - 当沙箱失败时，`smoke` 仍应写入结果报告，但 JSON 输出必须明确失败原因。
 - 当活跃提案新增或修改 `SMOKE-*` 用例时，`openlogos smoke` 必须额外执行 smoke 覆盖预检：缺少可达 runner 时输出 `smoke_runner_missing`，发现 runner 但没有有效结果时输出 `smoke_reporter_missing`，新增 ID 没有执行结果时输出 `smoke_cases_uncovered`。
 - 推荐 `smoke.command` 指向 `node scripts/run-smoke.js` 统一 dispatcher；dispatcher 自动发现并执行 `scripts/smoke-*` runner。
-
----
+- **smoke 结果记录**（`smoke.result_path` 每行）：`{ "id", "status": "pass"|"fail"|"skip", "detail"?: string, "reason_code"?: string, "error"?: string }`。skip 记录必须携带机器可读的不适用原因 `detail`；`reason_code` 可选，当前门禁唯一识别的取值为 `"platform-unavailable"`。
+- **必要用例 skip**：本提案变更用例以 skip 结束时 Gate FAIL（`required_cases_skipped`），例外是 `reason_code === "platform-unavailable"` 且 `detail` 非空，该类放行并列入 `platform_skipped_cases`。非本提案用例的 skip 口径不变，不得单独导致 FAIL。
 
 ## 6. 错误处理
 
@@ -1261,6 +1273,10 @@ openlogos smoke --env production --format json
 > `openlogos archive` 仍是纯文本命令，不新增 stdout JSON envelope。上述 `ARCHIVE_WATCH_*` 以稳定错误码文本写 stderr 并非零退出；机器可读握手细节位于 `logos/.runtime/archive-watch/v1/requests/<requestId>/result.json`。
 >
 > `openlogos impact` 的操作错误（`IMPACT_*`）在 `--format json` 下走 stderr error envelope、默认文本下走 stderr `Error [<code>]: <message>`；**判定完成（含 fail-closed `lifecycle_only: false`）不是错误**，走 stdout success envelope、exit 0（见 §3.16）。
+>
+> `openlogos deploy`（来源变更 environment-deploy）的错误码与 `error.details` 形态见「`openlogos deploy --format json`（environment-deploy）」，完整列表与触发条件见 `spec/environments.md` §8；smoke 新增的 `SMOKE_DEPLOY_SUPERSEDED` 见「smoke / env / status 部署字段增量（environment-deploy）」。
+>
+> `openlogos approve`、`deploy` 的晋级与审批错误码（`DEPLOY_PROMOTION_UNVERIFIED`、`DEPLOY_APPROVAL_REQUIRED`）与 `deploy-done` 的 `DEPLOY_DONE_GATED_ENV`（来源变更 environment-promotion-approval）见「`openlogos approve --format json`（environment-promotion-approval）」与「deploy / deploy-done / env / status 晋级与审批增量（environment-promotion-approval）」，完整列表与触发条件见 `spec/environments.md` §8、§12。
 
 ### 6.2 overlay 派生错误信封
 
@@ -1599,7 +1615,7 @@ initial 用 `current_phase → PHASE_KEY_TO_NODE_ID`（显式正向 map，**不*
 - **【R3】cmd 瞬态求值（overlay-add 节点 + builtin verify/deploy/smoke cmd gate，S30）**：`next_node` 取**本次响应 cmd 求值（cmdEval 回灌）后**的最终节点——`done_when:cmd` `exit 0` 续推 → 指向**续推后**节点（**不**指向已 done 的 cmd 节点/gate）；`fail_when:cmd` `exit 0` → 该节点/gate `failed` → 指向**该 cmd 节点/gate**；cmd 非 0/超时 → 指向**该 cmd 节点/gate**（求值后 `active`/停门前）；budget=1 遇第二个 cmd → 指向**第二个 pending cmd** 节点/gate。builtin gate id 取 `cmd_gate.node_id`。
 - **【R4】`--auto` 放行**：`gate_auto_passed === true` 时默认**省略 `next_node`**（放行后宿主走 gate 的 command，下一节点待重新 `next` 派生）。**例外一：`gate_id === "plan-exit"` 时，CLI 已写入 `PLAN_APPROVED` 并重新派生到 `write-delta`，本次响应必须输出 `next_node.id == "write-delta"`。例外二（split-slice-planner-stage）：仅当 `gate_id === "slice-exit"`、`gate_auto_passed === true` 且 CLI 已确认 `[code]` 满足 `tasks_code_filled` 时，CLI 才会写入 `SLICES_APPROVED` 并重新派生到 `coding` / `code` 前沿，本次响应必须输出 `next_node.id == "code"`。若 `[code]` 未脱模板，则 `slice-exit` 尚未到达，不适用 R4 放行例外；响应必须按 R8 走 `plan-slices` 节点前沿。** `--auto` 放行态下 `next_node` 不带 `gate_id`（门已被消费，非"待批准"，见 R8）。
 - **【R7】loop 阻塞**：未达上限 → `next_node` = loop subflow 的**工作节点**（overlay `current_node` 优先；否则 resolved flow 中 `id == "code"` 且未 `skipped` 的节点，**非 `verify`**，对齐 action「修代码」）；`code` 缺失/被 overlay `skip` → **省略**（仅 initial 等**合法 resolved flow**——launched 对 builtin `code` 的 `skip`/`reorder` 在派生入口已 `FLOW_SCHEMA_INVALID`、走不到此省略）；达上限（`escalated`）→ **省略**（宿主读 `loop_state.escalated`）。与 `loop_state` 互补：环状态看 `loop_state`，这一轮派哪个节点的 skill/agent 看 `next_node`。
-- **【R5】命令级建议**：当前建议不指向某 flow node（`all_done` / launched 无 active proposal → `openlogos change <slug>` / 补 baseline → `openlogos change add-baseline-docs` / `openlogos launch` 等）→ **省略 `next_node`**。`plan-exit` / `slice-exit` auto 消费后已分别指向真实 `write-delta` / `code` 节点，不按命令级建议省略。
+- **【R5】命令级建议**：当前建议不指向某 flow node（`all_done` / launched 或 adopted 无 active proposal → `openlogos change <slug>` / `openlogos launch` 等）→ **省略 `next_node`**。恢复门通过后的 `required`、安全 `partial`、`seeded` 共用同一 direct-change 分支，不存在 `add-baseline-docs` fixture。`plan-exit` / `slice-exit` auto 消费后已分别指向真实 `write-delta` / `code` 节点，不按命令级建议省略。
 - **【R8】切片出口门前沿（默认 `next`，含半自动/手动；本次修复）**：`proposal_step == "ready-to-implement"` 是「`plan-slices` 节点完成判定 `tasks_code_filled` 二分」的驻留态，`next_node` 据此二分（落地 `spec/flow-spec.md` §12.5(2)/§12.6(2) 已规定的前沿）：
   - `[code]` 仍为模板（未 `tasks_code_filled`）→ `plan-slices` 未完成，前沿 = 该节点：`next_node.id == "plan-slices"`、**不带** `gate_id`。默认 `next` 与 `next --auto` 在此前沿上一致：宿主应派 slice-planner 规划切片，CLI 不得自动消费 `slice-exit`。
   - `[code]` 已脱模板（`tasks_code_filled`）且 `SLICES_APPROVED` **不存在** → `plan-slices` 完成、前沿移到 `slice` 出口门：`next_node.id == "plan-slices"` **并附加** `next_node.gate_id == "slice-exit"`（宿主**不得**再派 slice-planner；半自动/手动停等人类在 `slice-exit` 门确认，`--auto` 则按 R4 例外二自动放行、消费后 `next_node.id == "code"` 且无 `gate_id`）。
@@ -2358,3 +2374,945 @@ git diff --no-relative --name-status -z <base> <head> | openlogos impact --stdin
 - 判定完成 → stdout success envelope；操作错误 → stderr error envelope（错误码见 §6.1：`IMPACT_GIT_DIFF_FAILED` / `IMPACT_INPUT_INVALID`）。默认（无 `--format json`）输出人读文本，stdout 无 JSON。
 - **命名回归红线**：data 递归键集合必须恰为上表声明的键（全 snake_case，§1.1），不得出现未声明键（防实现内部 camelCase 类型名泄漏到 stdout）。
 - 命令全程只读（项目内外零写入）；路径语义、坐标系与修订参数安全的权威声明见根 `spec/change-impact.md`。
+
+## 切片验收与 manifest 恢复 JSON 契约
+
+### 契约版本
+
+本能力为 1.x 向后兼容增量，`data.contract.version` 升为 `1.1.0`，对应打包的 status、next 与 verify JSON Schema。消费方必须按 schema 校验 `output.data`；未知字段可忽略，未知枚举值或未知 manifest 主版本必须走保守分支。
+
+### status/next slice_verification_state
+
+处于多切片 slice/implement 阶段时，status 与 next 暴露同源对象：
+
+```json
+{
+  "slice_verification_state": {
+    "manifest_status": "valid",
+    "verify_mode": "slice-checkpoint",
+    "attempted_slice_id": "slice-02-runner",
+    "confirmed_slice_ids": ["slice-01-manifest"],
+    "eligible_test_ids": ["ST-S31-12", "UT-S31-28"],
+    "pending_test_ids": ["ST-S31-13", "UT-S31-29"]
+  }
+}
+```
+
+数组稳定排序；同一磁盘状态在 status/next 中逐字段同义。单切片 legacy、docs-only 或已越过 final 的兼容路径可省略整个对象。
+
+### 恢复动作
+
+manifest 缺失或可恢复失效时，next data 必须包含：
+
+```json
+{
+  "reason": "test-slice-manifest-missing",
+  "slice_verification_state": {
+    "manifest_status": "missing",
+    "verify_mode": null,
+    "attempted_slice_id": null,
+    "confirmed_slice_ids": [],
+    "eligible_test_ids": [],
+    "pending_test_ids": []
+  },
+  "next_node": {
+    "id": "plan-slices",
+    "name": "恢复测试—切片清单",
+    "subflow_id": "slice",
+    "skill": "slice-planner",
+    "working_agent": null,
+    "review_agent": null,
+    "pre_script": null,
+    "post_script": null,
+    "dispatch": {
+      "idempotent": true,
+      "timeout_seconds": 900,
+      "artifacts_hint": ["tasks.md", "TEST_SLICE_MANIFEST.json", "logos/resources/test/"]
+    }
+  }
+}
+```
+
+稳定 reason 枚举：
+
+- `test-slice-manifest-missing`
+- `test-slice-manifest-invalid`
+- `test-slice-manifest-stale`
+- `test-slice-manifest-unsupported`
+- `test-slice-assignment-ambiguous`
+
+前三者可派发恢复；后两者保守阻塞并给出诊断，不自动覆盖。恢复态不得同时宣称 verify Gate FAIL，不写 marker 或 loop 行。
+
+### LOOP_ITERS 扩展
+
+新增可选字段 `verify_mode` 与 `attempted_slice_id`。checkpoint 失败两者分别为 `slice-checkpoint` 与非空稳定 ID；final 行为 `final` 与 null。旧行缺字段继续可读，但不能用于恢复新 manifest 的 attempted identity。
+
+### 宿主消费规则
+
+RunLogos 只消费 `reason`、`next_node`、`dispatch` 与状态对象，不读取 proposal/tasks 判完成。派发完成后必须重新调用 OpenLogos 获取 canonical 状态；相同恢复动作应按 idempotent 语义重投。未知字段忽略，未知 enum/schema 不能猜测为成功。
+
+### 契约版本
+
+status/next 响应出现 `plan_package`、`completion_issues` 或 dispatch `completion` 时，`data.contract.version` 必须为 `1.3.0`。字段只增不改；1.0.0～1.2.0 消费方按未知字段保守兼容。
+
+### PlanPackageEvaluation
+
+```json
+{
+  "schema": "openlogos/plan-package-evaluation@1",
+  "contract_version": "1",
+  "ready": false,
+  "proposal": {"filled": false, "issues": []},
+  "tasks": {
+    "plan_filled": true,
+    "code_required": true,
+    "code_slices_filled": false,
+    "issues": []
+  },
+  "issues": []
+}
+```
+
+status/next 的模块级 `plan_state.plan_package` 承载完整对象；为便于旧 consumer 渐进迁移，`plan_state` 同时可投影 `completion_contract_version`、`completion_issues`、`proposal_filled`、`tasks_plan_filled`、`tasks_code_required`、`tasks_code_slices_filled`。投影存在时必须与对象逐字段一致。
+
+### CompletionIssue
+
+| 字段 | 必需 | 语义 |
+|---|---|---|
+| `code` | 是 | 稳定机器问题码 |
+| `path` | 是 | 项目根相对路径 |
+| `message` | 是 | locale 人读说明 |
+| `fix_hint` | 是 | 可执行修复建议 |
+| `section_id` | 否 | locale-independent section 语义 ID |
+| `line` | 否 | 1-based 行号 |
+| `actual` | 否 | 脱敏实际值 |
+| `expected` | 否 | 期望值或 canonical 标题 |
+
+首版问题码至少包含 proposal required section missing/duplicate/empty、placeholder remaining、change type invalid、deployment fields invalid、clarification invalid、tasks template remaining、code entry before spec-complete、code section missing。数组按共享 evaluator 顺序稳定输出。
+
+### change-lint
+
+检查成功但 L0 未通过仍使用 stdout success envelope、`data.pass=false`、exit 2，并携带 `data.plan_package`。L0 通过后才继续 L1～L9；最终 pass 必须与 plan_package.ready 等价。操作错误仍 stderr error envelope、exit 1。
+
+### dispatch completion
+
+`next_node.dispatch.completion`：
+
+```json
+{
+  "command": "openlogos change-lint --slug fix-x --format json",
+  "expected": {
+    "/data/pass": true,
+    "/data/plan_package/ready": true
+  },
+  "expected_proposal_step": "ready-to-delta"
+}
+```
+
+`expected` 的 key 为 RFC 6901 JSON Pointer，value 为期望标量。未知 completion 字段允许忽略；无法执行或无法证明全部期望时不得报告完成。
+
+### 等价、挂载与兼容
+
+- 单模块 legacy 顶层与 `modules[]` 同构时，plan package 内容必须相同。
+- 历史已越过 plan 的响应可省略新诊断或给 warning，但不得回退 proposal_step。
+- 旧 CLI 无 completion contract 时，新宿主提示升级/sync，不解析 Markdown 猜测。
+
+## 3.17 `state_inconsistency` 对账投影字段（lifecycle-failclosed-reconciliation）
+
+`status` / `next`（以及复用 `collectStatusData` 的 `watch`）在检测到**活跃提案的事实矛盾**时输出的只读投影，供宿主面板呈现对账提示。它不改变任何既有字段的语义。
+
+### 挂载位置
+
+- `modules[].active_change.state_inconsistency`（权威位置）。
+- legacy 单模块输出可回退顶层 `state_inconsistency`（与 `plan_state` 的回退规则同构）。
+- 与 `plan_state`、`automation_diagnostic`、`merge_transaction`、`slice_transaction` 等既有只读投影**并列挂载**，互不覆盖。
+
+### 出现条件
+
+全部成立才出现：
+
+1. 存在活跃提案；
+2. `proposal_step === "ready-to-deploy"`（即 `DEPLOY_DONE` 缺失）；
+3. 至少一项**矛盾的下游证据**在场（见 `evidence` 枚举）。
+
+**零漂移边界**：不满足时该键**不出现**（不是输出 `null`）。既有 `status` / `next` golden 因此逐字不受影响。
+
+### Schema
+
+```jsonc
+{
+  "kind": "deploy_done_missing_with_downstream_evidence",
+  "evidence": ["smoke_pass_marker_present", "deploy_tasks_all_checked"],
+  "remediation": "openlogos deploy-done"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `kind` | string | 是 | 矛盾类型。当前唯一取值 `deploy_done_missing_with_downstream_evidence`；未来新增取值时消费方按未知值保守处理（呈现但不据其自动动作） |
+| `evidence` | string[] | 是 | 非空、去重、**按固定顺序**输出的证据枚举（顺序：`smoke_pass_marker_present` → `smoke_fail_marker_present` → `deploy_tasks_all_checked`），保证同一磁盘事实下输出稳定可 golden |
+| `remediation` | string | 是 | 一条可直接执行的补救命令；当前恒为 `"openlogos deploy-done"` |
+
+`evidence` 取值：
+
+| 值 | 磁盘事实 |
+|---|---|
+| `smoke_pass_marker_present` | 提案目录存在 `SMOKE_PASS` |
+| `smoke_fail_marker_present` | 提案目录存在 `SMOKE_FAIL` |
+| `deploy_tasks_all_checked` | `tasks.md` 的 `[deploy]` section 全部条目已勾选 |
+
+### 派生规则与不变量
+
+1. **即时只读派生**：每次命令调用重新计算，**不落盘、不缓存**，无新鲜度问题、无 shadow source。
+2. **不改 `proposal_step`**：投影是旁挂说明而非状态跃迁；`ready-to-deploy` 仍是 `ready-to-deploy`，下游门禁仍按缺标状态 fail-closed。
+3. **不写任何 marker**：尤其不写 `DEPLOY_DONE`——`status` / `next` 是被动派生，本字段不破坏该性质。
+4. **`DEPLOY_DONE` 唯一 writer 不变**：补救只能由 `openlogos deploy-done` 完成；消费方不得据本字段自动补写 marker。
+5. `status` schema 为 `additionalProperties: true`，本字段为 additive、向后兼容；旧消费方忽略即可。
+
+### 消费方契约
+
+- 面板应把 `evidence` 呈现为「检测到什么矛盾事实」，把 `remediation` 呈现为可一键复制/执行的补救命令。
+- 消费方**不得**据本字段推断部署已完成，也不得据其跳过任何 fail-closed 门。
+- `next` 的人类可读输出在既有引导之后追加一行对账建议；文本形态非机器契约，机器消费一律走本字段。
+
+## 5.5 smoke 前置 fail-closed 错误语义（lifecycle-failclosed-reconciliation）
+
+`openlogos smoke` 在执行 `smoke.command` **之前**完成前置校验；任一不满足即 fail-closed 拒绝，走 §6 通用错误 envelope（stderr + 非零退出），**不产生任何 success envelope**。
+
+判定顺序固定 ①→②→③→④，命中即停，只报第一个错误码：
+
+| # | 前置 | 错误码 | message 必须含的补救命令 |
+|---|---|---|---|
+| ① | 提案声明需要 smoke（`smoke_required=true`） | `SMOKE_NOT_REQUIRED` | `openlogos archive <slug>` |
+| ② | 提案部署决策无冲突 | `SMOKE_DEPLOY_DECISION_CONFLICT` | 先修正 `proposal.md` / `tasks.md` |
+| ③ | `DEPLOY_DONE` 存在 | `SMOKE_DEPLOY_NOT_DONE` | `openlogos deploy-done` |
+| ④ | `tasks.md` 的 `[deploy]` section 全勾 | `SMOKE_DEPLOY_TASKS_INCOMPLETE` | 补齐 `[deploy]` 任务后 `openlogos deploy-done` |
+
+**零副作用（强制）**：任一 fail-closed 分支都不得执行 `smoke.command`、不得进入 sandbox、不得写 `SMOKE_PASS` / `SMOKE_FAIL`、不得生成 `smoke-report.md`、不得追加 `smoke-results.jsonl`。
+
+**禁止 auto-heal**：`openlogos smoke` 在任何分支下都不得写入 `DEPLOY_DONE`。
+
+**零回归**：四项前置全满足时进入既有执行路径，§5.2 data schema、§5.3 字段说明与 §5.4 兼容规则逐项不变。
+
+## 6.3 生命周期 fail-closed 错误码（lifecycle-failclosed-reconciliation）
+
+以下错误码与 §6.1 表并列生效，均为**前置门未过**的 fail-closed 拒绝，共同不变量是「零副作用」：拒绝分支不产生任何状态更新。
+
+| 错误码 | 命令 | 说明 |
+|--------|------|------|
+| `SMOKE_NOT_REQUIRED` | `smoke` | 提案声明无需 smoke；建议直接归档 |
+| `SMOKE_DEPLOY_DECISION_CONFLICT` | `smoke` | 提案部署决策冲突；须先修正 `proposal.md` / `tasks.md` |
+| `SMOKE_DEPLOY_NOT_DONE` | `smoke` | `DEPLOY_DONE` 缺失；须先完成部署并执行 `openlogos deploy-done` |
+| `SMOKE_DEPLOY_TASKS_INCOMPLETE` | `smoke` | `tasks.md` 的 `[deploy]` section 未全勾 |
+| `ARCHIVE_VERIFY_NOT_PASSED` | `archive` | `VERIFY_PASS` 缺失或 `VERIFY_FAIL` 在场 |
+| `ARCHIVE_DEPLOY_NOT_DONE` | `archive` | 需部署提案的 `DEPLOY_DONE` 缺失（`SMOKE_PASS` 在场也不例外） |
+| `ARCHIVE_SMOKE_NOT_PASSED` | `archive` | 需 smoke 提案的 `SMOKE_PASS` 缺失或 `SMOKE_FAIL` 在场 |
+
+**输出通道**：
+
+- `SMOKE_*` 走 §6 通用错误 envelope（`--format json` 下 stderr JSON；默认文本下 stderr 文本），非零退出。
+- `ARCHIVE_*` 与既有 `ARCHIVE_WATCH_*` 一致——`openlogos archive` **仍是纯文本命令，不新增 stdout JSON envelope**；以稳定错误码文本写 stderr 并非零退出。
+
+**archive 链条判定顺序**固定 `ARCHIVE_VERIFY_NOT_PASSED` → `ARCHIVE_DEPLOY_NOT_DONE` → `ARCHIVE_SMOKE_NOT_PASSED`，命中即停；后两者只对 `deployment_required=true`（及 `smoke_required=true`）的提案适用。链条校验在 Windows 归档握手**之前**执行：顺序为「链条校验 → 握手（`ARCHIVE_WATCH_*`）→ rename」，链条不满足时不建立握手请求。
+
+**`--auto` 语义**：standing 授权放行的是「运行该命令这个动作」，**不跳过**上述前置门；前置不满足时 `--auto` 同样 fail-closed 拒绝，`GATE_AUTO_PASSED` 审计行不构成对缺口状态的放行依据。
+
+## openlogos slice plan 输出合同
+
+`openlogos slice plan --file <slices.json> [--format json]` 是切片规划的**唯一受控写入口**，一次调用完成校验、写 `[code]` 段、写 `TEST_SLICE_MANIFEST.json` 与指纹自算。
+
+### 适用范围
+
+本合同覆盖 `slice plan` 的输入结构与 JSON 输出。切片规划的**下游消费**（`verify` 的 `slice-checkpoint` 增量验收、`status` / `next` 的切片派生）读取的仍是 `TEST_SLICE_MANIFEST.json` 与 `SLICE_CHECKPOINTS.jsonl` 两个结构化事实源，其字段契约不因本次变更改动。
+
+### 输入结构（`slices.json`）
+
+顶层为切片数组（或含 `slices` 键的对象），每项固定含：
+
+| 字段 | 类型 | 约束 |
+|---|---|---|
+| `slice_id` | string | 提案内唯一，kebab-case |
+| `task_text` | string | 非空；逐字写入 `[code]` 段该切片的 checkbox 条目文本 |
+| `owned_test_ids` | string[] | 非空；每个 ID 必须存在于已合并测试规格 |
+| `runner_selectors` | string[] | 非空 |
+| `spec_targets` | string[] | 非空；项目根相对路径 |
+
+字段与既有 `TEST_SLICE_MANIFEST.json` 的 `slices` 逐字一致，不新造 schema。
+
+### 输出（`--format json`）
+
+成功时 stdout 输出标准 envelope，`data` 至少含 `slice_count`、`slice_ids`、`task_fingerprint`、`spec_fingerprint`、`manifest_path`。失败时走 §6 通用错误 envelope 并非零退出。
+
+### 稳定错误码
+
+| 错误码 | 触发 |
+|---|---|
+| `SLICE_PLAN_INPUT_INVALID` | `slices.json` 非法 JSON、非数组、数组为空、缺必需字段 |
+| `SLICE_PLAN_DUPLICATE_SLICE_ID` | `slice_id` 在提案内重复 |
+| `SLICE_PLAN_UNKNOWN_TEST_ID` | `owned_test_ids` 含未在已合并测试规格中定义的 ID |
+| `SLICE_PLAN_NO_ACTIVE_CHANGE` | 无活跃提案或提案目录缺失 |
+
+**零副作用（强制）**：任一错误码触发时，`tasks.md` 与 `TEST_SLICE_MANIFEST.json` 均不得被修改。
+
+### 结构化事实源不变量（规范性）
+
+**流程判断必须使用结构化数据；非结构化文本只用于展示给用户。**
+
+`owned_test_ids` 是 `verify` 计算 `eligible` 集合的输入，属流程判断数据。因此消费方**禁止**从 `tasks.md` 的 `[code]` 段散文解析该集合——正文中「被提及」的测试 ID（如叙述某 ID 转为历史锚）不等于该切片「拥有」它，实测这种解析会使 `eligible` 多算并以缺结果误红。唯一合法来源是 `TEST_SLICE_MANIFEST.json` 的 `owned_test_ids`。
+
+### 重跑时的 checkbox 保留（规范性）
+
+`slice plan` 既是初次规划入口，也是 manifest 失效恢复与划分重划的入口——三者是同一个动作（根规范 `spec/test-slice-manifest.md` §2.3、§2.4）。因此**重跑不得冲掉已完成切片的实现进度**，该保留由命令**构造性完成**，不设开关、不依赖调用方或 Agent 纪律：
+
+- 逐 `slice_id` 判定：新输入中某 `slice_id` 的 `task_text` 与其旧值**逐字相等**时，该条目在重写后的 `[code]` 段中沿用旧勾选状态（`- [x]` 保持 `- [x]`）；不相等或该 `slice_id` 为新增时写为未勾选（`- [ ]`）。
+- 旧值取自在盘旧 `TEST_SLICE_MANIFEST.json` 的 `slice_id → task_text` 映射；旧 manifest 缺失或不可解析（manifest missing 的恢复正是此形态）时退化为直接在旧 `[code]` 段中查找同文本条目——判据仍是同一条「文本逐字相等才保留」。
+- 初次规划无旧 `[code]` 条目与旧 manifest，规则天然无副作用：**既有输入零改动即得与 0.15.0 逐字一致的行为**，命令面与输入结构不做破坏性变更。
+
+**对输出的影响**：`slice_count`、`slice_ids`、`task_fingerprint`、`spec_fingerprint`、`manifest_path` 五个 `data` 字段的语义与取值口径**均不变**——checkbox 状态不进入 manifest，也不改变 `[code]` 条目的文本与顺序。
+
+**checkbox 不参与 `task_fingerprint`（规范性，订正）**：`task_fingerprint` 不是对 `tasks.md` 的字节求哈希，而是对 `[code]` 段的**结构化模型**求哈希——按顶层顺序保留规范化 `task_text` 与父子关系，**`checked` 状态、列表标记、行尾空白与无语义空行一律不参与**（根规范 `spec/test-slice-manifest.md` §4.1）。因此同一 `slices.json` 在「全未勾选」与「部分已勾选」两种在盘态下重跑，`[code]` 文本相同、`task_fingerprint` 也**必然相同**。
+
+> 本段订正 0.15.1 的一处错误表述（原文称「`- [x]` 与 `- [ ]` 的字节差异会如实反映其中……`task_fingerprint` 可以不同」）。该表述与根规范 §4.1 及既有实现均不符，且若被实现者采信，会使勾选后恢复重跑的 manifest 身份发生变化（`task_fingerprint` 是身份组成，见根规范 §6.1），本规范承诺的「恢复保住 checkpoint 账本」随之不成立。
+
+`slice plan` **不触碰** `SLICES_APPROVED` 与 `SLICE_CHECKPOINTS.jsonl`：前者属 slice-exit 门、后者属 `verify` 账本，均不在本命令的写域内。
+
+### 指纹语义（降级为观察）
+
+`task_fingerprint` / `spec_fingerprint` 由 `slice plan` 依**刚写出的** `tasks.md` 与 `spec_targets` 即时计算并写入 manifest。二者承担**两种彼此独立的角色**，必须分开对待——混为一谈会得出「同一个字段既不许参与判定又必须参与判定」的假矛盾。
+
+#### 角色一：漂移诊断（观察，不作独立阻塞门）
+
+把在盘 manifest 记录的指纹与**当下重算之值**比较，得出 stale 与否。它回答的是「产物写出之后，它所依据的东西有没有被改过」，属事后诊断。其 **stale 判定为警告而非阻塞**：不得单独构成一道门，不得据此阻断 `status` / `next` / `verify` 的前进。该结论不因本次变更放宽（功能规格 §2.68.4）。
+
+#### 角色二：持久化身份的组成（允许影响 checkpoint 采信）
+
+把指纹**写进 manifest**、并作为其判定实质身份的组成部分。它回答的是另一个问题——「某条已落盘的 PASS checkpoint 属不属于**当前这份**切片划分」，属归属判定。该用法**允许影响流程判定**：checkpoint 的采信按根规范 `spec/test-slice-manifest.md` §6.1 比对身份，`task_fingerprint` 或 `spec_fingerprint` 变化即身份变化，旧账本不再被采信。
+
+两者不冲突，因为比较的对象与产出的结论都不同：角色一比「当下重算 vs 在盘记录」，产出诊断；角色二比「checkpoint 记录的身份 vs 当前 manifest 的身份」，产出归属。**禁止**把角色一的 stale 结论升格为阻塞门；**同样禁止**以角色一的「观察性质」为由把指纹排除出身份——后者会让「划分或其依赖的规格已经变了」这件事在归属判定中不可见，旧绿得以冒充新证据。
+
+#### 不得进入身份的：无判定价值的写盘时刻
+
+`TEST_SLICE_MANIFEST.json` 的 `generated_at` 与上述两者**不同类**：它是纯时间戳，只记录写盘时刻，判定价值为零——两次调用相差毫秒即不同，而这种不同**不携带任何**关于「切片划分或其依赖是否改变」的信息。因此它不得进入任何流程分支的条件，包括 checkpoint 的身份。
+
+**已知违例与订正**：0.15.1 及之前，切片 checkpoint 的采信条件是「行的 `manifest_sha256` 等于 manifest **整份文件字节**的哈希」，而文件字节含 `generated_at`。于是一个无判定价值的时间戳事实上决定了流程分支——以逐字相同的 `slices.json` 恢复重跑（根规范 §2.3）重建 manifest 时 `generated_at` 必然不同，整本 checkpoint 账本随之全部落空，§9 承诺的「恢复仅重建 manifest、保留 checkpoint」名存实亡。订正后 checkpoint 绑定 manifest 的**判定实质身份**（`schema` / `change` / `module` / `slices` / `task_fingerprint` / `spec_fingerprint` 的规范化 JSON SHA-256，排除 `generated_at`），口径见根规范 §6.1。
+
+**对本合同其余部分的影响：无。** `slice plan` 的输入结构、`data` 的五个字段、稳定错误码与零副作用要求逐条不变；`TEST_SLICE_MANIFEST.json` 的 schema、字段与 `generated_at` 亦不变——变的只是 checkpoint 账本拿什么去比对身份。
+
+**判据（供后续实现自检）**：凡「某个值参与流程判定」的地方，都要能回答「它变化时，被判定的事实是否真的变了」。答不上来的（如 `generated_at`），说明绑错了对象；答得上来的（如 `slices`、两个 fingerprint），才有资格进入身份。
+
+## openlogos merge 直接合并输出合同
+
+`openlogos merge <slug> [--format json]` 一次调用完成合并；提案已合并时，同一条命令按 delta 摘要执行幂等返回或增量修正（功能规格 §2.69.1、§2.69.4）。
+
+### 成功输出
+
+stdout 输出标准 envelope，`data` 至少含：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `slug` | string | 提案 slug |
+| `result` | `"merged"` \| `"amended"` \| `"already-merged"` | 首次合并 / 增量修正 / 幂等（当前 delta 摘要等于已合并摘要）；闭合枚举，消费方遇未知值按保守分支处理 |
+| `delta_digest` | string | 本次所用 delta 的摘要（`sha256:<hex>`，算法见功能规格 §2.69.4.1）；`already-merged` 时即已合并摘要 |
+| `target_count` | number | 本次实际写入的 canonical target 数；`already-merged` 为 0 |
+| `targets` | string[] | 本次实际写入的 canonical target 路径（升序）；`already-merged` 为 `[]` |
+| `spec_merged_path` | string | `SPEC_MERGED` 相对路径 |
+| `test_change_set` | object | 结构化，与 `SPEC_MERGED` 中同源；`amended` 时为整体重算后的结果 |
+| `invalidated_markers` | string[] | 本次清除的验收 / 交付标记文件名（升序，取自 `VERIFY_PASS` / `VERIFY_FAIL` / `DEPLOY_DONE` / `SMOKE_PASS` / `SMOKE_FAIL`）；`merged` 与 `already-merged` 恒为 `[]` |
+| `amend` | object \| null | 仅 `amended` 时非 null：`{ "targets_recomposed": string[], "targets_added": string[], "targets_restored": string[] }`，三类互不相交、并集等于 `targets` |
+
+宿主据 `result` 区分「首次合并完成 / 修正已应用 / 已是最新无需修正」，**不得**自行比较 delta 与主文档字节。
+
+### 稳定错误码
+
+| 错误码 | 触发 |
+|---|---|
+| `MERGE_NO_ACTIVE_CHANGE` | 无活跃提案或提案目录缺失（含已归档提案） |
+| `MERGE_DELTA_INVALID` | delta 段标记缺失、章节锚解析到 0 或多处、物质结果复验不通过 |
+| `MERGE_TARGET_MISMATCH` | P==T==D 不成立（proposal / tasks / deltas 目标集不等） |
+| `MERGE_ALREADY_COMPLETE` | 内部防御码：首次合并路径在 `SPEC_MERGED` 已在场时被调用。命令层对已合并提案改走幂等或增量修正，正常流程不再对外产生 |
+| `MERGE_AMEND_BASELINE_MISSING` | 已合并、delta 已修改，但 `SPEC_MERGED` 无 `merge_baseline`（旧标记或 legacy `MERGED`）；不从 git 历史回推 |
+| `MERGE_AMEND_BASELINE_UNREADABLE` | 需读回的合并前字节 `git_blob` 为 null、对象不可读或 sha256 不匹配 |
+| `MERGE_AMEND_DRIFT` | 上次已应用目标的当前 sha256 ≠ `after_sha256`；message 点名全部漂移文件 |
+| `MERGE_AMEND_CREATE_WITHDRAW` | 首次以 CREATE 新建的目标在当前 delta 中已不再涉及 |
+| `MERGE_AMEND_PROTOTYPE_UNSUPPORTED` | 原型资产相对上次合并有变化 |
+| `MERGE_APPLY_FAILED` | 落盘失败。是否已整批回滚以原语结构化返回 `rolled_back` 为准（功能规格 §2.84.3 档 B / 档 C）；增量修正时**仅** `rolled_back === true` 才恢复被清除的验收 / 交付标记，否则标记保持缺失 |
+
+**零副作用（强制）**：除 `MERGE_APPLY_FAILED` 外，任一错误码触发时 `logos/resources/`、`SPEC_MERGED` 与提案目录内全部标记均未被触碰；`MERGE_AMEND_*` 全部在写入与清除标记之前判定。`MERGE_APPLY_FAILED` 时状态声明按功能规格 §2.84.3 三档如实报告，不得以错误码本身推断已回滚；增量修正下档 B 恢复标记失败须点名未恢复的标记，档 C 不恢复标记并如实报告规格可能已是修正后字节。错误 message 附 `git checkout logos/resources/` 作为兜底回滚提示；`MERGE_AMEND_*` 另附手工处理指引（另立新提案或人工处理）。
+
+### SPEC_MERGED 结构（结构化事实源）
+
+```jsonc
+{
+  "type": "merge_complete",
+  "completed_at": "<ISO 时间戳>",              // 首次合并时间，增量修正不改写
+  "test_change_set": { /* schema 与内容口径与事务时代逐字段一致；增量修正时整体重算 */ },
+  "merge_baseline": {
+    "schema": "openlogos/merge-baseline@1",
+    "delta_digest": "sha256:<hex>",
+    "targets": [
+      {
+        "path": "<canonical target>",
+        "mode": "CREATE" | "MODIFY",            // 首次触及时的模式
+        "before": null | { "sha256": "<hex>", "git_blob": "<hex>" | null },
+        "after_sha256": "<hex>"
+      }
+    ]
+  },
+  "amendments": [
+    {
+      "amended_at": "<ISO 时间戳>",
+      "previous_delta_digest": "sha256:<hex>",
+      "delta_digest": "sha256:<hex>",
+      "targets_recomposed": [], "targets_added": [], "targets_restored": [],
+      "invalidated_markers": []
+    }
+  ]
+}
+```
+
+`test_change_set` 被 `verify`、`change-lint`、`test-slice-manifest` 三处消费——**流程判断使用结构化数据**，消费方读取行为零改动；`merge_baseline` / `amendments` 为新增字段，旧消费方忽略即可。本版之前写入的 `SPEC_MERGED` 不含这两个字段，读取方必须容忍缺失（视为无基线）。
+
+## openlogos lint-specs 输出合同
+
+`openlogos lint-specs [--format json]` 是规格结构的**只读诊断**命令，检查 `logos/resources/test/` 下的重复 ID、表格列数一致性与 ID 格式。
+
+成功时 stdout 输出 envelope，`data` 含 `checked_files`、`issues`（每项含 `code` / `path` / `line` / `message`）。发现问题时非零退出。
+
+**不参与任何门（强制）**：`merge` / `verify` / `archive` / `change-lint` 均不读取本命令结论、不因其结果阻断——它承接的是 seal preflight 删除后的结构检查能力，但以诊断工具而非门的形态提供。
+
+## modules[].active_change.spec_amend 增量修正只读投影
+
+> 来源变更：merge-amend-merged-change。场景 S11「S11 已合并提案的增量修正只读投影」；功能规格 §2.69.4。
+
+### 挂载位置
+
+- `openlogos status --format json` 的 `modules[].active_change.spec_amend`；`watch` 事件 `data` 与 `status` 同构，随之出现。
+- **仅当活跃提案已完成规格阶段**（`SPEC_MERGED` 或 legacy `MERGED` 在场）时出现；未合并提案、无活跃提案时不出现该键，既有 golden 不漂移。
+
+### Schema
+
+```jsonc
+{
+  "spec_amend": {
+    "merged_delta_digest": "sha256:<hex>" | null,
+    "current_delta_digest": "sha256:<hex>",
+    "pending": true | false | null,
+    "blocked_reason": null | "baseline-missing" | "baseline-unreadable" | "drift" | "create-withdraw" | "prototype-changed",
+    "amend_count": 0
+  }
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `merged_delta_digest` | string \| null | 是 | `SPEC_MERGED.merge_baseline.delta_digest`；无基线或标记不可解析时为 null |
+| `current_delta_digest` | string | 是 | 按功能规格 §2.69.4.1 算法对当前 `deltas/` 计算的摘要（与 merge 同一实现） |
+| `pending` | boolean \| null | 是 | 有修正待应用：`current ≠ merged`；`merged_delta_digest` 为 null 时为 null（不可判定） |
+| `blocked_reason` | string \| null | 是 | `pending == true` 时按 merge 同一顺序只读检查拒绝边界的首个命中，取值与 merge 错误码一一对应（`baseline-unreadable` ↔ `MERGE_AMEND_BASELINE_UNREADABLE` 等）；`pending == false` 时为 null；无基线时为 `"baseline-missing"`。闭合枚举，遇未知值按受阻处理 |
+| `amend_count` | number | 是 | `SPEC_MERGED.amendments` 长度；无该字段时为 0 |
+
+### 派生规则
+
+- `baseline-unreadable` 在 status 中只以 `git cat-file -e` 探测对象存在性；sha256 复核在 merge 执行时完成，故 status 未报受阻时 merge 仍可能以 `MERGE_AMEND_BASELINE_UNREADABLE` 拒绝（对象损坏），反之不成立。
+- 投影只读：不写任何文件、不写 git 对象、不清除或生成标记、不改变 `proposal_step` 派生。
+- `pending` 不改变 `proposal_step`：已合并提案的前沿仍由既有派生决定；修正成功后因验收标记被清除，前沿按既有规则回到待 verify 一侧。
+
+### 消费方契约
+
+- `pending == true && blocked_reason == null`：修正入口可用，宿主可在获授权后执行 `openlogos merge <slug>`（半自动下仍是人类确认点）。
+- `pending == false`：修正已应用或从未修改，不需要再次 merge。
+- `pending == null`：不可判定（旧标记），宿主**不得**按 false 处理、**不得**自行比较字节；如需修正，按 `blocked_reason: "baseline-missing"` 的指引另立新提案。
+- `blocked_reason` 非 null：执行 merge 必然以对应错误码拒绝，宿主应转人工处理。
+
+## verify / smoke `sandbox.reuse` 沙箱复用字段
+
+> 归属 `## 4. openlogos verify --format json`（§4.3 字段说明）与 `## 5. openlogos smoke --format json`（§5.3 字段说明）；来源变更 verify-sandbox-reuse-0-16-1（决策 C05），功能规格 §2.91。**采用 ADDED 子节而非 MODIFIED §4.3 / §5.3**：本节只新增 `sandbox.reuse` 的定义，不改两节既有字段与兼容规则。
+
+### 字段
+
+`sandbox` 对象新增**可选**字段 `reuse`（additive、向后兼容）。`sandbox.mode` 为 `"off"` 时不出现；为 `"auto"` / `"always"` 时恒出现。
+
+```jsonc
+"sandbox": {
+  "mode": "auto",
+  "root": "/Volumes/BuildWork/openlogos-sandbox/openlogos-cli-sandbox-reuse-3f2a9c0d1e4b5a6c/ws-000000000007",
+  "isolated": true,
+  "workspace_write_denied": true,
+  "status": "pass",
+  "diagnostics": [],
+  "suggestions": [],
+  "infos": ["沙箱复用：reused（世代 ws-000000000007；复制 3、删除 1、内容比较 5；同步 412 ms）"],
+  "reuse": {
+    "enabled": true,
+    "state": "reused",           // "created" | "reused" | "recovered" | "fresh" | "busy-fallback" | "unsupported" | "disabled"
+    "dir": "/Volumes/BuildWork/openlogos-sandbox/openlogos-cli-sandbox-reuse-3f2a9c0d1e4b5a6c",
+    "generation": "ws-000000000007",
+    "copied": 3,
+    "removed": 1,
+    "content_compared": 5,
+    "sync_ms": 412,
+    "abandoned": []
+  }
+}
+```
+
+| 字段 | 类型 | 必填（reuse 出现时） | 说明 |
+|---|---|---|---|
+| `reuse.enabled` | boolean | 是 | 配置是否启用复用（`sandbox_reuse` 读取后的值）；`false` 时 `state` 为 `disabled` |
+| `reuse.state` | string | 是 | `created`：首次创建项目目录与工作区世代；`reused`：沿用上一正常释放世代；`recovered`：上一持有者非正常退出、上一轮释放为 `tainted`（旧写入者存活检查未通过：命令进程组仍有成员、存在带该世代运行标记的存活进程，或无法完成检查）或发布前复查不通过，新建世代；`fresh`：`--fresh-sandbox` 新建世代；`busy-fallback`：锁被占用或无法确认，本次退回一次性临时沙箱；`unsupported`：文件系统不支持 `link()` 或平台不具备进程组探测或运行标记扫描能力，本次退回一次性临时沙箱；`disabled`：`sandbox_reuse=false` |
+| `reuse.dir` | string \| null | 是 | 持久沙箱项目目录绝对路径；`disabled` 时为 `null` |
+| `reuse.generation` | string \| null | 是 | 本次使用的工作区世代目录名，恒等于本次发布的锁记录 `ws`；`busy-fallback` / `unsupported` / `disabled` 时为 `null` |
+| `reuse.copied` | number | 是 | 本次同步复制（新建或覆盖字节）的普通文件与 symlink 数，含白名单结果文件等一切参与镜像的路径；仅原位整定 `mode` / `mtime` 而未重写字节的文件不计入；`busy-fallback` / `unsupported` / `disabled` 时为 `0` |
+| `reuse.removed` | number | 是 | 本次同步删除的条目数（按顶层被删条目计） |
+| `reuse.content_compared` | number | 是 | 本次两侧均存在、未能凭同步清单指纹跳过而判定内容的普通文件数（大小不同直接判为不同、大小相同逐字节比较；含判定后相同而未复制的） |
+| `reuse.sync_ms` | number | 是 | 本次同步耗时（毫秒）；`busy-fallback` / `unsupported` / `disabled` 时为 `0` |
+| `reuse.abandoned` | string[] | 是 | 被弃用、需用户确认无进程使用后手动清理的工作区世代绝对路径；无则为空数组 |
+
+### 规则
+
+- `sandbox.root` 在 `created` / `reused` / `recovered` / `fresh` 时为当前工作区世代目录，`busy-fallback` / `unsupported` / `disabled` 时为一次性临时目录（既有语义）。
+- verify 多阶段（回归 + 增量）时，`sandbox.reuse` 取最后一次执行阶段的值；`infos` 照既有规则去重合并。
+- 复用摘要只进 `sandbox.infos`，不得进入 `sandbox.diagnostics` 或 verify 的 `pre_run.diagnostics`；`reuse` 的任何取值都不改变 `sandbox.status` 与门禁结论。非法缓存路径的诊断属于问题诊断，进 `sandbox.diagnostics`。
+- 消费方（RunLogos / CI）判断是否命中复用应读 `reuse.state`，不得解析 `infos` 文案。
+
+## `openlogos env list|show|check --format json`（environment-registry）
+
+> 来源变更：environment-registry（决策 C04、C08）。格式与判据权威：`spec/environments.md`。三个命令只读、不要求活跃提案，使用通用成功 / 错误 envelope；面向人的文案走 i18n。
+
+### 用法
+
+```bash
+openlogos env list [--format json]
+openlogos env show <id|alias> [--format json]
+openlogos env check [<id|alias>] [--probe] [--format json]
+```
+
+### 公共对象
+
+**DeployRecord**（账本 deploy 记录投影）：
+
+```jsonc
+{
+  "deploy_id": "6f1c…",                // string
+  "slug": "add-login",                 // string
+  "ref": "<40 位 commit>",             // string | null（null = 版本未知）
+  "ref_source": "explicit",            // "explicit" | "unknown"
+  "observed_head": "<40 位 commit>",   // string | null，仅观察信息
+  "observed_dirty": false,             // boolean | null，仅观察信息
+  "recorded_at": "2026-10-14T08:00:00.000Z"
+}
+```
+
+**SmokeRecord**（账本 smoke 记录投影）：
+
+```jsonc
+{
+  "deploy_id": "6f1c…",                // string | null（依据旧空 DEPLOY_DONE 时为 null）
+  "slug": "add-login",
+  "ref": "<40 位 commit>",             // string | null，继承所依据的部署记录
+  "result": "pass",                    // "pass" | "fail"
+  "env_evidence": "declared",          // "declared" | "missing" | "mismatch"
+  "fresh_results": true,               // boolean，本次是否实际运行 smoke.command 产生新结果
+  "deploy_env_confirmed": true,        // boolean
+  "verified": true,                    // boolean，判据见 spec/environments.md §5.3
+  "observed_head": "<40 位 commit>",
+  "recorded_at": "2026-10-14T08:05:00.000Z"
+}
+```
+
+**EnvView**：`{ id, name, tier, current_ref, last_deploy: DeployRecord | null, last_smoke: SmokeRecord | null }`；`current_ref` 为 `last_deploy.ref`（无部署记录时为 null）。
+
+**Ledger**：`{ path: "logos/.openlogos-runtime/deployments.jsonl", corrupt_lines: number }`。
+
+### `env list`（data）
+
+```jsonc
+{
+  "registry_path": "logos/environments.yaml",
+  "registry_present": true,            // 登记表不存在时为 false，environments 为 []
+  "proposal_default_env": "test",      // 可选（来源变更 proposal-default-environment）：仅登记表配置了顶层 proposal_default_env 时输出，值为环境 id；未配置时不输出该键
+  "environments": [
+    { "id": "test", "name": "测试环境", "tier": "test", "aliases": ["测试", "qa"],
+      "current_ref": "…", "last_deploy": { /* DeployRecord */ }, "last_smoke": { /* SmokeRecord */ } }
+  ],
+  "ledger": { "path": "logos/.openlogos-runtime/deployments.jsonl", "corrupt_lines": 0 },
+  "warnings": [ { "code": "ENV_UNKNOWN_FIELD", "message": "…", "environment": "prod", "field": "promote_from" } ]
+}
+```
+
+- `proposal_default_env`（来源变更 proposal-default-environment，决策 C06）：权威定义见 `spec/environments.md` §13。只在登记表配置了该字段时出现；未配置（含无登记表）时 data 字段集与引入前逐字一致。`env show`、`env check` 的 data 与 `status` 不输出该字段（`env show` 另在 `environment.deploy` 输出部署配置，见下节）。登记表中该字段非法时登记表按非法处理，`env list` 使用错误 envelope `ENV_REGISTRY_INVALID`（退出码 1），`env check` 在 `data.errors` 中报 `ENV_FIELD_INVALID`（`field=proposal_default_env`）。
+
+### `env show`（data）
+
+```jsonc
+{
+  "environment": {                     // 登记表中该环境的配置（只含规范字段；secrets 只有变量名）
+    "id": "prod", "name": "生产环境", "tier": "prod", "aliases": ["生产"],
+    "description": null, "health": "https://…", "version": "https://…", "secrets": ["PROD_TOKEN"],
+    "deploy": {                        // 可选（来源变更 proposal-default-environment）：仅该环境配置了 deploy 时输出；经 spec/environments.md §11.2 校验后的配置，不含命令与密钥值
+      "mode": "agent",                 // "script" | "ci" | "agent"
+      "script": null, "args": [], "workdir": "worktree", "timeout_sec": 1800,
+      "provider": null, "workflow": null, "workflow_ref": null, "inputs": {}, "poll_interval_sec": 10,
+      "trigger_script": null, "status_script": null,
+      "plan_section": "生产环境发布步骤"  // 登记表实际写的章节标题
+    }
+  },
+  "current_ref": "…",
+  "last_deploy": { /* DeployRecord */ },
+  "last_smoke": { /* SmokeRecord */ },
+  "history": [ { "kind": "smoke", /* SmokeRecord 字段 */ }, { "kind": "deploy", /* DeployRecord 字段 */ } ],  // 最多 20 条，新到旧
+  "ledger": { "path": "…", "corrupt_lines": 0 },
+  "warnings": []
+}
+```
+
+- `environment.deploy`（来源变更 proposal-default-environment，proposal delta-r1 F1）：权威定义见 `spec/environments.md` §13.3。该环境未配置 `deploy` 时不输出该键，此时 `environment` 字段集与引入前逐字一致。字段与登记表 `deploy`（§11.2）一一对应，未适用于当前 `mode` 的字段为 null 或默认值；`secrets` 仍只有变量名。用途：让提案阶段（change-writer）无需解析登记表原文即可取得该环境实际引用的脚本、工作流与方案章节。`env show` 不输出 `proposal_default_env`。
+
+### `env check`（data）
+
+```jsonc
+{
+  "scope": "prod",                     // 传入 <id|alias> 时为解析后的 id，否则为 null（全部环境）
+  "ok": false,                         // errors 为空时为 true
+  "errors": [
+    { "code": "ENV_DUPLICATE_ID_OR_ALIAS", "message": "…", "environment": "prod", "field": "aliases" },
+    { "code": "ENV_GATE_REFERENCE_UNKNOWN", "message": "…", "module": "core", "value": "staging" },
+    { "code": "ENV_SECRET_MISSING", "message": "…", "environment": "prod", "name": "PROD_TOKEN" },
+    { "code": "ENV_PROBE_FAILED", "message": "…", "environment": "prod", "kind": "health", "url": "https://…" }
+  ],
+  "warnings": [ { "code": "ENV_UNKNOWN_FIELD", "message": "…" } ],
+  "secrets": [ { "environment": "prod", "name": "PROD_TOKEN", "present": false } ],   // 只有变量名与是否存在，永不含值
+  "probes": [                          // 未加 --probe 时为 []
+    { "environment": "prod", "kind": "health", "url": "https://…", "status": 200, "ok": true, "duration_ms": 120, "error": null },
+    { "environment": "prod", "kind": "version", "url": "https://…", "status": 200, "ok": true, "duration_ms": 98, "error": null, "body_excerpt": "1.4.2" }
+  ]
+}
+```
+
+- `body_excerpt` 只在 `kind=version` 时出现，为响应正文前 200 个字符（去除首尾空白）。
+- 存在任一 error 时退出码 1，仍输出完整 data（成功 envelope 之外以 `ok=false` 表达）；登记表不存在或无法加载时使用错误 envelope（`ENV_REGISTRY_NOT_FOUND` / `ENV_REGISTRY_INVALID`），退出码 1。
+
+### 错误语义
+
+| 命令 | 错误码 | 退出码 |
+|---|---|---|
+| `env list` | `ENV_REGISTRY_INVALID`（登记表存在但非法） | 1 |
+| `env show` | `ENV_REGISTRY_NOT_FOUND`、`ENV_REGISTRY_INVALID`、`ENV_UNKNOWN` | 1 |
+| `env check` | `ENV_REGISTRY_NOT_FOUND`、`ENV_REGISTRY_INVALID`、`ENV_UNKNOWN`（scope 解析失败）；以及 data.errors 中的 `ENV_FIELD_INVALID`、`ENV_DUPLICATE_ID_OR_ALIAS`、`ENV_GATE_REFERENCE_UNKNOWN`、`ENV_SECRET_MISSING`、`ENV_PROBE_FAILED` | 1 |
+
+## deploy-done / smoke / status 环境字段（environment-registry）
+
+> 来源变更：environment-registry（决策 C04～C06、C08）。**没有 `logos/environments.yaml` 的项目，本节新增的字段与错误码一律不出现**（例外：`deploy-done --ref` 的 `ENV_REF_UNRESOLVED` 只在使用新参数时产生；`SMOKE_DEPLOY_MARKER_INVALID`、`DEPLOY_DONE_WRITE_FAILED` 与 `SMOKE_LEDGER_WRITE_FAILED` 见下文各自的产生条件），既有字段语义不变。
+
+**错误 envelope 的附加字段（来源变更 fix-environment-registry-review-gaps，决策 C01）**：本节的错误码沿用 §6 通用错误 envelope；个别错误码在 `error` 对象中额外携带结构化字段（目前只有 `details`，各错误码的形态见下文）。附加字段只做新增，不得覆盖 `code` 与 `message`；未列出附加字段的错误码，其 `error` 对象与 §6 逐字一致。CLI 实现上由共用的错误 envelope 构造入口接受可选附加字段，未传时输出逐字不变。
+
+### `openlogos deploy-done`
+
+- 用法新增：`openlogos deploy-done --env <id|alias> [--ref <git revision>] [--format json]`。
+- 有登记表时，既有字段 `environment` 为**解析后的 id**（无登记表时仍为原始标签或 null）。
+- 有登记表时 data 新增：
+
+```jsonc
+"deployment": {
+  "deploy_id": "6f1c…",
+  "environment": "test",              // 解析后的 id
+  "ref": "<40 位 commit>",            // string | null
+  "ref_source": "explicit",           // "explicit" | "unknown"
+  "observed_head": "<40 位 commit>",  // string | null，仅观察
+  "ledger_written": true              // 传入 --env 时为 true
+}
+```
+
+- 新增错误码：`ENV_REGISTRY_INVALID`、`ENV_REQUIRED`、`ENV_UNKNOWN`、`ENV_REF_UNRESOLVED`。全部在任何写入之前判定；错误分支不得写入 `DEPLOY_DONE`、不得勾选 `[deploy]`、不得清理 smoke marker、不得写账本。
+- 写入阶段错误码 `DEPLOY_DONE_WRITE_FAILED`（错误 envelope，退出码 1；有无登记表都可能产生）：写入前快照读取失败（此时尚未写入任何文件），或勾选 `[deploy]`、清理旧 smoke marker、追加账本、最后写 `DEPLOY_DONE` 任一步失败。后一种情形按快照恢复 tasks.md、旧 `SMOKE_PASS` / `SMOKE_FAIL`、旧 `DEPLOY_DONE`，并只撤销本次追加的账本行；`message` 说明已完整恢复，或列出未能恢复的条目（`spec/environments.md` §5.1）。
+
+### `openlogos smoke`
+
+- 有登记表时，既有字段 `environment` 为解析后的 id。
+- 有登记表时 data 新增：
+
+```jsonc
+"environment_evidence": {
+  "target": "prod",                   // 本次解析后的 id，也是注入的 OPENLOGOS_SMOKE_ENV
+  "deploy_id": "6f1c…",               // string | null
+  "ref": "<40 位 commit>",            // string | null，继承 DEPLOY_DONE
+  "deploy_env_confirmed": true,
+  "env_evidence": "declared",         // "declared" | "missing" | "mismatch"
+  "mismatched_case_ids": [],          // env_evidence=mismatch 时列出声明不一致的结果行 id
+  "missing_case_ids": [],             // env_evidence=missing 时列出缺少声明的结果行 id
+  "fresh_results": true,              // 未运行 smoke.command、只汇总已有结果时为 false
+  "verified": true,
+  "ledger_written": true              // 无活跃提案时为 false（不写账本），deploy_id / ref 为 null、deploy_env_confirmed 为 false
+}
+```
+
+- 门禁新增失败原因 `gate.reason = "SMOKE_ENV_EVIDENCE_MISMATCH"`（登记表存在且任一结果行 `target_environment` 与 `target` 不一致），此时写 `SMOKE_FAIL`、退出码 1。
+- 前置新增错误码（错误 envelope，退出码 1，不运行 `smoke.command`、不写 smoke marker、不写账本）：`ENV_REGISTRY_INVALID`、`ENV_REQUIRED`、`ENV_UNKNOWN`、`SMOKE_ENV_MISMATCH`（以上只在登记表存在时产生），以及**无论有无登记表**都可能出现的 `SMOKE_DEPLOY_MARKER_INVALID`（存在活跃提案且 `DEPLOY_DONE` 非空损坏或无法读取）。无登记表时合法 marker 的环境标签与 `--env` 不一致不报错。
+- `SMOKE_DEPLOY_MARKER_INVALID` 的 `error.details`（来源变更 fix-environment-registry-review-gaps，决策 C01）：
+
+```jsonc
+// DEPLOY_DONE 内容非法（非空损坏）
+"error": {
+  "code": "SMOKE_DEPLOY_MARKER_INVALID",
+  "message": "…",                     // 文本不变，仍列出问题
+  "details": { "problems": ["ref", "recorded_at"] }   // 问题字段名或诊断项，非空数组
+}
+// DEPLOY_DONE 存在但无法读取（被目录替代、权限不足、检查后消失）
+"error": {
+  "code": "SMOKE_DEPLOY_MARKER_INVALID",
+  "message": "…",
+  "details": { "problems": ["unreadable"], "reason": "EACCES: permission denied, open '…/DEPLOY_DONE'" }
+}
+```
+
+- 写入阶段错误码 `SMOKE_LEDGER_WRITE_FAILED`（错误 envelope，退出码 1；只在存在活跃提案且传入 `--env`、需要追加账本时产生，与有无登记表无关；来源变更 fix-environment-registry-review-gaps，决策 C02）。smoke 先追加账本、后写 smoke marker（`spec/environments.md` §5.1）：
+  - 账本追加失败（含账本锁等待超时）：不写、不改任何 smoke marker，账本无本次的行或残片；
+  - 账本已写、随后标记阶段失败（写目标 marker 失败，或目标 marker 已写成、删除对侧 marker 失败）：按执行前快照恢复 `SMOKE_PASS` / `SMOKE_FAIL` 并撤销本次账本行；恢复动作逐项捕获，恢复失败不抛未捕获异常，以 `rollback` 如实报告。
+  - `smoke-report.md` 可能已按本次门禁结论写出，保留，`message` 说明这一点。
+
+```jsonc
+"error": {
+  "code": "SMOKE_LEDGER_WRITE_FAILED",
+  "message": "…",
+  "details": {
+    "stage": "ledger",                // "ledger"：账本追加失败；"marker"：账本已写、标记阶段失败
+    "reason": "deployment ledger is locked by another openlogos process (…)",
+    "gate_result": "PASS",            // 本次门禁结论，"PASS" | "FAIL"
+    "rollback": "complete",           // 仅 stage=marker 时出现："complete" | "incomplete"
+    "rollback_problems": []           // 仅 stage=marker 时出现：未能恢复的位置及原因；rollback=complete 时为 []
+  }
+}
+```
+
+### `openlogos status`
+
+- 有登记表时顶层新增 `environments`（EnvView 数组，见「`openlogos env list|show|check --format json`」公共对象）与 `environment_ledger`（Ledger 对象）。
+- 登记表存在但非法时 `environments` 为 `[]`，并新增 `environment_registry_error`：`{ "code": "ENV_REGISTRY_INVALID", "message": "…" }`；退出码不因此改变。
+- 登记表不存在时以上三个字段都不出现。`status` 不发起任何网络请求。
+
+## `openlogos deploy --format json`（environment-deploy）
+
+> 来源变更：environment-deploy（决策 C04～C12）。行为与判据的权威定义见 `spec/environments.md` §11；本节只定义 JSON 形态。信封沿用 §1.2，`command` 为 `"deploy"`；错误沿用 §6 通用错误 envelope（附加字段约定见「deploy-done / smoke / status 环境字段」开头）。
+
+### deploy 用法
+
+```bash
+openlogos deploy --env <id|alias> [--ref <revision>] [--rollback] [--channel proposal|version] [--dry-run] --format json
+openlogos deploy --env <id|alias> --complete <deploy_id> --result done|failed --format json
+openlogos deploy --env <id|alias> --abandon <deploy_id> --format json
+openlogos deploy --env <id|alias> --reconcile --format json
+```
+
+### deploy 成功输出（stdout，退出码 0）
+
+```jsonc
+{
+  "command": "deploy",
+  "version": "<cli-version>",
+  "timestamp": "<ISO-8601>",
+  "data": {
+    "status": "done",                    // "done" | "dry-run" | "awaiting-agent" | "reconciled" | "still-running" | "abandoned"
+    "environment": "prod",               // 解析后的 id
+    "deploy_id": "6f1c…",                // dry-run 时为 null
+    "channel": "version",                // "proposal" | "version"
+    "mode": "script",                    // "script" | "ci" | "agent"
+    "ref_input": "v1.0.4",
+    "ref_requested": "<40 位 commit>",
+    "ref": "<40 位 commit>",             // 已确认的部署版本；未确认为 null
+    "ref_source": "explicit",            // "explicit" | "ci-reported" | "unknown"
+    "rollback": false,
+    "rollback_from": null,
+    "duration_ms": 41230,
+    "ci": null,                          // ci 方式：{"provider","run_id","run_url","conclusion","reported_ref"}
+    "log_path": "logos/.openlogos-runtime/deploy-logs/6f1c….log",
+    "output_tail": "…",                  // 已遮盖密钥；末尾 80 行或 8 KiB
+    "ledger_written": true,
+    "proposal": null,                    // 提案通道：{"slug","marker_path","deploy_tasks_checked","deploy_tasks_total","cleared_smoke_markers","deployment_report_path","next_step"}
+    "plan": null,                        // dry-run：{"workdir","script","args","workflow","dispatch_ref","inputs","timeout_sec"}；agent：{"plan_path","plan_section"}
+    "warnings": []                       // [{"code":"DEPLOY_REF_UNCONFIRMED","message":"…","requested":"…","reported":"…"}]
+  }
+}
+```
+
+- `status=dry-run`：只做检查，`deploy_id`、`ref`、`duration_ms`、`log_path`、`output_tail` 为 null，`ledger_written=false`，`plan` 给出将要执行的内容。
+- `status=awaiting-agent`：agent 方式开始阶段，已登记未决记录，`ledger_written=false`，`plan` 给出部署方案位置与章节。
+- `status=reconciled`：`--reconcile` 查到远程已完成并补记终态记录；`still-running`：远程仍在运行，环境保持占用，`ledger_written=false`。
+- `status=abandoned`：`--abandon` 解除未决记录并追加 `result=unknown`、`failure_reason=abandoned` 的记录。
+- 成功但版本未确认时 `status` 仍为 `done`，`ref` 为 null、`ref_source="unknown"`，`warnings` 含 `DEPLOY_REF_UNCONFIRMED`。
+
+### deploy 失败输出（stderr，退出码 1）
+
+部署已执行但失败、结果未知或记录失败时，错误 envelope 的 `error.details` 带本次部署信息：
+
+```jsonc
+"error": {
+  "code": "DEPLOY_FAILED",               // 或 "DEPLOY_RESULT_UNKNOWN" / "DEPLOY_RECORD_FAILED"
+  "message": "…",
+  "details": {
+    "deploy_id": "6f1c…",
+    "environment": "prod",
+    "channel": "proposal",
+    "mode": "script",
+    "ref_requested": "<40 位 commit>",
+    "exit_code": 3,                      // 非 script 方式或超时为 null
+    "timed_out": false,
+    "failure_reason": "exit-code",       // 见 spec/environments.md §5.2
+    "ci": null,
+    "log_path": "logos/.openlogos-runtime/deploy-logs/6f1c….log",
+    "output_tail": "…",
+    "ledger_written": true,
+    "deployed": false,                   // 仅 DEPLOY_RECORD_FAILED 为 true
+    "unwritten_record": null             // 仅 DEPLOY_RECORD_FAILED：未能写入的账本记录原文
+  }
+}
+```
+
+- 前置拒绝（零执行、零写入）使用不带 `details` 的通用错误 envelope，错误码：`PROJECT_NOT_INITIALIZED`、`ENV_REGISTRY_NOT_FOUND`、`ENV_REGISTRY_INVALID`、`ENV_REQUIRED`、`ENV_UNKNOWN`、`ENV_REF_UNRESOLVED`、`DEPLOY_NOT_CONFIGURED`、`DEPLOY_ARGS_CONFLICT`、`DEPLOY_REF_REQUIRED`、`DEPLOY_ROLLBACK_TARGET_MISSING`、`DEPLOY_GIT_REQUIRED`、`DEPLOY_WORKTREE_MISMATCH`、`DEPLOY_SCRIPT_MISSING`、`DEPLOY_SCRIPT_NOT_EXECUTABLE`、`DEPLOY_CI_UNAVAILABLE`、`DEPLOY_CI_REF_NOT_DISPATCHABLE`、`DEPLOY_SECRETS_MISSING`、`DEPLOY_PENDING_NOT_FOUND`，以及提案通道沿用的 `NO_ACTIVE_CHANGE`、`CHANGE_NOT_FOUND`、`VERIFY_NOT_PASSED`、`DEPLOYMENT_DECISION_CONFLICT`、`DEPLOYMENT_NOT_REQUIRED`、`DEPLOY_TASKS_MISSING`。
+- `DEPLOY_IN_PROGRESS` 的 `error.details` 为 `{"holder": {"deploy_id","mode","started_at","pid","run_id","run_url","unresolved"}}`。
+- `DEPLOY_SECRETS_MISSING` 的 `error.details` 为 `{"missing": ["PROD_TOKEN"]}`，只列名字。
+- 文本模式：实时输出部署过程，结束时打印结论、`deploy_id`、已确认版本与 `log_path`；错误打印 `Error: [<code>] <message>`。
+
+## smoke / env / status 部署字段增量（environment-deploy）
+
+> 来源变更：environment-deploy（决策 C06、C15）。以下字段、写入与错误码只在部署执行已启用时出现（`spec/environments.md` §1：登记表中至少一个环境配置了 `deploy`，或账本中已有 `openlogos deploy` 写出的记录）；未启用的项目（含无登记表的项目）输出与写入与引入前逐字一致，既有字段语义不变。
+
+### smoke 部署身份字段（environment-deploy）
+
+- 前置新增错误码 `SMOKE_DEPLOY_SUPERSEDED`（错误 envelope，退出码 1，零副作用）：部署执行已启用（`spec/environments.md` §1）、传入 `--env` 且存在活跃提案时，`DEPLOY_DONE.deploy_id` 不是账本中该环境最近一条 deploy 记录（`spec/environments.md` §4.2「部署身份核对」）：
+
+```jsonc
+"error": {
+  "code": "SMOKE_DEPLOY_SUPERSEDED",
+  "message": "…",
+  "details": {
+    "marker": { "deploy_id": "6f1c…", "ref": "<40 位 commit>" },
+    "latest": { "deploy_id": "9a2b…", "ref": "<40 位 commit>", "channel": "version", "result": "done" }
+  }
+}
+```
+
+- 无活跃提案、部署执行已启用且传入 `--env` 时，`environment_evidence` 的 `deploy_id`、`ref` 取自账本中该环境最近一条 deploy 记录（无记录为 null），`deploy_env_confirmed` 在该记录 `result=done` 时为 true，`ledger_written=true`（追加 `slug` 为 null 的 smoke 记录）；不写任何提案 marker。`verified` 规则不变。
+
+### env 与 status 部署视图字段（environment-deploy）
+
+- EnvView（`env list` 的 `environments[]`、`env show` 的顶层视图字段、`status` 的 `environments[]`）在部署执行已启用时新增 `previous_ref`、`deploy_mode`、`deploy_in_progress`；`current_ref` 改为最近一条成功部署的已确认版本（成功但未确认时为 null）；`last_deploy` 新增 `result`、`channel`、`mode`、`ref_requested`、`failure_reason`（旧形态记录为 null）。字段定义见 `spec/environments.md` §7.1：
+
+```jsonc
+{
+  "id": "prod", "name": "生产环境", "tier": "prod",
+  "current_ref": "<40 位 commit>",
+  "previous_ref": "<40 位 commit>",      // string | null，回滚目标
+  "deploy_mode": "script",               // "script" | "ci" | "agent" | null
+  "deploy_in_progress": null,            // {"deploy_id","mode","started_at","run_id","run_url","unresolved"} | null
+  "last_deploy": { "deploy_id": "…", "slug": null, "ref": "…", "ref_source": "explicit", "result": "done",
+                   "channel": "version", "mode": "script", "ref_requested": "…", "failure_reason": null,
+                   "observed_head": "…", "observed_dirty": false, "recorded_at": "…" },
+  "last_smoke": { /* 不变 */ }
+}
+```
+
+- `env show` 的 `history[]` 中 deploy 记录带全部扩展字段（`spec/environments.md` §5.2）。
+- `env check` 的 `errors[]` 新增 `deploy` 子字段的 `ENV_FIELD_INVALID` 条目（`field` 形如 `deploy.script`）；配置了 `deploy` 的环境额外报告 `secrets` 存在性与 ci 方式的 `gh` 可用性（只报是否满足，不读取值）。
+- `spec/schema/status.schema.json` 覆盖 `environments`、`environment_ledger`、`environment_registry_error` 及本节新增字段（schema 文件在实现中直接修改，不经 delta）。
+
+## `openlogos approve --format json`（environment-promotion-approval）
+
+> 来源变更：environment-promotion-approval（决策 C02、C05、C07）。行为与判据的权威定义见 `spec/environments.md` §12.2；本节只定义 JSON 形态。信封沿用 §1.2，`command` 为 `"approve"`；错误沿用 §6 通用错误 envelope。
+
+### approve 用法
+
+```bash
+openlogos approve --env <id|alias> --ref <revision> [--note <文字>] --format json
+```
+
+### approve 成功输出（stdout，退出码 0）
+
+```jsonc
+{
+  "command": "approve",
+  "version": "<cli-version>",
+  "timestamp": "<ISO-8601>",
+  "data": {
+    "environment": "prod",                 // 解析后的 id
+    "approval_id": "3b0e…",               // 新写入或既有的未使用审批
+    "created": true,                       // false：已有该环境该 commit 的未使用审批，幂等返回、未写新行
+    "ref": "<40 位 commit>",
+    "ref_input": "v1.0.4",
+    "approver": "Alice <alice@example.com>", // 只作展示，可为 null
+    "note": "发版窗口",                     // 可为 null
+    "recorded_at": "<ISO-8601>"            // created=false 时为既有审批的写入时间
+  }
+}
+```
+
+### approve 失败输出（stderr，退出码 1）
+
+- 通用错误 envelope，不带 `details`，错误码：`PROJECT_NOT_INITIALIZED`、`ENV_REGISTRY_NOT_FOUND`、`ENV_REGISTRY_INVALID`、`ENV_REQUIRED`、`ENV_UNKNOWN`、`APPROVAL_NOT_REQUIRED`、`APPROVAL_REF_REQUIRED`、`ENV_REF_UNRESOLVED`；账本写入失败（含账本锁等待超时）为 `APPROVAL_WRITE_FAILED`，账本保持调用前字节。
+- 文本模式：成功时打印环境、commit、`approval_id` 与是否新写入；错误打印 `Error: [<code>] <message>`。
+- AI 宿主内调用受 guard 宿主原生审批约束（`spec/pretooluse-guard.md`「保护范围变更的宿主原生审批（C14）」），被阻断时命令不执行，不产生本节输出。
+
+## deploy / deploy-done / env / status 晋级与审批增量（environment-promotion-approval）
+
+> 来源变更：environment-promotion-approval（决策 C01、C06～C09）。以下字段与错误码只在目标环境的登记表条目写有 `promote_from` 或 `require_approval` 时出现（`spec/environments.md` §12.1、§7.1）；未写这两个字段的项目输出与引入前逐字一致，既有字段语义不变。
+
+### deploy 参数与错误码（environment-promotion-approval）
+
+- 新增参数 `--force-promote "<理由>"`（`openlogos deploy` 用法见「`openlogos deploy --format json`（environment-deploy）」）。理由为空、目标环境未配置 `promote_from`、与 `--rollback` 或 `--complete` / `--abandon` / `--reconcile` 同用时为 `DEPLOY_ARGS_CONFLICT`。
+- 前置拒绝（零执行、零写入）新增两个带 `error.details` 的错误码：
+
+```jsonc
+"error": {
+  "code": "DEPLOY_PROMOTION_UNVERIFIED",
+  "message": "…",
+  "details": {
+    "environment": "prod",
+    "promote_from": "staging",
+    "requested": "<40 位 commit>",
+    "upstream_current_ref": "<40 位 commit> | null",
+    "upstream_candidate_ref": "<40 位 commit> | null"   // 上游最近一条 verified=true smoke 记录的 ref
+  }
+}
+```
+
+```jsonc
+"error": {
+  "code": "DEPLOY_APPROVAL_REQUIRED",
+  "message": "…",
+  "details": {
+    "environment": "prod",
+    "requested": "<40 位 commit>",
+    "approve_command": "openlogos approve --env prod --ref <40 位 commit>"
+  }
+}
+```
+
+- 取得环境锁后复核发现审批已被其他部署使用时，同样以 `DEPLOY_APPROVAL_REQUIRED` 结束（零执行），`details` 形态相同。
+
+### deploy 成功输出新增字段（environment-promotion-approval）
+
+- 目标环境为受门环境时，`data` 新增：`approval_id`（字符串或 null）、`promoted_from`（字符串或 null）、`promotion_override_reason`（字符串或 null），取值与本次账本记录一致；`status=awaiting-agent` 时取值与未决记录一致。
+- `status=dry-run` 时 `plan` 新增 `approval_id`（将使用的审批或 null）与 `promotion`：通过晋级检查时为 `{"from": "<上游 id>", "verified_ref": "<40 位 commit>"}`，越过时为 `{"override_reason": "<理由>"}`，未配置 `promote_from` 或 `--rollback` 时为 null。
+
+### deploy-done 错误码（environment-promotion-approval）
+
+- `deploy-done --env` 的目标环境为受门环境时以通用错误 envelope（`command: "deploy-done"`）输出 `DEPLOY_DONE_GATED_ENV`，退出码 1，零写入；`message` 提示改用 `openlogos deploy --env <id>`。不带 `details`。
+
+### env 与 status 晋级与审批视图字段（environment-promotion-approval）
+
+- EnvView（`env list` 的 `environments[]`、`env show` 的顶层视图字段、`status` 的 `environments[]`）在该环境登记表条目写有 `promote_from` 或 `require_approval` 时新增四个字段，定义见 `spec/environments.md` §7.1：
+
+```jsonc
+{
+  "id": "prod", "name": "生产环境", "tier": "prod",
+  "promote_from": "staging",               // string | null
+  "require_approval": true,                // boolean
+  "open_approvals": [                      // 未使用的审批
+    { "approval_id": "3b0e…", "ref": "<40 位 commit>", "approver": "Alice <alice@example.com>", "note": null, "recorded_at": "…" }
+  ],
+  "promotion": { "from": "staging", "candidate_ref": "<40 位 commit>" }   // 未配置 promote_from 时为 null
+}
+```
+
+- `env show` 的 `history[]` 可含 `kind: "approval"` 的记录（字段见 `spec/environments.md` §5.2）；deploy 记录可带 `approval_id`、`promoted_from`、`promotion_override_reason`。
+- `env check` 的 `errors[]` 新增 `promote_from` / `require_approval` 的 `ENV_FIELD_INVALID` 条目（`field` 为字段名）。
+- `spec/schema/status.schema.json` 覆盖上述新增字段（可选字段，不提升 `contract.version` 的 major）。

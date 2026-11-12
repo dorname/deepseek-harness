@@ -406,6 +406,19 @@ logos/resources/verify/smoke-results.jsonl
 
 `scripts/run-smoke.js` 负责发现并顺序运行 `scripts/smoke-*.sh` / `scripts/smoke-*.js`。runner 可通过 `OPENLOGOS_SMOKE_RESULT_PATH` 读取目标结果路径，避免硬编码。
 
+### 目标环境注入与 `target_environment`（environment-registry）
+
+- 项目存在 `logos/environments.yaml` 且执行 `openlogos smoke --env <id|alias>` 时，CLI 以环境变量 `OPENLOGOS_SMOKE_ENV=<解析后的 id>` 运行 `smoke.command`（含沙箱内执行）。登记表不存在时不注入。
+- smoke 结果行新增**可选**字段 `target_environment`（string）：runner 写入其**实际验证的**环境 id，通常取自 `OPENLOGOS_SMOKE_ENV`，但必须是 runner 真正访问的目标，不得在访问了其他环境时照抄注入值。
+
+```json
+{ "id": "SMOKE-core-01", "status": "pass", "timestamp": "2026-10-14T08:00:00.000Z", "target_environment": "prod" }
+```
+
+- 既有字段 `environment`（若 runner 写入）是 runner 自定义的执行环境标签，语义不变，不参与环境证据判定。
+- CLI 只就计入门禁的结果行判定环境证据：任一行声明与本次环境不一致 → 登记表存在时门禁 FAIL，原因 `SMOKE_ENV_EVIDENCE_MISMATCH`；全部声明一致 → 记为已声明；存在缺少声明的行 → 门禁按既有判据计算（兼容旧 runner），但本次结果不算「已在该环境验证」。判定细节与账本记录见 `spec/environments.md` §5、§6。
+- 本字段不改变 `id` / `status` / `reason_code` / `detail` 的既有语义，也不改变覆盖预检与 skip 统计口径。
+
 ## JSONL 结果账本一致性与 Gate 判据
 
 `openlogos verify` 读取 `test-results.jsonl` 时，必须把“结果格式合法”和“统计自洽”作为 Gate PASS 的前置条件。
@@ -500,3 +513,80 @@ pass_rate_pct == 100
 | `directory-convention.md` | 定义 `logos/resources/verify/` 目录位置 |
 | `logos.config.json` | `verify.result_path` 可覆盖默认路径 |
 | `openlogos verify` 命令 | 读取此格式文件，生成验收报告 |
+
+## 切片 checkpoint 的结果集合与 pending 语义
+
+### 三个集合
+
+切片感知 verify 必须在读取 reporter JSONL 前确定以下互斥/包含关系：
+
+- `eligible_test_ids`：本轮必须有合法最终结果、参与覆盖率与 Gate 的测试。
+- `pending_test_ids`：属于未来未确认切片，尚不要求结果且不进入分母。
+- `defined_test_ids`：已合并测试规格中全部非 manual ID，满足 `eligible ∪ pending ⊆ defined`。
+
+checkpoint 下 eligible 为基线回归、已确认切片与 attempted slice 的并集；pending 为其余 owned tests。final 下 eligible 等于全部 defined，pending 为空。
+
+### reporter 处理
+
+1. reporter 格式、合法 `status`、timestamp 去重与手工用例排除沿用既有规则。
+2. 覆盖率只按 eligible 计算：
+
+```text
+covered = eligible ∩ latest_result_ids
+uncovered = eligible − covered
+coverage = |covered| / |eligible|
+```
+
+3. pending 没有结果是合法状态，不生成 pass/skip 行，不进入 uncovered。
+4. reporter 若意外输出 pending ID，保留该行供诊断但不得使未来切片提前确认；严格模式以 `result_outside_eligible_scope` 失败。
+5. 未在 defined 中的结果仍按既有 unknown ID 硬门失败。
+
+### 基线回归集合
+
+`baseline_test_ids = defined_test_ids − manifest_owned_test_ids`。它在每个 checkpoint 都属于 eligible，用于阻止当前切片破坏未触达能力。manifest owned 集合必须只包含本提案新增或修改的测试 ID；不得把全项目测试都分配到切片以逃避基线定义。
+
+### checkpoint/final 报告
+
+验收报告新增 mode、attempted slice、eligible/pending 数量和 ID 清单、manifest fingerprint、confirmed slices。checkpoint PASS 明确标注“切片检查点通过，非最终验收”，不得产生最终 `VERIFY_PASS`。final 报告继续给出全量覆盖率与 Gate 结论。
+
+### checkpoint 账本
+
+`SLICE_CHECKPOINTS.jsonl` 每行至少包含：`schema`、`slice_id`、`manifest_sha256`、`result`、`eligible_test_ids_sha256`、`timestamp`。有效完成只采信当前 manifest 哈希的最新 PASS；相同 identity 的重复 PASS 幂等。FAIL 可留作审计，但 attempted identity 由“缺少有效 PASS 的首片”恢复。
+
+### 安全边界
+
+- pending 不是 reporter status，允许的结果状态枚举不新增 `pending`。
+- checkpoint 不降低非法状态、unknown ID、重复结果和 100% eligible coverage 硬门。
+- final 不允许 pending，不接受部分结果。
+- manifest 恢复态不读取旧 JSONL 计算 Gate，不生成验收报告假失败。
+
+## 沙箱复用配置
+
+> 归属「`verify.sandbox_mode` / `smoke.sandbox_mode`」；来源变更 verify-sandbox-reuse-0-16-1（决策 C01、C02），功能规格 §2.91。本节为 `verify` / `smoke` 两个新增可选配置字段的权威定义；`spec/logos.config.schema.json` 的 `verify` / `smoke` 节点未限制额外属性，新字段不会被拒绝，schema 补录另案处理。
+
+### 字段
+
+| 字段 | 所在节点 | 类型 | 默认 | 说明 |
+|---|---|---|---|---|
+| `sandbox_reuse` | `verify`、`smoke` | boolean | `true` | 仅在 `sandbox_mode` 为 `auto` / `always` 时生效。`true`：每项目一份持久沙箱，跨运行留存并增量同步；`false`：一次性临时沙箱（引入复用前的行为） |
+| `sandbox_cache_paths` | `verify`、`smoke` | string[] | `[]` | 工作区相对路径。命中的路径归沙箱所有：同步时不从工作区复制、不删除，跨运行留存（如 Rust 的 `target`、`src-tauri/target`） |
+
+```json
+{
+  "verify": {
+    "pre_run_command": "cargo test && node scripts/report.js",
+    "sandbox_mode": "auto",
+    "sandbox_root": "/Volumes/BuildWork/openlogos-sandbox",
+    "sandbox_reuse": true,
+    "sandbox_cache_paths": ["src-tauri/target"]
+  }
+}
+```
+
+### 约束
+
+- 默认值在读取时补齐；`openlogos init` / `sync` 不向配置写入这两个字段。
+- `sandbox_cache_paths` 的非法项（绝对路径、规范化后含 `..`、为空或项目根、与任一白名单结果路径相同 / 为其祖先 / 为其后代）被忽略并在 `sandbox.diagnostics` 中给出诊断，按普通镜像路径处理。**结果文件不得放在缓存路径内**——reporter 写入的结果文件必须随每次同步被工作区状态覆盖，才能保证回收的是本次结果。
+- 缓存路径**不豁免**写入审计：`sandbox_deny_workspace_write=true` 时，命令对缓存路径的写入与其他非白名单写入同口径（`auto` 告警、`always` 失败）。需要在 `always` 下使用缓存路径的项目，应让构建产物写到工作区之外（如 cargo 的 `CARGO_TARGET_DIR`）。
+- reporter 不需要感知复用：清空策略不变，每次完整测试运行前仍应清空对应阶段的结果文件。verify 在执行预跑命令前清空结果文件，清空后的状态经同步进入沙箱。
+- 复用不改变 `test-results.jsonl` 的 schema 与门禁判据。

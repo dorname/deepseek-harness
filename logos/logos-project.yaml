@@ -16,6 +16,7 @@ modules:
       - database
       - scenario
     deployment_required: true
+    product_type: api
 deployment_gates:
   core:
     deployment_required: true
@@ -67,6 +68,90 @@ resource_index:
     desc: core 实现清单（场景→主责包映射、验证命令、reporter 接入差距）。涉及实现定位时必读。
   - path: logos/resources/reference/note/2026-10-06-multi-user-and-cluster-plan.md
     desc: 用户数据隔离与集群部署差距分析及 M1-M4 落地方案。涉及多用户、共享存储、执行池、分布式调度的变更提案前必读。
+  - path: logos/resources/prd/3-technical-plan/1-architecture/acp-network-system-map.md
+    desc: 系统架构概要。涉及技术栈选型、系统组件划分、非功能性约束时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/acp-S01-network-session-lifecycle.md
+    desc: S01 场景时序图。涉及 S01 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/acp-S02-network-permission-prompt.md
+    desc: S02 场景时序图。涉及 S02 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S34-shared-session-generations.md
+    desc: S34 场景时序图。涉及 S34 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S35-shared-domain-namespace.md
+    desc: S35 场景时序图。涉及 S35 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S36-shared-attachments.md
+    desc: S36 场景时序图。涉及 S36 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S37-session-leases.md
+    desc: S37 场景时序图。涉及 S37 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S38-dispatch-continuation.md
+    desc: S38 场景时序图。涉及 S38 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S39-stream-relay.md
+    desc: S39 场景时序图。涉及 S39 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S40-schedule-dispatch.md
+    desc: S40 场景时序图。涉及 S40 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S41-webhook-ingress.md
+    desc: S41 场景时序图。涉及 S41 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S42-drain-rolling-upgrade.md
+    desc: S42 场景时序图。涉及 S42 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S49-acp-permission-policy.md
+    desc: S49 场景时序图。涉及 S49 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S50-acp-skills-list.md
+    desc: S50 场景时序图。涉及 S50 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S51-acp-plan-mode.md
+    desc: S51 场景时序图。涉及 S51 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S52-acp-compaction.md
+    desc: S52 场景时序图。涉及 S52 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S53-acp-multi-provider.md
+    desc: S53 场景时序图。涉及 S53 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S54-acp-goal-approval.md
+    desc: S54 场景时序图。涉及 S54 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/2-scenario-implementation/core-S55-acp-session-export.md
+    desc: S55 场景时序图。涉及 S55 实现细节、API 设计、异常分支时必读。
+  - path: logos/resources/prd/3-technical-plan/3-deployment/acp-network-deployment-plan.md
+    desc: 部署方案。涉及部署拓扑、环境配置、发布命令、回滚策略和 smoke 验证时必读。
+  - path: logos/resources/test/core-S49-test-cases.md
+    desc: S49 测试用例。涉及 S49 单元测试与场景测试的实现与验收时必读。
+  - path: logos/resources/test/core-S50-test-cases.md
+    desc: S50 测试用例。涉及 S50 单元测试与场景测试的实现与验收时必读。
+  - path: logos/resources/test/core-S51-test-cases.md
+    desc: S51 测试用例。涉及 S51 单元测试与场景测试的实现与验收时必读。
+  - path: logos/resources/test/core-S52-test-cases.md
+    desc: S52 测试用例。涉及 S52 单元测试与场景测试的实现与验收时必读。
+  - path: logos/resources/test/core-S53-test-cases.md
+    desc: S53 测试用例。涉及 S53 单元测试与场景测试的实现与验收时必读。
+  - path: logos/resources/test/core-S54-test-cases.md
+    desc: S54 测试用例。涉及 S54 单元测试与场景测试的实现与验收时必读。
+  - path: logos/resources/test/core-S55-test-cases.md
+    desc: S55 测试用例。涉及 S55 单元测试与场景测试的实现与验收时必读。
+  - path: logos/resources/test/smoke/acp-network-smoke-test-cases.md
+    desc: network 模块部署后冒烟测试用例。涉及 openlogos smoke 或 launch 前门禁时必读。
+  - path: logos/resources/verify/acceptance-report.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
+  - path: logos/resources/verify/agent-runner-pool-staging.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
+  - path: logos/resources/verify/baseline-docs-report.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
+  - path: logos/resources/verify/cluster-web-staging-report.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
+  - path: logos/resources/verify/deployment-report.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
+  - path: logos/resources/verify/distributed-host-services-staging.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
+  - path: logos/resources/verify/s50-deployment-report.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
+  - path: logos/resources/verify/s51-deployment-report.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
+  - path: logos/resources/verify/s52-deployment-report.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
+  - path: logos/resources/verify/s53-deployment-report.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
+  - path: logos/resources/verify/s54-deployment-report.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
+  - path: logos/resources/verify/s55-deployment-report.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
+  - path: logos/resources/verify/shared-persistence-staging.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
+  - path: logos/resources/verify/smoke-report.md
+    desc: 验收报告。涉及 verify、部署或 smoke 结果、覆盖度分析、Gate 判定时必读。
 conventions:
   - 遵循 OpenLogos 三层推进模型（Why → What → How）
   - 每次变更必须先创建 logos/changes/ 变更提案

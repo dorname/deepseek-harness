@@ -40,35 +40,18 @@ project-root/
 
 ### proposal.md
 
-变更说明文档，必须包含：
+变更说明文档。**其形态的唯一来源是脚手架**：`openlogos change <slug>` 由
+`proposalTemplate`（`cli/src/i18n.ts`）在磁盘上写出完整的 `proposal.md`，章节集合随 CLI 版本演进。
+**其必填判据的唯一来源是 change-lint**：canonical 必填章节由 `PLAN_SECTION_REGISTRY`
+（`cli/src/lib/plan-package-contract.ts`）经 L0 执行，UI/UX 声明段由 L7 执行。
 
-```markdown
-# 变更提案：[变更名称]
+**本规范不复述章节清单。** 章节是否必填不由文档决定；文档里再抄一份清单，只会与脚手架、与判据三方漂移，
+而漂移会被 lint 掩盖到某个不设门的段丢失为止。要知道当前的章节集合，读脚手架产物或跑
+`openlogos change-lint`，不要查本节。
 
-## 变更原因
-[为什么要做这个变更？来源于哪个需求/反馈/Bug？]
-
-## 变更类型
-[需求级 / 设计级 / 接口级 / 代码级]
-
-## 变更范围
-- 影响的需求文档：[列表]
-- 影响的功能规格：[列表]
-- 影响的业务场景：[列表]
-- 影响的 API：[列表]
-- 影响的 DB 表：[列表]
-- 影响的编排测试：[列表]
-
-## 部署影响
-- 是否需要部署：是 / 否
-- 部署原因：[说明为什么需要或不需要部署]
-- 影响环境：[本地 / 测试 / 预发 / 生产 / 无]
-- 是否涉及数据迁移：是 / 否
-- 是否需要回滚预案：是 / 否
-
-## 变更概述
-[用 1-3 段话概述具体改什么]
-```
+同理，填写方式也只有一条规则：**在脚手架产物上原地逐段填写，禁止整篇重写**。脚手架含不由 lint 强制的段
+（当前为「最小实现论证」），整篇重写会静默丢失它们。填写要点见 `skills/change-writer/SKILL.md`
+Step 4 与 §canonical scaffold 保真。
 
 `## 部署影响` 是人工审核依据。CLI 的部署状态判断以 `tasks.md` 的 `[deploy]` section 和提案目录标记文件为准，不解析自由文本作为唯一依据。
 
@@ -128,13 +111,17 @@ Section 标记规则：
 
 **条目守恒契约（S37，merge-conservation-archive-audit）**：
 
-- `MODIFIED` 是**整章节替换**——块内容必须携带该章节**全量**应保留内容；**不得隐式删除既有条目**。
-- **带稳定 ID 的条目**（测试 ID `UT-*` / `ST-*` / `SMOKE-*`、场景 ID `SXX`、多级节号含字母后缀，由 ID 模式注册表统一定义）的显式删除有两种形态，`REMOVED` 基本语义零改动：
+- `MODIFIED` 是**整章节替换**——块内容必须携带该章节**全量**应保留正文；目标章节根标题由章节锚唯一解析后原位保留，正文不得为满足守恒而重复根标题；**不得隐式删除既有条目**。
+- **`MODIFIED` 的替换范围（lint-modified-sibling-section-collision）**：自锚标题起，到目标文档中**下一个同级或更高级标题**止——**不是整份文档**。正文内与锚同级或更浅的标题不会替换兄弟章节，而是被合成器**合法下沉**为锚章节的子节（相对子标题写法）；原兄弟章节原样保留。整篇改写含多个同级章节的文档时，**每个章节各写一个 `MODIFIED` 块**，只携带该章节自己的正文。凡因此导致合成后态**测试 ID 重复**，由 `openlogos change-lint` L4 以 `delta_test_id_duplicate` fail-closed 拒绝——lint 侧对本提案触及的 test 目标集合以同一合成器求后态、调用同一 `buildTestChangeSet`，与 merge 合成期的 `test-change-set-duplicate-id` **逐字同判据**（merge 准入预检同源）；标题同名本身不是违规。
+- **最终章节结构是 retained 的计算对象**：目标侧 existing 从命中的根标题开始抽取；MODIFIED 侧 retained 必须用目标命中的真实 heading level/text 重建同一根标题，再拼接块正文抽取。对于 `## S10 ...`、`## D12：...`、`## 2.3 ...`，控制锚已保留根标题身份，不得误报根 ID 被删除。
+- **安全重建边界**：只有锚唯一命中后才可使用目标 `hit.level` / `hit.text`；禁止从 anchor 字符串扫描 ID，因为标题路径父级或散文 token 可能形成保留伪证。锚 0 命中或多命中继续 fail-closed，不构造 retained 根标题。
+- **最小豁免**：根标题重建只证明该根标题自身仍在最终文档中。原章节内嵌标题、测试表 ID、场景表行及其表身份仍须逐结构位置保留；真正缺失时照常报 `delta_implicit_id_removal`。
+- **带稳定 ID 的条目**（测试 ID `UT-*` / `ST-*` / `SMOKE-*`、场景 ID `SXX`、决策 ID `DXX`、多级节号含字母后缀，由 ID 模式注册表统一定义）的显式删除有两种形态，`REMOVED` 基本语义零改动：
   1. **删整节**：`REMOVED — <唯一章节锚>`，删除锚定章节全节；该节全部既有结构化 ID 视为随章节显式删除。
   2. **删部分条目**：`MODIFIED — <章节锚>`（携带删除后剩余的全量内容）**成对搭配** `REMOVED-ITEMS — <同一章节锚>`（逐行点名被删 ID）。REMOVED-ITEMS 是**纯声明性标记**——物质变更由 MODIFIED 的整节替换完成，merge / merge-executor 不据 REMOVED-ITEMS 执行任何编辑，它只作为守恒判据的点名采信来源与审计记录。
 - **章节锚唯一定位（fail-closed）**：段标记标题即章节锚，目标标题在主文档中重复时必须用**标题路径锚**（父级到目标级以 ` > ` 连接）；锚解析到 0 个或 ≥2 个章节一律 fail-closed（`delta_section_anchor_unresolvable`），禁止取第一个命中、合并同名章节或按内容反猜。
-- **结构化归属**：守恒计数只认结构位置（测试表 ID 首列、场景标题 / 场景表行首列、标题行节号）；散文提及、非 ID 列单元格、代码围栏引用不构成「保留」也不构成「点名」；保留与点名必须归属 ID 原所在章节，跨章节引用不背书。
-- 机器门：`openlogos change-lint` L8 与 `openlogos merge` 打包调用**同一守恒判据**——逐触及章节对账，既有结构化 ID 凡未在同锚新内容中保留、未被同锚 REMOVED-ITEMS 点名、也未随整节 REMOVED 删除者判 `delta_implicit_id_removal`；点名 ID 不属于锚定章节判 `delta_removed_unknown_id`。lint exit 2 报红、merge 拒绝生成 MERGE_PROMPT（与模板骨架拒绝同级）。目标主文档不存在（全新文档）时跳过守恒。L4 段标记检查承认 `REMOVED-ITEMS` 为合法标记（仅含 REMOVED-ITEMS 而无物质变更块的 delta 仍非法）。
+- **结构化归属**：守恒计数只认结构位置（标题中的 SXX/DXX/节号、测试表 ID 首列、场景表行首列及表身份）；散文提及、非 ID 列单元格、代码围栏引用不构成「保留」也不构成「点名」；保留与点名必须归属 ID 原所在章节，跨章节引用不背书。
+- 机器门：`openlogos change-lint` L8 与 `openlogos merge` 打包调用**同一守恒判据**——逐触及章节对账，既有结构化 ID 凡未在同锚真实最终章节中保留、未被同锚 REMOVED-ITEMS 点名、也未随整节 REMOVED 删除者判 `delta_implicit_id_removal`；点名 ID 不属于锚定章节判 `delta_removed_unknown_id`。lint exit 2 报红、merge 拒绝生成 MERGE_PROMPT（与模板骨架拒绝同级）。目标主文档不存在（全新文档）时跳过守恒。L4 段标记检查承认 `REMOVED-ITEMS` 为合法标记（仅含 REMOVED-ITEMS 而无物质变更块的 delta 仍非法）。
 - merge-executor 合并落盘后须做**事后点数**自检：合并后主文档实际结构化 ID 集合 == 合并前 − REMOVED 整节 ID − REMOVED-ITEMS 点名 + 新增；不符即报告并暂停、**不写 `SPEC_MERGED`**（见 `skills/merge-executor/SKILL.md`）。
 - 残差：无稳定 ID 的散文内容不在机器门内，其「不得隐式删除」为写作契约；散文所在章节的整体消失仍被章节级 ID 守恒抓住。
 
@@ -153,13 +140,14 @@ Delta 文件的目录结构映射主文档目录：
 
 ## 变更工作流
 
-> **核心原则（两档模式）**：`openlogos merge`、`openlogos verify`、部署执行、`openlogos smoke`、`openlogos archive` 和 `git push` 在**半自动 / 手动模式（无 `--auto`）**下是人类确认点——AI 可提醒、解释、准备命令；未经用户明确授权不得执行，不得在"顺手完成流程""按流程走完"等隐式场景中自动触发；用户以明确请求或 slash command 授权时可代为执行。在**全自动 / 无人值守模式（`openlogos next --auto`）**下，用户选择 `--auto` 即构成对该提案全链路的 **standing run-scoped 授权**：上述确认点中**代码已绿之后的盖章 / 发布动作**——`verify`、部署执行、`smoke`、`archive`、`git push`——以及可跳 flow 门（含 merge 的 `spec-exit`）**自动放行执行**，每次放行向 `GATE_AUTO_PASSED` 追加审计行。
+> **核心原则（两档模式）**：`openlogos merge`、`openlogos verify`、部署执行、`openlogos smoke`、`openlogos archive` 和 `git push` 在**半自动 / 手动模式（无 `--auto`）**下是人类确认点——AI 可提醒、解释、准备命令；未经用户明确授权不得执行，不得在"顺手完成流程""按流程走完"等隐式场景中自动触发；用户以明确请求或 slash command 授权时可代为执行。在**全自动 / 无人值守模式（`openlogos next --auto`）**下，用户选择 `--auto` 即构成对该提案全链路的 **standing run-scoped 授权**：上述确认点中**代码已绿之后的盖章 / 发布动作**——`verify`、部署执行、`smoke`、`archive`、`git push`——以及可跳 flow 门（含 merge 的 `spec-exit`）**自动放行执行**，每次放行向 `GATE_AUTO_PASSED` 追加审计行。standing 授权**不覆盖**部署审批（`openlogos approve`）、晋级越过（`--force-promote`）与已配置门禁的环境登记表的修改，这三类动作只能由人经宿主原生审批产生（来源变更 environment-promotion-approval，D14，见下第 3 条）。
 >
 > **无人值守模型（统一）**：launched flow 中的人类停顿点按性质分三类，`--auto` 区别对待：
 >
 > 1. **可跳 flow 门**（`plan` 出口 `plan-exit` 批准方案、`spec` 出口 `spec-exit` 审 delta + 授权合并、`slice` 出口 `slice-exit` 切片待批准、`deliver` 入口 `deliver-entry` 部署执行，均 `skippable:true`）：`--auto` 自动放行（既有行为不变）；放行依据是**本次 `--auto` 响应的 `gate_auto_passed=true`**（live 决策），每次放行写 `GATE_AUTO_PASSED`（append-only 审计、历史审计行不构成对后续动作的授权）。
 > 2. **代码已绿后的盖章 / 发布红线步骤**（`verify`、`smoke`、`archive`、`git push`——非 skip-gate flow 门，由 CLI / 宿主 driver 驱动）：`--auto` 下由 **standing run-scoped 授权**自动执行（选择 `--auto` 即授权至 `archive`），每次执行写 `GATE_AUTO_PASSED` 审计行。其中 `git push` **无需任何 marker / guard 改动**——PreToolUse guard 的 Bash 命令安全白名单本就放行 `git push`（`^git push` 在 guard-check 的安全模式内），guard 从不拦截 `git push`；唯一约束是生成的指令文本（AGENTS.md/CLAUDE.md）：全自动下指令文本授权 AI 自动 push，半自动 / 手动下指令文本要求人工确认。
 > 3. **硬红线（任何模式、含 `--auto` 都绝不自动放行）**：`gate:implement:loop-exhausted`（达迭代上限仍未过测试的未收敛 / 未绿代码）。其默认 `skippable:false`、即使 `--auto` 也照常阻塞、仅 overlay `set-loop` 的 `set.exhausted_gate.skippable:true` 可单点 opt-in 放行——这套逻辑**完整保留、一字不改**。放行未收敛代码与「全自动发布的是已验证成果」的前提直接相悖，故 `loop-exhausted` 是该前提的守门人，永不纳入全自动放行。
+>    另一条硬红线（来源变更 environment-promotion-approval，决策 C03，D14）：**目标环境要求审批（`require_approval: true`）而该版本未获审批，或晋级检查（`promote_from`）未通过**。`openlogos deploy` 以 `DEPLOY_APPROVAL_REQUIRED` / `DEPLOY_PROMOTION_UNVERIFIED` 零执行结束，部署停在「等待审批」或「晋级未满足」；`--auto` 不放行，AI 在任何模式下都不得自行执行 `openlogos approve`、不得加 `--force-promote`、不得换环境或版本、不得改用手工部署或 `deploy-done`（`deploy-done --env` 对受门环境以 `DEPLOY_DONE_GATED_ENV` 拒绝），也不得修改已配置门禁的登记表来关闭门禁（guard 以宿主原生审批或阻断处理，见 `spec/pretooluse-guard.md`）。人批准（审批写入账本）后宿主重新驱动即可继续，不新增恢复机制、flow 节点、门或 marker。未配置这两道门的环境不受本条影响。
 >
 > **默认 / 手动模式（无 `--auto`）行为完全不变**：merge / verify / 部署执行 / smoke / archive / git push 全部停在对应人类确认点等明确授权（部署目标可能是测试环境而非生产，故 deliver 门纳入可跳门）。**R2 安全闸保留**：仍卡在未完成 overlay 节点时，任何放行（含可跳门）都不触发。
 >
@@ -184,16 +172,22 @@ Delta 文件的目录结构映射主文档目录：
    └── 团队/自审 proposal.md 和 delta 文件
    └── delta 任务全部勾选且存在可合并 delta 后，对应 proposal_step: ready-to-merge
 
-5. 生成合并指令（CLI）【人类确认点；--auto 下 spec-exit 门自动放行】
+5. 开启合并事务（CLI）【人类确认点；--auto 下 spec-exit 门自动放行】
    └── openlogos merge {slug}
-   └── 扫描 deltas/，生成 MERGE_PROMPT.md
-   └── 写入 MERGE_PROMPT_GENERATED，表示“合并指令已生成，等待 AI 合并主规格”
+   └── 校验 deltas/（守恒 L8、模板骨架等）后创建合并事务 MERGE_TRANSACTION.json（phase: collecting）
+   └── 成功后置条件二分（跨仓合同）：no-delta 提案当场写 SPEC_MERGED、前沿即进；
+       有 delta 提案创建（或幂等返回既有非终态 / 终态归档让位后重建）事务——
+       exit 0 + 事务在盘且 phase 合法 = 本跳成功，前沿推进 merge-generated、停在 apply 前为合法中间态
+   └── 对非终态事务重跑 merge 幂等返回现状，不重复创建
+   └── legacy 测试模式（NODE_ENV=test + 内部开关）仍生成 MERGE_PROMPT.md / MERGE_PROMPT_GENERATED，仅供 0.13.x 合同回归；生产路径不产生这两个文件
 
 6. AI 执行合并（merge-executor Skill）
-   └── AI 读取 MERGE_PROMPT.md，逐个 delta 合并到主文档（logos/resources/）
+   └── merge-executor 按事务合同逐 slot 提交最终内容：
+       openlogos merge transaction submit-content → seal → apply
+   └── apply 原子落盘主文档（logos/resources/）、metadata 与 receipt，并由事务最后写入 SPEC_MERGED，
+       表示“主规格已合并，可以开始切片规划/代码实现”
    └── 合并完成后，AI 自动 commit 规格文档变更（告知用户，无需确认）
    └── commit message 格式：docs({slug}): merge spec deltas
-   └── 写入 SPEC_MERGED，表示“主规格已合并，可以开始切片规划/代码实现”
 
 7. 切片规划（slice-planner Skill）【slice 出口 slice-exit 为人类确认点；无人值守 --auto 下可放行】
    └── 前置 auto-reset（enforce-slice-stage-ordering）：进入本步骤前，CLI 已在「进入 slice 段」的确定性动作上自动清理任何提前填充的 [code]——有 delta 提案于 openlogos merge 时、纯代码提案于 plan 门放行（写 PLAN_APPROVED）时，把 [code] 重置为占位并把旧内容备份到提案目录 CODE_AUTORESET（append-only jsonl，可追溯）；故 slice-planner 恒从空 [code] 开始划分。清理幂等、不阻断流程、无人值守自愈（见 spec/flow-spec.md §12.7）
@@ -247,6 +241,8 @@ Delta 文件的目录结构映射主文档目录：
     └── 无人值守 --auto 模式：archive 完成后由 standing 授权自动 push（写 GATE_AUTO_PASSED 审计）
     └── git push 无需任何 marker / guard 改动：PreToolUse guard 安全白名单本就放行 git push，唯一约束是指令文本，全自动放开即可
 ```
+
+**merge 中间态与前沿推进（fix-merge-flow-transaction-contract）**：有 delta 提案在步骤 5 成功后、步骤 6 apply 完成前，`SPEC_MERGED` 尚未落盘、前沿停在 `apply-merge` 节点——这是**合法中间态**，宿主不得判失败；`proposal_step` 于开事务后即推进 `merge-generated`（权威事实 = `MERGE_TRANSACTION.json` 在盘，见 `spec/flow-spec.md` 与架构「四十七」），`status` / `next` 在活跃事务在场时必挂 `data.merge_transaction` 只读投影供分流（契约见 `spec/cli-json-output.md`）。
 
 ### commit 粒度规则
 
@@ -308,20 +304,18 @@ push 是独立的人类确认点（Step 12），AI 必须等待用户明确授�
 
 ### 决策记录沉淀（S38，decision-record-capability）
 
-> 来源变更：decision-record-capability（社区 RFC issue #12 补充观察）。承接「归档定位：audit-only（S37）」——决策理由不再是 archive 的独有内容。
-
 **目的**：把设计决策的**理由**从「只活在 archive 的 proposal 变更原因里」沉淀为 `logos/resources/decisions/` 下可检索的活文档。archive 归档后仅供审计、可删除（S37），若决策理由只活在 proposal 里则归档即失联；决策记录使「为什么这样设计」成为当前有效规格的一部分。
 
 **「变更原因」与「决策记录」分工（升格判据）**：
 - **变更原因**：`proposal.md` 每案必填的叙述性动机，留在 proposal / archive，**不机械复制进 resources**。
 - **决策记录**：`logos/resources/decisions/` 下**少数**值得长期复盘的拍板。满足任一即升格——① 立了未来变更必须遵守的不变量 / 约束；② 在真实备选间取舍且被否项可能被重提；③ 跨多个规格 / 组件。一句话测试：「读合并后的规格本身能否还原这个 why？」能→不升格；会丢 why 与被否方案→才升格。bug 修复 / 机械重构 / 发版 bump / trivial 不升格。
 
-**两阶段 bootstrap（delta-r1 F1）**：`deltas/decisions/` 是尚未注册的 delta 类别，现行 `delta-classify.ts` 会判 `delta_path_invalid`、`openlogos merge` 拒绝生成 `MERGE_PROMPT`；注册该类别属代码、只能 merge 后实现。故引入本能力的变更**先合并能力规格 + 在代码注册 `decisions` 类别与索引扫描**，**首条真实决策记录由后续变更**在注册上线后产出。
+**两阶段 bootstrap（delta-r1 F1）**：`deltas/decisions/` 是尚未注册的 delta 类别，现行 `delta-classify.ts` 会判 `delta_path_invalid`、`openlogos merge` 拒绝创建合并事务（legacy 测试模式下为拒绝生成 `MERGE_PROMPT`）；注册该类别属代码、只能 merge 后实现。故引入本能力的变更**先合并能力规格 + 在代码注册 `decisions` 类别与索引扫描**，**首条真实决策记录由后续变更**在注册上线后产出。
 
 **流程接入（不强制、零负担、走既有 delta 通道；落盘所有者 = merge-executor）**：
 1. change-writer 在 `proposal.md` 新增**可选**「已确定的设计决策」章节（每条含**拟定** `DXX`、决策一句话、理由摘要——拟定号不硬编，最终号由 merge-executor 按公式定）。
 2. 含该章节的提案，`tasks.md` `[delta]` 必须规划 `deltas/decisions/<module>-DXX-<slug>.md` 决策记录 delta。
-3. **`openlogos merge` 只校验 delta（含 `decisions` 类别合法性、S37 守恒 L8）+ 生成 `MERGE_PROMPT` / `MERGE_PROMPT_GENERATED`——不写资源、不改计数器**。
+3. **`openlogos merge` 只校验 delta（含 `decisions` 类别合法性、S37 守恒 L8）+ 创建合并事务（legacy 测试模式为生成 `MERGE_PROMPT` / `MERGE_PROMPT_GENERATED`）——不写资源、不改计数器**。
 4. **merge-executor 在 apply 时**（同一提交内）：按分配公式定号——`base = max(configured_next_id ?? 1, max(【已落盘】DXX，空集=0)+1)`（**基准只含已落盘、不纳入本批待落盘 DXX**，delta-r2 F5），候选按稳定序第 `i` 条 `expected_i = base + i`，校验「文件名==标题==`expected_i`」、拒重复 → 落盘决策记录到 `logos/resources/decisions/` → 持久化 `decision_counter.next_id = base + 候选数`（对齐 `scenario_counter` / `feature_counter` 的 AI 维护语义）→ 更新 `resource_index`（内容化 desc 由 `sync-resource-index.ts` 扩展扫描器生成）→ 事后 ID 点数自检通过后写 `SPEC_MERGED`。失败回滚（不提前消耗编号）、重试幂等。详见 `skills/merge-executor/SKILL.md`。
 5. **不含该章节的提案，全流程行为与现状完全一致（零回归、零负担）**；**不新增 `openlogos decision` CLI 命令**。
 
@@ -333,7 +327,9 @@ push 是独立的人类确认点（Step 12），AI 必须等待用户明确授�
 
 ## MERGE_PROMPT.md 文件规范
 
-`openlogos merge` 命令自动生成的指令文件，结构如下：
+> **legacy 范围（fix-merge-flow-transaction-contract）**：自 0.14.x 起本节仅适用于 **legacy 测试模式**（`NODE_ENV=test` + 内部开关，供 0.13.x 合同回归）；生产路径的 `openlogos merge` 走合并事务（`MERGE_TRANSACTION.json` → submit-content → seal → apply），**不生成本节文件**。守恒 / 模板骨架等校验失败时生产路径同样拒绝创建事务（错误文案中「拒绝生成 MERGE_PROMPT」在事务语义下等价于「拒绝创建合并事务」）。
+
+`openlogos merge` 命令（legacy 测试模式）自动生成的指令文件，结构如下：
 
 ```markdown
 # Merge Instruction
@@ -382,7 +378,7 @@ openlogos archive add-remember-me
 ## AI Skills 集成
 
 - **change-writer**：在 `openlogos change` 后使用，辅助填写 proposal.md 和 tasks.md
-- **merge-executor**：在 `openlogos merge` 后使用，读取 MERGE_PROMPT.md 执行实际合并
+- **merge-executor**：在 `openlogos merge` 后使用——生产路径按合并事务合同逐 slot 提交最终内容（submit-content → seal → apply，`SPEC_MERGED` 由事务写入）；legacy 测试模式读取 MERGE_PROMPT.md 执行实际合并
 
 ## no-delta spec-complete
 
@@ -454,7 +450,7 @@ openlogos 仓（生产者侧）验收范围 = **生产者契约**：`contract` �
 
 对已 `launched` 的 **GUI 产品项目**（网站 / 桌面应用 / 移动 App），变更管理在**提案阶段（plan 阶段）就前置产出界面原型**，使用户在「批准提案」这一现有动作上（面板已渲染原型的前提下）连界面一起确认，把 UI/UX 纠偏从"全自动实现期"提前到"提案批准门"。
 
-本特性**不新增门态、不新增确认标记文件、不新增 `ui/` 目录**：原型**复用现有 delta 路径映射**（`deltas/prd/**→resources/prd/**`）与现有批准门；但原型资产的实际落盘**不经 merge-executor 的整份合并路径**，而由 `openlogos merge` 内新增的专用事务落盘实现 `commitVerifiedPrototypes()` 统一执行——它是所有 `ui_impact` 原型资产的**唯一落盘入口**（无第二条绕过它的原型落盘路径）。但这**不等于 driver 不变**——面板对原型的 producer dispatch / 渲染 / 原型批准记录 写入是本特性核心价值的必要实现，归 runlogos 协同 change（见「跨仓交付闭环与发布顺序」）。非 GUI 项目（纯 CLI / API / Skills）整个特性不启用，变更流程零改动。
+本特性**不新增门态、不新增确认标记文件、不新增 `ui/` 目录**：原型**复用现有 delta 路径映射**（`deltas/prd/**→resources/prd/**`）与现有批准门；但原型资产的实际落盘**不经 merge-executor 的整份合并路径**，而由 `openlogos merge` 内新增的专用事务落盘实现 `commitVerifiedPrototypes()` 统一执行——它是所有 `ui_impact` 原型资产的**唯一落盘入口**（无第二条绕过它的原型落盘路径）。但这**不等于 driver 不变**——面板对原型的 producer dispatch / 渲染 / provenance 写入是本特性核心价值的必要实现，归 runlogos 协同 change（见「跨仓交付闭环与发布顺序」）。非 GUI 项目（纯 CLI / API / Skills）整个特性不启用，变更流程零改动。
 
 ### 原型作为 page-design delta（不新增目录 / 门态 / 标记）
 
@@ -478,9 +474,9 @@ plan-exit 门前，写入范围**显式且仅放行** `deltas/prd/2-product-desi
 原型产出的授权链上无悬空授权、无「谁批准 producer 写」的缺口：
 
 1. **producer（change-writer，driver 派发）**：原型产出是 plan 节点**门前的普通内容生成**，授权状态与「写 `proposal.md` / `tasks.md`」**完全相同**，不新增授权、不新增门；其写入由 guard 的 **plan 阶段 allowlist（仅放行 `2-page-design/*.html`）** 授权，越界路径被 guard 拒。
-2. **原型批准记录 写入方（runlogos 面板 / driver）**：批准时写 `PLAN_APPROVED` body，**由用户的批准动作本身授权**（同一次点击），无独立授权。
-3. **`--auto`**：`plan-exit`（`skippable:true`）自动放行，producer 仍在门前产原型、原型批准记录 仍记录，无新授权。
-4. **hash 比对消费者（下游 merge / implement）**：只读 原型批准记录，无写授权需求。
+2. **provenance 写入方（runlogos 面板 / driver）**：批准时写 `PLAN_APPROVED` body，**由用户的批准动作本身授权**（同一次点击），无独立授权。
+3. **`--auto`**：`plan-exit`（`skippable:true`）自动放行，producer 仍在门前产原型、provenance 仍记录，无新授权。
+4. **hash 比对消费者（下游 merge / implement）**：只读 provenance，无写授权需求。
 
 唯一人类确认点仍是 `plan-exit`。
 
@@ -491,11 +487,11 @@ plan-exit 门前，写入范围**显式且仅放行** `deltas/prd/2-product-desi
 - **可交付 done_when（逐页非空 + 令牌）**：声明段声明的**每一个页面**在 `2-page-design/` 下都有对应的**非空**原型文件，且提案目录存在 `design-system.json`（ui-ux-pro-max 令牌，供追溯）。不再是「至少一个文件」的弱收敛。
 - **不可约残差（如实标注）**：「HTML 是否*真出自* ui-ux-pro-max」除 `design-system.json` 令牌可追溯外**无法纯机器证明**，属既有 acceptance 口径下的荣誉制 + 令牌追溯限制，**如实记录、非遗漏**；Python3 缺失时以通用风格兜底并在提案标注「未走设计系统」，不阻塞、不报错。
 
-### 「批准即确认」的前提与 原型批准记录 契约（F3 / F4）
+### 「批准即确认」的前提与 provenance 契约（F3 / F4）
 
-「批准 == UI 已确认」这一等价**仅当面板实际渲染了原型时成立**；在不渲染的旧面板上，批准只是普通方案批准、**不构成 UI 视觉确认**。为把该保证做实而不新增门 / 标记文件，在既有 `plan-exit` 批准记录上叠加 原型批准记录 属性：
+「批准 == UI 已确认」这一等价**仅当面板实际渲染了原型时成立**；在不渲染的旧面板上，批准只是普通方案批准、**不构成 UI 视觉确认**。为把该保证做实而不新增门 / 标记文件，在既有 `plan-exit` 批准记录上叠加 provenance 属性：
 
-**载体与向后兼容（F3）**：原型批准记录 落在 **`PLAN_APPROVED` marker 的可选 JSON body**。`PLAN_APPROVED` 是「存在性 marker + 可选 原型批准记录 body」的**向后兼容超集**：
+**载体与向后兼容（F3）**：provenance 落在 **`PLAN_APPROVED` marker 的可选 JSON body**。`PLAN_APPROVED` 是「存在性 marker + 可选 provenance body」的**向后兼容超集**：
 
 - **存在性语义完全不变**：`PLAN_APPROVED` 存在即门已过，**空 marker 仍合法**，现有空写路径与「仅存在性」读取者不受影响。
 - **缺失 / 空 body = 安全默认「不宣称 UI 已确认」**。
@@ -512,7 +508,7 @@ plan-exit 门前，写入范围**显式且仅放行** `deltas/prd/2-product-desi
 
 - `ui_prototype_rendered:true` 且 **hash 全匹配** = UI 已确认、放行。
 - **hash 失配**（原型在批准后漂移）= 该 UI 确认**作废**，且对 `ui_impact:true` 变更**阻断其交付前进**（非仅 advisory 放行）。阻断**复用现有 `plan-exit` 门的「批准内容变更即批准失效 → 必须重新批准」完整性语义**，**不新增门**。由此杜绝「确认 vX、实现 vY」。
-- 缺失 / false（旧面板 / 未渲染，非漂移）= 不宣称 UI 已确认、记 advisory、不阻断（保留 F3 向后兼容语义：无 原型批准记录 ≠ 漂移）。
+- 缺失 / false（旧面板 / 未渲染，非漂移）= 不宣称 UI 已确认、记 advisory、不阻断（保留 F3 向后兼容语义：无 provenance ≠ 漂移）。
 - 仅 `ui_impact:true` 提案要求这些字段有意义。
 
 ### 「动没动界面」判定（主体、时机、去循环依赖，F2）
@@ -521,43 +517,37 @@ plan-exit 门前，写入范围**显式且仅放行** `deltas/prd/2-product-desi
 
 ### driver 非「不变」（F2）
 
-看界面挂在既有「批准提案」动作上、复用 `plan-exit` 门，故 openlogos 侧**不新增门态 / 标记 / 目录**。但本特性核心价值（plan 门前产原型 + 面板渲染 + 写 原型批准记录 + hash 比对）**必然需要 runlogos driver 改动**：producer dispatch、原型渲染、原型批准记录 写入均为 runlogos 的**必要改动**，归 runlogos 协同 change，**不排除、不宣称 driver 不变**。openlogos 侧只定契约、不含这些 driver 实现。
+看界面挂在既有「批准提案」动作上、复用 `plan-exit` 门，故 openlogos 侧**不新增门态 / 标记 / 目录**。但本特性核心价值（plan 门前产原型 + 面板渲染 + 写 provenance + hash 比对）**必然需要 runlogos driver 改动**：producer dispatch、原型渲染、provenance 写入均为 runlogos 的**必要改动**，归 runlogos 协同 change，**不排除、不宣称 driver 不变**。openlogos 侧只定契约、不含这些 driver 实现。
 
 ### 跨仓交付闭环与发布顺序
 
-**交付闭环（两仓都必须落地）**：本特性核心价值 = openlogos 契约（本 change：flow 节点 + `ui_impact` flag + 声明段 + 原型批准记录 契约 + guard allowlist）**且** runlogos 实现（producer dispatch + 原型渲染 + 原型批准记录 写入 + hash 比对）。**二者缺一，核心视觉确认价值即不成立**。
+**交付闭环（两仓都必须落地）**：本特性核心价值 = openlogos 契约（本 change：flow 节点 + `ui_impact` flag + 声明段 + provenance 契约 + guard allowlist）**且** runlogos 实现（producer dispatch + 原型渲染 + provenance 写入 + hash 比对）。**二者缺一，核心视觉确认价值即不成立**。
 
 - **具名依赖**：runlogos 关联件登记为具名 change **`ui-ux-first-panel`**（runlogos 仓，待创建），本提案以此 slug 引用、跟踪对齐，**非「默认其存在」**。顺序：openlogos 契约先 merge / 发布 → runlogos 依此实现；runlogos change 是**必须交付的关联件（非可选）**。
-- **前置能力门（capability gate，F2 R4）**：runlogos 在批准前声明 `capabilities.ui_prototype_render`；openlogos 侧在 plan-exit **之前**据此选模式——**就绪 → 渲染确认模式**（要求 原型批准记录 + hash）；**缺失（旧面板 / CLI-only）→ 降级模式**（不 claim UI 确认、advisory 不阻断）。能力信号经 SessionStart 上下文（源模板 `plugin/bin/openlogos-phase` + `plugin-codex/session-start.sh`）与 `openlogos status` / `next` JSON 的 `capabilities` 字段表面传递；输入通道 = runlogos 会话建立时写 `logos/.session-capabilities.json`（`{"ui_prototype_render": true}`），文件缺失 = 能力缺失（降级）。该文件为 runlogos 私有会话态、`logos/` 下（gitignore）。**原型批准记录 存在性仅作事后一致性校验**。
-- **三层指令资产纳入交付（F2 R4）**：运行时行为由三层指令资产驱动，均为交付物，缺一则运行时指令链断——**(L1) skills**：`change-writer` / `product-designer` / `merge-executor` SKILL + checker 命令说明；**(L2) 生成的 AI 指令文件**：`openlogos sync` 重新生成的 `AGENTS.md` / `CLAUDE.md`（承载 UI-first 工作流指令，随发布分发）；**(L3) flow overlay 资产**：方法论 GUI overlay 模板（含 `write-ui-prototype` / `verify-ui-原型批准记录` overlay-add 节点），经 project-init / sync 注入。
-- **完整运行时指令链（端到端有序）**：① driver 在 plan 节点判 `ui_impact` 且前置能力就绪 → ② dispatch change-writer（ui-ux-pro-max）产逐页原型 + `design-system.json`（写 `2-page-design/`，guard allowlist 放行）→ ③ overlay-add `write-ui-prototype` 的 `done_when: cmd:openlogos check-ui-prototype`（真实可执行子命令，`<...>` 仅文档示意）富对账通过 → ④ 面板渲染原型、用户批准 → ⑤ 面板 / driver 写 `PLAN_APPROVED` body（`ui_prototype_rendered` + `pages` + `hashes`）→ ⑥ merge 前 `verify-ui-原型批准记录` 的 `done_when: cmd:openlogos check-ui-hash-match` 按三分支重算 hash（见漂移检测点）→ 含 原型批准记录 完好匹配 / legacy advisory 则 done 前进、失配或部分 原型批准记录 则卡未 done。
+- **前置能力门（capability gate，F2 R4）**：runlogos 在批准前声明 `capabilities.ui_prototype_render`；openlogos 侧在 plan-exit **之前**据此选模式——**就绪 → 渲染确认模式**（要求 provenance + hash）；**缺失（旧面板 / CLI-only）→ 降级模式**（不 claim UI 确认、advisory 不阻断）。能力信号经 SessionStart 上下文（源模板 `plugin/bin/openlogos-phase` + `plugin-codex/session-start.sh`）与 `openlogos status` / `next` JSON 的 `capabilities` 字段表面传递；输入通道 = runlogos 会话建立时写 `logos/.session-capabilities.json`（`{"ui_prototype_render": true}`），文件缺失 = 能力缺失（降级）。该文件为 runlogos 私有会话态、`logos/` 下（gitignore）。**provenance 存在性仅作事后一致性校验**。
+- **三层指令资产纳入交付（F2 R4）**：运行时行为由三层指令资产驱动，均为交付物，缺一则运行时指令链断——**(L1) skills**：`change-writer` / `product-designer` / `merge-executor` SKILL + checker 命令说明；**(L2) 生成的 AI 指令文件**：`openlogos sync` 重新生成的 `AGENTS.md` / `CLAUDE.md`（承载 UI-first 工作流指令，随发布分发）；**(L3) flow overlay 资产**：方法论 GUI overlay 模板（含 `write-ui-prototype` / `verify-ui-provenance` overlay-add 节点），经 project-init / sync 注入。
+- **完整运行时指令链（端到端有序）**：① driver 在 plan 节点判 `ui_impact` 且前置能力就绪 → ② dispatch change-writer（ui-ux-pro-max）产逐页原型 + `design-system.json`（写 `2-page-design/`，guard allowlist 放行）→ ③ overlay-add `write-ui-prototype` 的 `done_when: cmd:openlogos check-ui-prototype`（真实可执行子命令，`<...>` 仅文档示意）富对账通过 → ④ 面板渲染原型、用户批准 → ⑤ 面板 / driver 写 `PLAN_APPROVED` body（`ui_prototype_rendered` + `pages` + `hashes`）→ ⑥ merge 前 `verify-ui-provenance` 的 `done_when: cmd:openlogos check-ui-hash-match` 按三分支重算 hash（见漂移检测点）→ 含 provenance 完好匹配 / legacy advisory 则 done 前进、失配或部分 provenance 则卡未 done。
 
 ### 双阶段发布状态（F2 R7）
 
 发布状态与对外宣称边界由验收结果**机器判定**，非人工声称：
 
-- **contract-ready（capability-disabled）**：OpenLogos npm 新版本 + 文档站发布即达此态。**只交付契约**（flow overlay / `ui_impact` flag / 声明段 / 原型批准记录 契约 / guard allowlist / 会话入口例外文案 / merge 严格校验代码），**默认降级、不得对外 claim「UI/UX 确认已前移」已启用**。对外宣称边界 = contract-ready。
+- **contract-ready（capability-disabled）**：OpenLogos npm 新版本 + 文档站发布即达此态。**只交付契约**（flow overlay / `ui_impact` flag / 声明段 / provenance 契约 / guard allowlist / 会话入口例外文案 / merge 严格校验代码），**默认降级、不得对外 claim「UI/UX 确认已前移」已启用**。对外宣称边界 = contract-ready。
 - **feature-enabled**：**当且仅当** 具名关联 change `ui-ux-first-panel`（runlogos 仓）已部署，且**跨仓端到端 smoke 通过**后达此态，方可 claim UI-first 正式启用。
 
-**跨仓端到端 smoke 完成标准（逐条可判）**：① `ui-ux-first-panel` 已部署且在会话建立时写入 `logos/.session-capabilities.json`（`ui_prototype_render:true`）；② 两个 SessionStart 入口（`plugin/bin/openlogos-phase` + `plugin-codex/session-start.sh`）读取并**一致 surface** 该 capability；③ 面板实际渲染原型并在批准时写入绑定 `pages` / `hashes` 的 `PLAN_APPROVED` 原型批准记录；④ merge 严格 hash 校验对批准后漂移的原型**确实拒绝**；⑤ smoke 能**区分** contract-ready 与 feature-enabled 两态。owner = runlogos（`ui-ux-first-panel` 交付方）联合 openlogos 发布；成功标记 = 跨仓 smoke 全绿 → 置 feature-enabled；任一步失败 → 保持 contract-ready 并如实声明「契约就绪、功能未启用（降级）」，**不得 claim feature-enabled**。契约侧 smoke 覆盖补入 `logos/resources/test/smoke/core-smoke-test-cases.md`；跨仓端到端 smoke 由 `ui-ux-first-panel` change 承载并登记为其交付。
+**跨仓端到端 smoke 完成标准（逐条可判）**：① `ui-ux-first-panel` 已部署且在会话建立时写入 `logos/.session-capabilities.json`（`ui_prototype_render:true`）；② 两个 SessionStart 入口（`plugin/bin/openlogos-phase` + `plugin-codex/session-start.sh`）读取并**一致 surface** 该 capability；③ 面板实际渲染原型并在批准时写入绑定 `pages` / `hashes` 的 `PLAN_APPROVED` provenance；④ merge 严格 hash 校验对批准后漂移的原型**确实拒绝**；⑤ smoke 能**区分** contract-ready 与 feature-enabled 两态。owner = runlogos（`ui-ux-first-panel` 交付方）联合 openlogos 发布；成功标记 = 跨仓 smoke 全绿 → 置 feature-enabled；任一步失败 → 保持 contract-ready 并如实声明「契约就绪、功能未启用（降级）」，**不得 claim feature-enabled**。契约侧 smoke 覆盖补入 `logos/resources/test/smoke/core-smoke-test-cases.md`；跨仓端到端 smoke 由 `ui-ux-first-panel` change 承载并登记为其交付。
 
 **openlogos 可独立发布至 contract-ready**：原型即普通 delta，merge 照常落盘，旧面板仍不崩不阻断；但**核心视觉确认价值须 runlogos 到位并跨仓 smoke 通过才 feature-enabled**。
-
-### 漂移失效检测点（前移到 merge 前，F4 R4）
-
-- **检测点前移**：漂移检测由 **overlay-add 节点 `verify-ui-原型批准记录`** 承载，置于 **merge 之前**（`before: generate-merge-prompt`、`when: ui_impact`），在原型落盘 resources **之前**拦截漂移（放在 merge 之后太迟）。
-- **单 `done_when: cmd:` + `check-ui-hash-match` 三分支（F6）**：`verify-ui-原型批准记录` 用**单个 `done_when: cmd:openlogos check-ui-hash-match`**（无 `fail_when`；三分支逻辑全在命令内部）。该命令是**真实可执行 CLI 子命令**（项目根 cwd、自解析活跃提案、`exit 0`=放行 / 非 0=阻断；文档中 `<...>` 仅示意，运行时须为可执行命令）。命令读**持久化 `PLAN_APPROVED` 原型批准记录**（非会话 capability）分三支：**(1) 含 UI 原型批准记录**（`ui_prototype_rendered:true` + `pages` + `hashes`）→ 重算 `2-page-design/` 现值 hash 比对 `PLAN_APPROVED.hashes`：完好且全匹配 `exit 0`（节点 done、放行）；缺失 / 损坏 / 失配 **fail closed 非 0**（节点未 done、前向阻断）。**(2) legacy/degraded 或旧空 marker 且无任何「曾渲染确认」证据** → **记 advisory 后 `exit 0`**（节点 done、merge 可达）——**新增第三成功分支**，令 GUI `ui_impact:true` 但批准记录为旧空 `PLAN_APPROVED` 的提案不再永久卡在 `verify-ui-原型批准记录`；此类提案的 advisory 放行现**经本节点 `exit 0` 达成，而非绕过节点**。**(3) 部分 / 损坏 原型批准记录**（`ui_prototype_rendered:true` 但 `hashes` 缺 / 空）→ 不得误判 legacy → **fail closed 非 0**。单 cmd: 合法（overlay-add，非双 cmd:）；只有第 1 支全匹配与第 2 支 advisory 两种成功路径。
-- **状态转换（诚实边界）**：flow 引擎**前向线性、无跨 subflow 自动 rewind**。「退回 plan-exit」**非引擎自动倒转**，而是——失配即卡在未 done，remediation = **driver / 人工显式重入 plan**（重跑 producer 产原型 + plan-exit 重批，刷新 `PLAN_APPROVED.hashes`）→ 再到该节点时 hash 匹配 `exit 0` → done → 放行。
 
 ### F4 R7 红线：严格性以持久化 `PLAN_APPROVED` 为键，绝不因会话 capability 缺失降级
 
 **模式选择**与**强制语义**分离，堵跨会话降级绕过：
 
 - **模式选择（plan-exit 之前）** 才读会话 capability（`.session-capabilities.json`）：就绪 → 渲染确认模式；缺失 → 降级模式。这是该文件的**唯一**合法用途，**绝不**作为批准后的完整性门降级开关。
-- **强制语义（plan-exit 之后：merge / 落盘 / 落盘后复核）以持久化 `PLAN_APPROVED` 原型批准记录 为键，不再读 session capability**：
-  - **批准记录含 UI 原型批准记录**（`ui_prototype_rendered:true` + `pages` + `hashes`，即曾走渲染确认路径）⇒ **所有 merge / 落盘 / 落盘后复核入口永久 fail closed**：`hashes` 必须存在且完好、逐文件重算匹配；缺失 / 损坏 / 失配一律拒绝（非零退出、不生成 `MERGE_PROMPT`、不写 resources、不写 `SPEC_MERGED`）。**当前会话 capability 文件缺失 / 过期 / 被清理一律不得降级**——「曾渲染确认」证据已固化在批准记录里，易失会话态无权推翻它。
-  - **仅** 批准记录为 legacy/degraded、或旧空 marker 且无任何「曾渲染确认」证据时 ⇒ 才允许 F3 向后兼容 advisory 放行（不要求 `hashes`、不阻断）。此 advisory 放行**经 `check-ui-hash-match` 第三成功分支 `exit 0` 达成**（`verify-ui-原型批准记录` 节点正常 done、merge 可达），**非绕过节点**——故「旧空 marker advisory 不阻断」现是节点内的合法成功路径，不是流程被跳过（见「漂移失效检测点」三分支）。
-  - **部分 / 损坏 原型批准记录**（`ui_prototype_rendered:true` 但 `hashes` 缺 / 空）**不得**误判为 legacy 走上一支 ⇒ **fail closed**（拒绝 / 阻断），与含完好 原型批准记录 的失配同等对待。
+- **强制语义（plan-exit 之后：merge / 落盘 / 落盘后复核）以持久化 `PLAN_APPROVED` provenance 为键，不再读 session capability**：
+  - **批准记录含 UI provenance**（`ui_prototype_rendered:true` + `pages` + `hashes`，即曾走渲染确认路径）⇒ **所有 merge / 落盘 / 落盘后复核入口永久 fail closed**：`hashes` 必须存在且完好、逐文件重算匹配；缺失 / 损坏 / 失配一律拒绝（非零退出、不生成 `MERGE_PROMPT`、不写 resources、不写 `SPEC_MERGED`）。**当前会话 capability 文件缺失 / 过期 / 被清理一律不得降级**——「曾渲染确认」证据已固化在批准记录里，易失会话态无权推翻它。
+  - **仅** 批准记录为 legacy/degraded、或旧空 marker 且无任何「曾渲染确认」证据时 ⇒ 才允许 F3 向后兼容 advisory 放行（不要求 `hashes`、不阻断）。此 advisory 放行**经 `check-ui-hash-match` 第三成功分支 `exit 0` 达成**（`verify-ui-provenance` 节点正常 done、merge 可达），**非绕过节点**——故「旧空 marker advisory 不阻断」现是节点内的合法成功路径，不是流程被跳过（见「漂移失效检测点」三分支）。
+  - **部分 / 损坏 provenance**（`ui_prototype_rendered:true` 但 `hashes` 缺 / 空）**不得**误判为 legacy 走上一支 ⇒ **fail closed**（拒绝 / 阻断），与含完好 provenance 的失配同等对待。
 - 判据由 `ui_impact` **与 `PLAN_APPROVED` 内容**共同决定；merge.ts / `check-ui-hash-match` / freshness 三处（提示前 / 落盘时 / 落盘后）**一致按此三分支**分支，杜绝三处复用同一「capability 缺失即降级」错误分支而一致放行、形不成纵深防御。
 
 ### freshness 权威校验点在落盘时刻 + 事务门（F1 新循环 / R2 / R3）
@@ -565,13 +555,13 @@ plan-exit 门前，写入范围**显式且仅放行** `deltas/prd/2-product-desi
 `openlogos merge` 是 AI 驱动——`merge.ts` 生成 `MERGE_PROMPT` 后停手，实际落盘由后续 `apply-merge` / merge-executor 完成，「提示生成 → 实际落盘」之间原型仍可漂移。故权威校验点下沉到**落盘时刻**，并升级为事务语义：
 
 - **具名执行入口（单一 owner）**：原型资产落盘由 `openlogos merge` 内的**唯一命名函数** `commitVerifiedPrototypes()`（`cli/src/commands/merge.ts`）执行，是原型落盘的**唯一代码入口**；**merge-executor 绝不触碰原型资产**（只应用 markdown 规格 delta）。
-- **进入事务门的判据（按 F4 R7 持久化批准记录分支，非消费时 capability）**：所有 `ui_impact` 原型资产（含严格与 advisory 两模式）**一律经同一入口 `commitVerifiedPrototypes()` 落盘**，无第二条绕过它的原型落盘路径；该入口内部按持久化 `PLAN_APPROVED` 原型批准记录 选严 / 宽——`PLAN_APPROVED` 含 UI 原型批准记录 时**永久进入严格事务门并 fail closed**（全量校验 staged 字节 hash 匹配才提交，失配即在写入任何文件前 abort），**当前会话 capability 缺失 / 过期 / 被清理一律不得跳过本事务门、不得降级**；**仅** 批准记录为 legacy/degraded、或旧空 marker 且无「曾渲染确认」证据时，才走 F3 advisory 分支——**仍由 `commitVerifiedPrototypes()` 同一入口落盘，只是不做严格 hash 校验**（不进严格事务门、不阻断），**并非由 merge-executor 整份落盘**。**不以消费时 `.session-capabilities.json` 决定严 / 宽或是否进门**。
+- **进入事务门的判据（按 F4 R7 持久化批准记录分支，非消费时 capability）**：所有 `ui_impact` 原型资产（含严格与 advisory 两模式）**一律经同一入口 `commitVerifiedPrototypes()` 落盘**，无第二条绕过它的原型落盘路径；该入口内部按持久化 `PLAN_APPROVED` provenance 选严 / 宽——`PLAN_APPROVED` 含 UI provenance 时**永久进入严格事务门并 fail closed**（全量校验 staged 字节 hash 匹配才提交，失配即在写入任何文件前 abort），**当前会话 capability 缺失 / 过期 / 被清理一律不得跳过本事务门、不得降级**；**仅** 批准记录为 legacy/degraded、或旧空 marker 且无「曾渲染确认」证据时，才走 F3 advisory 分支——**仍由 `commitVerifiedPrototypes()` 同一入口落盘，只是不做严格 hash 校验**（不进严格事务门、不阻断），**并非由 merge-executor 整份落盘**。**不以消费时 `.session-capabilities.json` 决定严 / 宽或是否进门**。
 - **三段事务（verify-all → stage → atomic commit）**：① **全量校验**——落盘任何文件前，对本次全部 ui_impact 原型资产重算 hash 比对 `PLAN_APPROVED.hashes`，任一不符即在写入任何文件前 abort；② **staging**——校验通过的资产先写临时区，**对 staged 副本算 hash**（消除 verify-to-stage 竞态，提交的正是已校验的 staged 字节，无 TOCTOU 窗口）；③ **原子提交**——以原子 rename 逐文件提交，失败即回滚。
 - **崩溃恢复（intent journal）**：提交前写 commit journal（`{target, staged, backup}` 清单，落 `logos/changes/<slug>/`）；中途崩溃时下次 `openlogos merge` / 启动检测到残留 journal → 前滚或回滚到一致的全有或全无态，恢复后清 journal。
 - **落盘后复核（双保险）**：`apply-merge` 完成后复核 resources 中已落盘原型的 hash == `PLAN_APPROVED.hashes`，不符则阻断流程前进（不进 slice / code）。
 - **失败语义（无残留）**：任一阶段失败 ⇒ resources 回到 merge 前状态（无部分落盘、无未获批内容）、`SPEC_MERGED` 不写、流程标记失败并阻断；remediation = 显式重入 plan 刷新 hashes 后重跑。即**全有或全无、失败零残留**。
 - **堵直接调用绕过**：hash 校验同时下沉进 `merge()` 命令本身——对 `ui_impact:true` 提案，`merge()` 在扫 delta / 生成 `MERGE_PROMPT` **之前**读 `PLAN_APPROVED.hashes` 并重算原型现值 hash，失配即拒绝 merge（非零退出 + 明确错误，不生成 `MERGE_PROMPT`）。由此无论经 driver 流还是直接 CLI 调用都不可绕过。
-- 三处校验点（提示前 = 早失败优化 / 落盘时 = 权威门 / 落盘后 = 双保险）**全部按 F4 R7「持久化 原型批准记录 为键」分支**，不以消费时会话 capability 做严 / 宽开关。
+- 三处校验点（提示前 = 早失败优化 / 落盘时 = 权威门 / 落盘后 = 双保险）**全部按 F4 R7「持久化 provenance 为键」分支**，不以消费时会话 capability 做严 / 宽开关。
 
 ### 整份落盘规则收窄——防静默覆盖（F3）
 
@@ -603,6 +593,317 @@ L1 tasks 结构可解析 / L2 `[code]` 标题在场 / L3 分阶段测试证据 /
 ### merge 消费点守恒拒绝（S37，merge-conservation-archive-audit）
 
 - `openlogos merge` 在生成 `MERGE_PROMPT.md` **之前**打包调用与 change-lint L8 **同一守恒判据函数**（单一事实源，严禁第二份判据）：任一 delta 存在 `delta_implicit_id_removal` / `delta_removed_unknown_id` / `delta_section_anchor_unresolvable` 违规 → **非零退出、不生成 `MERGE_PROMPT.md`、不写任何 marker**，与模板骨架拒绝同级。
-- 修复方式：缺失 ID 补回同锚 MODIFIED 块的结构条目，或补充锚定该章节的 `REMOVED-ITEMS` 点名行；锚歧义改用标题路径锚（` > ` 连接父级）；修复后重跑 merge 即放行，无需重建提案。
+- 对唯一命中的 MODIFIED 锚，判据必须先用目标命中的 heading level/text 重建最终根标题再对账。根标题 ID 已由控制锚保留，不要求在正文中重复，不要求用 REMOVED-ITEMS 虚构删除；路径锚父级中的 ID 不参与 retained。
+- 修复真实缺失项时，把 ID 补回同锚 MODIFIED 块的原结构位置，或补充锚定该章节的 `REMOVED-ITEMS` 点名行；锚歧义改用标题路径锚（` > ` 连接父级）。不得通过重复 `### S10`、直接扫描 anchor token、错误点名根 ID 或关闭 L8 绕过。
 - merge-executor 侧的事后点数要求：合并落盘后按结构化口径清点，主文档实际 ID 集合 == 合并前 − REMOVED 整节 ID − REMOVED-ITEMS 点名 + 新增，不符即报告并暂停、不写 `SPEC_MERGED`（AI 行为规范，详见 `skills/merge-executor/SKILL.md`）。
-- 零回归：合法 delta（纯 ADDED / 全量 MODIFIED / 整节 REMOVED / MODIFIED+REMOVED-ITEMS 成对）的 merge 消费行为与既有逐字节一致；守恒门是新增拒绝分支，`ADDED / MODIFIED / REMOVED` 基本语义零改动（REMOVED-ITEMS 为新增的纯声明性标记，不引入新的合并操作语义）。
+- 零回归：合法根标题 ID Delta、纯 ADDED、全量 MODIFIED、整节 REMOVED、MODIFIED+REMOVED-ITEMS 成对形态均按既有操作语义消费；内嵌 ID 真删除、锚不可解析与表身份漂移仍 fail-closed。违规码、JSON envelope、稳定排序与 `ADDED / MODIFIED / REMOVED / REMOVED-ITEMS` 基本语义不变。
+
+## Plan 阶段决策澄清协议（openlogos/clarification@1）
+
+> **自 0.15.0 起本节为纯文档约定，不参与任何谓词。** 收缩依据是两条实测事实：
+> ① `## 决策澄清` 章节仍是**活结构要求**——change-lint L0 的 canonical 章节清单强制 proposal 含该章节（事实源 `plan-package-contract.ts`），缺章节即 `proposal_required_section_missing`；
+> ② 围绕它的**解析与门禁已删**——`evaluateProposalClarification`、schema 校验、完成谓词与 `plan_state.clarification` 输出均于 lite-cut3a 移除（功能规格 §2.74.1「决策澄清：判定 → 文档」）。
+> 因此本节按「保留结构、删除判定」收缩：`C-ID` 正则、category 九值枚举、source 枚举与 impact 状态机一并删除——它们描述的是一个不再存在的校验器；把它们留在规范里，就是让作者按一份没有检查者的格式书写。
+
+### 仍然生效的要求
+
+1. **proposal 必须含 `## 决策澄清` 章节**（canonical 章节清单的一员，change-lint L0 强制）。章节缺失或重复即违规。
+2. 章节内容用于**记录本次变更中由人做出的关键取舍**：问题是什么、选了什么、为什么、否决了什么。形式不受机器约束——列表、表格或 YAML 均可，历史提案沿用的 `openlogos/clarification@1` YAML 形态可继续使用，但**不再被解析**。
+3. 事实优先仍是写作纪律：可从仓库、配置、规格、运行环境查得的事实**不得**反问用户；决策澄清记录的是「仓库答不出、必须由人拍板」的那部分。
+4. `plan-exit` 仍是唯一完整方案批准门；决策澄清写没写、写成什么样，都**不构成**批准，也不改变任何 `proposal_step` 派生。
+
+### 已删除的部分（不再执行，历史提案中的残留写法无需回改）
+
+| 曾经的规定 | 现状 |
+|---|---|
+| `status: pending\|complete` 完成状态机与 fail-closed 判定 | 已删（无解析器求值；完成判定见 `spec/flow-spec.md` 的 plan 完成谓词，其中不含澄清项） |
+| `C\d{2}` 形态的 decision ID 正则、category 九值枚举、source 三值枚举 | 已删（无校验器） |
+| `impacts.*.status` 五维状态机与「高影响必问」触发表 | 已删（同上；判断由 change-writer 与人共同承担，不再是机器谓词） |
+| `plan_state.clarification` 的 status/next 输出 | 已删（契约不再发射该字段） |
+
+**这条收缩本身是一条判据**：规范中的每一条形式约束都应当有检查者；没有检查者的形式约束只会在起草阶段消耗作者、而拦不下任何真实缺陷——`authority-closure` 因同一理由在 0.15.0 被整体废止。
+
+## 切片感知 verify 生命周期与恢复门
+
+### 状态推进
+
+多切片代码提案在 `SPEC_MERGED` 后由 slice-planner 同时产出 `[code]` 与 `TEST_SLICE_MANIFEST.json`。slice-exit 批准后进入 implement；此后每个切片必须先获得有效 PASS checkpoint，最后再通过 final 全量 verify。
+
+```text
+plan-slices
+  → slice-exit
+  → code(slice N)
+  → verify(slice-checkpoint N)
+     ├─ PASS → code(slice N+1)
+     ├─ FAIL → repair(slice N)
+     └─ manifest recovery → plan-slices(recover)
+  → verify(final)
+     ├─ PASS → deliver
+     └─ FAIL → repair(final regression)
+```
+
+checkpoint PASS 只追加 `SLICE_CHECKPOINTS.jsonl`，不得写最终 `VERIFY_PASS`。final 仅在所有 manifest slice 均有匹配当前 manifest 哈希的 PASS checkpoint、且 `[code]` section 完成时可进入；final PASS 才满足 verify Gate。
+
+### 失败与预算
+
+- `slice-checkpoint` 的 eligible 测试真实失败：写 `VERIFY_FAIL` 与带 `attempted_slice_id` 的 `LOOP_ITERS`，repair 锁定同一切片。
+- checkpoint PASS：属于正常推进，不消耗 repair budget。
+- 后续切片 pending：不是结果也不是失败，不写 marker/loop 行。
+- manifest 缺失、已知版本非法或 fingerprint 漂移：属于可恢复规划状态，不写 `VERIFY_FAIL`、不追加 `LOOP_ITERS`。
+- final FAIL：按全量回归失败处理，pending 必须为空。
+
+### 恢复前沿
+
+当多切片 implement 提案没有有效 manifest 时，status/next/verify 必须回到 `plan-slices` 恢复前沿，并输出稳定 reason 与 slice-planner dispatch。恢复只允许重建 manifest，不重置 `SPEC_MERGED`、`SLICES_APPROVED`、`[code]` 文本/checkbox 或有效 checkpoint。完成后重新调用 canonical 状态派生，禁止宿主直接跳到 code/verify。
+
+### 授权与兼容
+
+- 恢复动作是既有实现流程内的可重复内容生产，不新增人类 gate；slice-exit、verify、deploy、smoke、archive、push 的既有授权语义不变。
+- 单切片、docs-only 和已越过 final 的 legacy 提案不因缺 manifest 回退。
+- 仍处于多切片 implement 的 legacy 提案必须恢复，禁止临时解析 tasks 形成私有事实。
+- `gate:implement:loop-exhausted` 仍是任何模式不可自动绕过的硬红线；manifest 恢复预算与其独立。
+
+## 场景 CREATE 结构完整性生产门与合并纵深防御
+
+### 生产端完成条件
+
+当 `baseline_closure` 含 `category: scenario, mode: CREATE` 目标时，change-writer 必须按 `spec/baseline-closure.md` §17 生成 canonical 文档。文件在场、task 已勾选或 Agent 自报 done 均不是完成证据；全部 Delta 产出后必须在项目根执行：
+
+```bash
+openlogos change-lint --slug <active-change> --format json
+```
+
+只有命令 exit 0 且 JSON `data.pass=true` 时，write-delta producer 才可报告规格完成。交付报告应携 slug、实际执行时间、exit code 与 `pass:true` 摘要；该摘要是本轮执行收据，不新增 marker 或生命周期事实源。exit 2 时必须消费 `violations[].code/path/message/fix_hint`，只修当前提案内被指向的 Delta，重跑直至通过；exit 1 先修复命令环境。
+
+### canonical 与兼容边界
+
+- producer 新写入固定使用 `## 步骤说明`，且步骤为至少 3 个非空有序列表项。
+- evaluator 兼容 `步骤说明`、`主路径步骤`、`主路径`、`主流程`、`正常流程`、`main path` 的精确标题；别名只用于读取，不授权 producer 继续生成多种格式。
+- 兼容不 grandfather 旧假阳性：只有散文、围栏、注释或样例关键词的文档必须失败。
+- Mermaid、异常/边界、追溯按结构和非空内容验收，不以全文字符串命中替代。
+
+### merge 纵深防御与副作用边界
+
+`openlogos merge <slug>` 继续在任何 `MERGE_PROMPT.md`、资源或状态写入前运行共享 closure evaluator。lint 通过不允许 merge 跳过重检；lint 后 Delta 漂移、目标模式漂移或 parser 异常均 fail-closed。
+
+scenario CREATE 不完整时：
+
+1. merge 返回非零并展示同源 `create_target_incomplete` 诊断；
+2. 不生成或覆盖 `MERGE_PROMPT.md`；
+3. 不修改 `logos/resources/**`、guard、scenario/decision counter、resource index、`SPEC_MERGED` 或其它 marker；
+4. 修复后重新运行 change-lint，并在人工模式下重新到独立 spec-exit/merge 授权点。
+
+### 跨仓边界
+
+本仓修复 CLI evaluator、producer Skill 与规格/测试合同。RunLogos 正常 `write-delta` WorkUnit 的 lint barrier、重派预算、stderr/violation 展示和 triage 分类由独立 companion change `enforce-write-delta-lint-barrier` 承担；不得在本案中声称该宿主能力已经完成。merge 纵深预检无论宿主是否适配都必须保留。
+
+### 单一事实源
+
+launched change 在 plan 前沿的 proposal/tasks 完成语义由 `PlanPackageEvaluator` 唯一持有。CLI scaffold、change-writer、change-lint、status、next 与 flow derive 必须消费同一 locale section registry 和 evaluation；禁止通过自然语言完成声明、checkbox 总数、文件存在或第二套正则旁路。
+
+### proposal canonical 章节
+
+registry 使用稳定语义 ID：`reason`、`type`、`scope`、`deployment`、`summary`、`clarification`。locale 只决定显示标题；必需章节必须唯一、非空、无模板占位，字段必须满足各自共享 evaluator。额外详细章节可存在，但不能替代 canonical 章节。
+
+### tasks 完成分层
+
+- `tasks_plan_filled`：plan 阶段 `[delta]/[deploy]` 已脱模板并与 proposal 一致。
+- `tasks_code_required`：本 change 在 spec-complete 后需要切片与代码实现。
+- `tasks_code_slices_filled`：merge 后 slice-planner 已写真实 `[code]` 切片。
+
+空 `[code]` 在 plan 阶段是代码必需锚点；plan 阶段任何 `[code]` checkbox 均非法。三个状态不得压缩回一个 `tasks_filled`。
+
+### L0 与等价关系
+
+change-lint 在 L1～L9 前运行 L0。无 Delta、无 `PLAN_APPROVED`、无更高优先级错误的 plan 前沿必须满足：
+
+```text
+change-lint.pass
+  ⇔ plan_package.ready
+  ⇔ status.plan_state.plan_ready
+  ⇔ next.proposal_step == ready-to-delta
+```
+
+L0 失败 exit 2；文件不可读、解析器故障等操作错误 exit 1。所有消费者共享 issue code/path/section/actual/expected/fix_hint 与稳定排序。
+
+### producer 交付纪律
+
+change-writer 必须填充 CLI scaffold、写后从磁盘读回、运行 change-lint 与 next 双检查。任一未收敛时不得报告 plan 完成。该检查不写 marker，不替代 plan-exit 批准，也不授权 Delta、merge、部署或发布。
+
+### 历史与跨仓边界
+
+已存在 `PLAN_APPROVED|SPEC_MERGED|MERGED|VERIFY_PASS` 的历史提案不因新模板规则回退；writing 中旧提案只诊断、不由只读命令自动修复。OpenLogos 在 dispatch 中声明 completion；RunLogos 独立执行并管理 WorkUnit，禁止复制 Markdown parser 或 proposal_step 规则。
+
+### merge-apply 的历史测试 ID 收敛
+
+当测试规格的 before 基线含历史重复 ID、而 prepared after 已收敛为唯一结构化定义时，test change set 构造必须允许 before 以同 ID 多候选参与语义匹配：after 定义匹配任一候选即视为该 ID 未变；after 不含该 ID 时只记录一次 removed；重编号后的新 ID进入 changed。before 中列数不一致的历史歧义行跳过候选匹配，对应 after 定义保守计入 changed；after 侧仍严格拒绝任何重复或歧义表行。
+
+该规则是单向兼容门，不是重复 ID 豁免：只有 after 全局唯一、表结构明确、UTF-8 合法且事务全部预检通过才可 apply。任何 after 重复或歧义继续在首写前失败，正式 targets、metadata 与 `SPEC_MERGED` 全部保持旧态。
+
+## Completed receipt 驱动的精确规格提交
+
+
+### 成功谓词
+
+规格 merge 成功必须同时满足 transaction=completed、receipt identity 合法、payload final hashes 合法、外层 artifact hashes 合法、两层 path 并集精确等于 commit_paths，并且 `SPEC_MERGED` 绑定同一 transaction/receipt identity。
+
+### Git 提交
+
+自动规格提交只能执行固定 argv 的 `git add -- <commit_paths...>`，随后核对 staged path 精确相等。不得扫描目录、读取内部 receipt、把 unrelated dirty 加入提交或根据 Delta/tasks 重算提交集合。
+
+### Abort 与恢复
+
+failed/aborted 不产生规格提交；普通 fatal failed 无自动动作；recovery_required 只允许 recover。response-lost 必须先 status/recover，同一 completed receipt 只能形成一次规格提交。
+
+### Stacked change
+
+不同 worktree/slug 分别拥有 guard、marker、verify、deploy、smoke 与 archive 证据。旧 SMOKE-core-150 和 follow-up SMOKE-core-151+ 不得互相顶替。
+
+## 生命周期命令前置链条语义（lifecycle-failclosed-reconciliation）
+
+> 本节把「变更工作流」步骤 11、12 里已隐含的顺序依赖（`SMOKE_PASS` 后才能归档、`DEPLOY_DONE` 存在时才运行 smoke）升格为**命令自身的 fail-closed 前置校验**。20260907 事故证明：只把顺序写在流程说明里，而命令端不设防，一次漏跑 `openlogos deploy-done` 就会让 smoke 照常写 `SMOKE_PASS`、archive 照常归档，缺口被固化进 audit-only 归档记录。
+
+### 不变量
+
+**生命周期命令必须 fail-closed 校验其上游事实标记；`status` / `next` 检测到矛盾事实时必须显式输出对账建议，不得沉默停滞。**（决策记录 D12）
+
+### `openlogos smoke` 前置链条
+
+执行 `smoke.command` 之前校验，顺序 ①→②→③→④，命中即停：
+
+1. 提案声明需要 smoke（`smoke_required=true`）；
+2. 提案部署决策无冲突；
+3. `DEPLOY_DONE` 存在；
+4. `tasks.md` 的 `[deploy]` section 已全部勾选。
+
+不满足即以稳定错误码拒绝（`SMOKE_NOT_REQUIRED` / `SMOKE_DEPLOY_DECISION_CONFLICT` / `SMOKE_DEPLOY_NOT_DONE` / `SMOKE_DEPLOY_TASKS_INCOMPLETE`，见 `spec/cli-json-output.md` §5.5、§6.3），**零副作用**：不执行 `smoke.command`、不写 `SMOKE_PASS` / `SMOKE_FAIL`、不生成报告、不追加结果 JSONL。
+
+### `openlogos archive` 前置链条
+
+移动提案目录之前校验，顺序 ①→②→③，命中即停：
+
+| # | 条件 | 适用范围 | 错误码 |
+|---|---|---|---|
+| ① | `VERIFY_PASS` 存在且 `VERIFY_FAIL` 不存在 | 全部提案 | `ARCHIVE_VERIFY_NOT_PASSED` |
+| ② | `DEPLOY_DONE` 存在 | 仅 `deployment_required=true` | `ARCHIVE_DEPLOY_NOT_DONE` |
+| ③ | `SMOKE_PASS` 存在且 `SMOKE_FAIL` 不存在 | 仅 `deployment_required=true` 且 `smoke_required=true` | `ARCHIVE_SMOKE_NOT_PASSED` |
+
+`deployment_required` / `smoke_required` 按「提案级部署决策优先级」解析（活跃提案 `proposal.md` 优先，`tasks.md` `[deploy]` section 为结构化证据，模块级默认值不得覆盖提案的明确决策）。
+
+不满足即拒绝，**零副作用**：不移动提案目录、不删除 `logos/.openlogos-guard`、不建立 Windows 归档握手请求。校验位于握手之前——顺序为「链条校验 → 握手 → rename」。`openlogos archive` 保持纯文本命令，以稳定错误码文本写 stderr 并非零退出。
+
+### 唯一 writer 与禁止 auto-heal
+
+`DEPLOY_DONE` 的唯一 writer 仍是 `openlogos deploy-done`。任何消费者——`smoke`、`archive`、`status`、`next`——都**不得写入或补写**该 marker，也不得由「smoke 已过」反推「部署已完成」。消费者只能拒绝（fail-closed）或点名（对账投影）。
+
+被否备选「smoke 检测到缺标时自动补写 `DEPLOY_DONE`」的否决理由：它绕过半自动模式下 `deploy-done` 的人类确认点语义，并把「人确认过部署完成」与「机器推断部署完成」混为同一事实，掩盖遗漏本身（详见决策记录 D12）。
+
+### 矛盾事实的显式对账
+
+`status` / `next`（及 `watch`）在派生停在 `ready-to-deploy` 且存在矛盾下游证据（`SMOKE_PASS` / `SMOKE_FAIL` 在场，或 `[deploy]` 已全勾）时，必须输出只读投影 `state_inconsistency`（`kind` / `evidence` / `remediation`，契约见 `spec/cli-json-output.md` §3.17），`next` 的人读引导同步给出补救命令 `openlogos deploy-done`。投影不落盘、不缓存、不改 `proposal_step` 派生、不写任何 marker；一致状态下字段不出现。
+
+它治愈两类状态：本次事故遗留的历史僵死提案，以及任何未来因旁路产生的缺口。
+
+### 两档模式语义
+
+前置链条校验只关命令自身的上游事实，**不新增人类确认点**：
+
+- **半自动 / 手动**：`smoke` / `archive` 仍各自停在人类确认点等明确授权；获授权后前置链条照常校验。
+- **全自动 `--auto`**：standing 授权放行的是「运行该命令这个动作」，**不跳过前置链条**；链条不满足时同样 fail-closed 拒绝，`GATE_AUTO_PASSED` 审计行不构成对缺口状态的放行依据。这与「自动放行只发生在代码已绿之后」的既有前提一致——链条未闭合时，本就不存在可盖章的成果。
+- **硬红线不变**：`gate:implement:loop-exhausted` 在任何模式下仍照常阻塞。
+
+## merge 直接合并与完成谓词（规范性）
+
+`openlogos merge <slug>` 是规格合并的**唯一写入口**，一次调用完成：
+
+1. 解析 `[delta]` 目标集并做 P==T==D 与路径合法性校验（校验全部前置于写入）；
+2. 逐 canonical target 经合并引擎合成最终字节，引擎内含章节锚唯一定位与物质结果复验；
+3. 全部目标经原子落盘原语一次提交，失败整批回滚；
+4. 末步写 `SPEC_MERGED`（含 `test_change_set` 与逐目标合并基线 `merge_baseline`）。
+
+**完成谓词**：`SPEC_MERGED` 在场即 spec-complete。不存在事务相位、receipt 或第二事实源参与该判定——**任何审计产物都不得出现在流程分支的条件里**。
+
+**失败与重来**：合并失败即整批回滚，主文档保持合并前字节，修正 delta 后重跑 `merge`。不提供 reopen / abort / recover——不存在需要出路的中间态。
+
+### 已合并后发现 delta 有误（merge-amend-merged-change）
+
+已合并、尚未归档的提案发现规格写错时，唯一正式路径是**增量修正**：
+
+1. 直接修正本提案 `deltas/` 下的文件（改写、新增或删除 delta），运行 `openlogos change-lint`——修正待应用时 lint 以合并基线为 before 执行与首次合并同等的依赖前态检查，与 merge 同判；
+2. 获用户明确授权后重跑 `openlogos merge <slug>`（半自动下 merge 仍是人类确认点；`--auto` 下属 standing 授权范围）。命令比较 delta 摘要：未变则幂等返回 `already-merged`；有变化则从合并基线重新合成、整体重算 `test_change_set`、一次原子落盘并在 `SPEC_MERGED` 追加修正记录；
+3. 增量修正成功会清除 `VERIFY_PASS` / `VERIFY_FAIL` / `DEPLOY_DONE` / `SMOKE_PASS` / `SMOKE_FAIL`：须按 `[code]` 实现与新规格对齐后**重新 verify**；需要部署的提案重新部署与 smoke，再进入 archive。`[code]` 段不被重置；
+4. merge 完成后照常由 AI 自动 commit 规格文档。
+
+**禁止的旧做法**：不再使用 `git checkout logos/resources/` 回到合并前（规格合并后通常已被提交，该命令恢复不了任何内容）；不得手工删除 `SPEC_MERGED` 再合并（属于手工改流程事实，且会把测试变更集缩小为只剩新一轮）。
+
+**增量修正拒绝时的手工处理**（均在写入前拒绝、零副作用）：
+
+| 拒绝原因 | 处理方式 |
+|---|---|
+| 旧标记无合并基线（本版之前合并，`MERGE_AMEND_BASELINE_MISSING`） | 不从 git 历史回推；保持本提案现状，另立新提案承载修正 |
+| 合并基线不可读或不匹配（`MERGE_AMEND_BASELINE_UNREADABLE`） | 另立新提案承载修正 |
+| 主文档已被其他提案或手工修改（`MERGE_AMEND_DRIFT`） | 不做三方合并；由人核对漂移文件后另立新提案 |
+| 撤回首次 CREATE 新建的目标（`MERGE_AMEND_CREATE_WITHDRAW`） | 恢复本提案对应 delta 以通过修正，或另立新提案删除该文件及其 `resource_index` 条目 |
+| 原型资产变化（`MERGE_AMEND_PROTOTYPE_UNSUPPORTED`） | 原型走 `commitVerifiedPrototypes` 与 provenance 校验，另立新提案 |
+
+已归档提案不支持增量修正，归档后的修改照旧另立新提案。宿主可读 `openlogos status --format json` 的 `modules[].active_change.spec_amend`（`pending` / `blocked_reason`）提前判断，契约见 `spec/cli-json-output.md`。
+
+## Delta RENAMED op：章节标题更名
+
+### 为什么需要第五个 op
+
+现有四个 op 都不能改写标题行：`ADDED` 顶层块**恒发 level 2**（无法产出 H1）、`MODIFIED` 的标题行取自被锚定章节的原标题（正文可换、标题不可换）、`REMOVED` 是整节删除、`REMOVED-ITEMS` 是纯声明。于是「把文档标题从已删机制名改成现名」这类变更在方法论内无路可走，只能越出 delta 手工改——那会让该次变更不可追溯，且限制反复复发。`RENAMED` 一次性解锁这一整类变更。
+
+### 语法
+
+```markdown
+## RENAMED — <章节锚>
+<新标题文本>
+```
+
+- **锚**：与其它 op 同一套定位语义——支持标题路径锚（`父级标题 > 目标标题`）与序数锚（`<标题> [n]`）；命中 0 或多个一律 fail-closed（`delta_section_anchor_unresolvable`）。
+- **正文**：块正文**恰好一行**，即新标题文本（不含 `#` 前缀）。多行、空正文、或正文以 `#` 开头一律拒绝。
+- **适用层级**：H1–H6，**含文档级 H1**——这是它与其它 op 的关键差别。
+
+### 语义（只做一件事）
+
+| 维度 | `RENAMED` 的行为 |
+|---|---|
+| 标题文本 | 替换为块正文给出的新文本 |
+| 标题层级 | **不变**（沿用原标题行的 `#` 数量；H1 更名后仍是 H1） |
+| 章节正文 | **逐字节不变**（`RENAMED` 块不携带正文内容，故不可能顺手改写） |
+| 章节位置 | **不变**（区别于 `REMOVED` + `ADDED`：后者会把该节删掉再追加到文末并降级为 H2） |
+| 子章节 | 不变（层级与内容均不受影响） |
+
+### 与既有 op 的组合
+
+- 同一 delta 内可与其它 op 共存，按块顺序依次作用于演进中的文档；
+- 更名后若还要改该节正文，用**新标题**作为后续 `MODIFIED` 的锚（顺序敏感，与既有多块语义一致）；
+- 对同一章节的 `REMOVED` 与 `RENAMED` 是冲突：第二个块必然锚解析失败，由既有 fail-closed 路径拒绝，不新增冲突规则；
+- 新标题若与文档中既有标题重复，会破坏后续章节可寻址性——由 `openlogos lint-specs` 的 `duplicate_heading` 在人读侧暴露（该项不参与任何门）。
+
+### 与条目守恒（L8）的关系
+
+`RENAMED` 不增删任何结构化条目（测试表 ID 行、场景表行、编号小节），故**不产生**守恒判定；它也不构成「隐式删除」的载体——正文不在块内，想删也删不掉。这正是把更名做成独立 op、而不是放宽 `MODIFIED` 的理由：op 的粒度与语义对齐，delta 文本才能自证「这节是新的、改了正文、还是只换了名字」。
+
+## Delta op 的标题保真规则
+
+本节适用于**全部**产出章节标题的 op（当前为 `ADDED` 与 `RENAMED`）。
+
+### 规则
+
+> **锚的规范化形式只用于定位，产出的标题一律取原始形式。**
+
+- **定位**：章节锚经 `stripInlineCode` 规范化后匹配——`` `X` `` 与 `X` 等价，这条不变；
+- **产出**：`ADDED` 发射的新章节标题取**原始锚文本**（`rawAnchor`），行内代码、反引号与全部排版标记原样保留；`RENAMED` 的新标题取块正文原文，同样不经规范化；
+- **对账**：合并后必须校验「delta 里写下的标题 == 落盘的标题」，且该校验**不得复用与产出同一条规范化管道**——否则两边用同一把尺子量，校验恒真。
+
+### 为什么立这条规则
+
+`stripInlineCode` 是**整段删除**行内代码，不是脱掉反引号。`ADDED` 曾用剥离后的锚做标题，于是标题里的 `` `x` `` 段落在落盘时消失，且既有复验（「锚在 final 唯一命中」）对此天然盲——锚与落盘标题被同一函数剥离，必然相等。
+
+两处真实损坏：本文件的「Delta \`RENAMED\` op」与 `spec/cli-json-output.md` 的「3.17 \`state_inconsistency\` 对账投影字段」，分别发生于 2026-09-11 与 2026-09-07，两次都无人发觉。上位原则见架构 §五十一「规范化形式不得充当产出内容」。
+
+### 损坏的不可逆性
+
+被吞内容**无法从落盘文本反推**——信息已丢失，只能回溯归档 delta 取原文。因此这条规则的价值不在修复，在**拦截**：新增实例由「写下的 == 落盘的」对账当场拦下，不再进入主文档。
